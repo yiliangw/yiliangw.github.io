@@ -1,0 +1,206 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>24. GVE poll mode driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="25. HINIC Poll Mode Driver" href="hinic.html" />
+    <link rel="prev" title="23. FM10K Poll Mode Driver" href="fm10k.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="gve-poll-mode-driver">
+<h1><span class="section-number">24. </span>GVE poll mode driver</h1>
+<p>The GVE PMD (<strong>librte_net_gve</strong>) provides poll mode driver support for
+Google Virtual Ethernet device (also called as gVNIC).</p>
+<p>gVNIC is the standard virtual Ethernet interface on Google Cloud Platform (GCP),
+which is one of the multiple virtual interfaces from those leading CSP
+customers in the world.</p>
+<p>Please refer to <a class="reference external" href="https://cloud.google.com/compute/docs/networking/using-gvnic">https://cloud.google.com/compute/docs/networking/using-gvnic</a>
+for the device description.</p>
+<p>Having a well maintained/optimized gve PMD on DPDK community can help those
+cloud instance consumers with better experience of performance, maintenance
+who wants to run their own VNFs on GCP.</p>
+<p>The base code is under MIT license and based on GVE kernel driver v1.3.0.
+GVE base code files are:</p>
+<ul class="simple">
+<li><p>gve_adminq.h</p></li>
+<li><p>gve_adminq.c</p></li>
+<li><p>gve_desc.h</p></li>
+<li><p>gve_desc_dqo.h</p></li>
+<li><p>gve_register.h</p></li>
+<li><p>gve.h</p></li>
+</ul>
+<p>Please refer to <a class="reference external" href="https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/tree/v1.3.0/google/gve">https://github.com/GoogleCloudPlatform/compute-virtual-ethernet-linux/tree/v1.3.0/google/gve</a>
+to find the original base code.</p>
+<p>GVE has 3 queue formats:</p>
+<ul class="simple">
+<li><p>GQI_QPL - GQI with queue page list</p></li>
+<li><p>GQI_RDA - GQI with raw DMA addressing</p></li>
+<li><p>DQO_RDA - DQO with raw DMA addressing</p></li>
+</ul>
+<p>GQI_QPL queue format is queue page list mode.
+Driver needs to allocate memory and register this memory
+as a Queue Page List (QPL) in hardware (Google Hypervisor/GVE Backend) first.
+Each queue has its own QPL.
+Then Tx needs to copy packets to QPL memory
+and put this packet’s offset in the QPL memory into hardware descriptors
+so that hardware can get the packets data.
+And Rx needs to read descriptors of offset in QPL to get QPL address
+and copy packets from the address to get real packets data.</p>
+<p>GQI_RDA queue format works like usual NICs
+that driver can put packets’ physical address into hardware descriptors.</p>
+<p>DQO_RDA queue format has submission and completion queue pair
+for each Tx/Rx queue.
+And similar as GQI_RDA,
+driver can put packets’ physical address into hardware descriptors.</p>
+<p>Please refer to <a class="reference external" href="https://www.kernel.org/doc/html/latest/networking/device_drivers/ethernet/google/gve.html">https://www.kernel.org/doc/html/latest/networking/device_drivers/ethernet/google/gve.html</a>
+to get more information about GVE queue formats.</p>
+<section id="features-and-limitations">
+<h2><span class="section-number">24.1. </span>Features and Limitations</h2>
+<p>In this release, the GVE PMD provides the basic functionality
+of packet reception and transmission.
+Supported features of the GVE PMD are:</p>
+<ul class="simple">
+<li><p>Multiple queues for Tx and Rx</p></li>
+<li><p>TSO offload</p></li>
+<li><p>Link state information</p></li>
+<li><p>Tx multi-segments (Scatter Tx)</p></li>
+<li><p>Tx UDP/TCP/SCTP Checksum</p></li>
+</ul>
+<p>Currently, only GQI_QPL and GQI_RDA queue format are supported in PMD.
+Jumbo Frame is not supported in PMD for now.
+It’ll be added in a future DPDK release.
+Also, only GQI_QPL queue format is in use on GCP
+since GQI_RDA hasn’t been released in production.</p>
+<p>Currently, setting MTU with value larger than 1460 is not supported.</p>
+<p>Currently, only “RSS hash” is force enabled
+so that the backend hardware device calculated hash values
+could be shared with applications.
+But for RSS, there is no such API to config RSS hash function or RETA table.
+So, limited RSS is supported only with default config/setting.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="fm10k.html" title="previous chapter"><span class="section-number">23. </span>FM10K Poll Mode Driver</a></li>
+      <li>Next: <a href="hinic.html" title="next chapter"><span class="section-number">25. </span>HINIC Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/gve.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

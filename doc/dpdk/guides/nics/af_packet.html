@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. AF_PACKET Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. AF_XDP Poll Mode Driver" href="af_xdp.html" />
+    <link rel="prev" title="3. Compiling and testing a PMD for a NIC" href="build_and_test.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="af-packet-poll-mode-driver">
+<h1><span class="section-number">4. </span>AF_PACKET Poll Mode Driver</h1>
+<p>The AF_PACKET socket in Linux allows an application to receive and send raw
+packets. This Linux-specific PMD binds to an AF_PACKET socket and allows
+a DPDK application to send and receive raw packets through the Kernel.</p>
+<p>In order to improve Rx and Tx performance this implementation makes use of
+PACKET_MMAP, which provides a mmapped ring buffer, shared between user space
+and kernel, that’s used to send and receive packets. This helps reducing system
+calls and the copies needed between user space and Kernel.</p>
+<p>The PACKET_FANOUT_HASH behavior of AF_PACKET is used for frame reception.</p>
+<section id="options-and-inherent-limitations">
+<h2><span class="section-number">4.1. </span>Options and inherent limitations</h2>
+<p>The following options can be provided to set up an af_packet port in DPDK.
+Some of these, in turn, will be used to configure the PACKET_MMAP settings.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">iface</span></code> - name of the Kernel interface to attach to (required);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qpairs</span></code> - number of Rx and Tx queues (optional, default 1);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">qdisc_bypass</span></code> - set PACKET_QDISC_BYPASS option in AF_PACKET (optional,
+disabled by default);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">blocksz</span></code> - PACKET_MMAP block size (optional, default 4096);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">framesz</span></code> - PACKET_MMAP frame size (optional, default 2048B; Note: multiple
+of 16B);</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">framecnt</span></code> - PACKET_MMAP frame count (optional, default 512).</p></li>
+</ul>
+<p>Because this implementation is based on PACKET_MMAP, and PACKET_MMAP has its
+own pre-requisites, it should be noted that the inner workings of PACKET_MMAP
+should be carefully considered before modifying some of these options (namely,
+<code class="docutils literal notranslate"><span class="pre">blocksz</span></code>, <code class="docutils literal notranslate"><span class="pre">framesz</span></code> and <code class="docutils literal notranslate"><span class="pre">framecnt</span></code> above).</p>
+<p>As an example, if one changes <code class="docutils literal notranslate"><span class="pre">framesz</span></code> to be 1024B, it is expected that
+<code class="docutils literal notranslate"><span class="pre">blocksz</span></code> is set to at least 1024B as well (although 2048B in this case would
+allow two “frames” per “block”).</p>
+<p>This restriction happens because PACKET_MMAP expects each single “frame” to fit
+inside of a “block”. And although multiple “frames” can fit inside of a single
+“block”, a “frame” may not span across two “blocks”.</p>
+<p>For the full details behind PACKET_MMAP’s structures and settings, consider
+reading the <a class="reference external" href="https://www.kernel.org/doc/Documentation/networking/packet_mmap.txt">PACKET_MMAP documentation in the Kernel</a>.</p>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">4.2. </span>Prerequisites</h2>
+<p>This is a Linux-specific PMD, thus the following prerequisites apply:</p>
+<ul class="simple">
+<li><p>A Linux Kernel;</p></li>
+<li><p>A Kernel bound interface to attach to (e.g. a tap interface).</p></li>
+</ul>
+</section>
+<section id="set-up-an-af-packet-interface">
+<h2><span class="section-number">4.3. </span>Set up an af_packet interface</h2>
+<p>The following example will set up an af_packet interface in DPDK with the
+default options described above (blocksz=4096B, framesz=2048B and
+framecnt=512):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev=eth_af_packet0,iface=tap0,blocksz=4096,framesz=2048,framecnt=512,qpairs=1,qdisc_bypass=0</span>
+</pre></div>
+</div>
+</section>
+<section id="features-and-limitations">
+<h2><span class="section-number">4.4. </span>Features and Limitations</h2>
+<p>The PMD will re-insert the VLAN tag transparently to the packet if the kernel
+strips it, as long as the <code class="docutils literal notranslate"><span class="pre">RTE_ETH_RX_OFFLOAD_VLAN_STRIP</span></code> is not enabled by the
+application.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="build_and_test.html" title="previous chapter"><span class="section-number">3. </span>Compiling and testing a PMD for a NIC</a></li>
+      <li>Next: <a href="af_xdp.html" title="next chapter"><span class="section-number">5. </span>AF_XDP Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/af_packet.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,290 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. Intel(R) ACC100 and ACC101 5G/4G FEC Poll Mode Drivers &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Intel® vRAN Boost Poll Mode Driver (PMD)" href="vrb1.html" />
+    <link rel="prev" title="5. Intel(R) FPGA 5GNR FEC Poll Mode Driver" href="fpga_5gnr_fec.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="intel-r-acc100-and-acc101-5g-4g-fec-poll-mode-drivers">
+<h1><span class="section-number">6. </span>Intel(R) ACC100 and ACC101 5G/4G FEC Poll Mode Drivers</h1>
+<p>The BBDEV ACC100 5G/4G FEC poll mode driver (PMD) supports an
+implementation of a VRAN FEC wireless acceleration function.
+This device is also known as Mount Bryce.
+The BBDEV ACC101, also known as Mount Cirrus, is a derivative device from Mount Bryce
+with functional and capacity improvements but still with the same exposed BBDEV capabilities.</p>
+<section id="features">
+<h2><span class="section-number">6.1. </span>Features</h2>
+<p>ACC100 and ACC101 5G/4G FEC PMDs support the following features:</p>
+<ul class="simple">
+<li><p>LDPC Encode in the DL (5GNR)</p></li>
+<li><p>LDPC Decode in the UL (5GNR)</p></li>
+<li><p>Turbo Encode in the DL (4G)</p></li>
+<li><p>Turbo Decode in the UL (4G)</p></li>
+<li><p>16 VFs per PF (physical device)</p></li>
+<li><p>Maximum of 128 queues per VF</p></li>
+<li><p>PCIe Gen-3 x16 Interface</p></li>
+<li><p>MSI</p></li>
+<li><p>SR-IOV</p></li>
+</ul>
+<p>ACC100 and ACC101 5G/4G FEC PMDs support the following BBDEV capabilities:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>For the LDPC encode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24B_ATTACH</span></code> :  set to attach CRC24B to CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_RATE_MATCH</span></code> :  if set then do not do Rate Match bypass</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_INTERLEAVER_BYPASS</span></code> : if set then bypass interleaver</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For the LDPC decode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_TYPE_24B_CHECK</span></code> :  check CRC24B from CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_ITERATION_STOP_ENABLE</span></code> :  disable early termination</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_TYPE_24B_DROP</span></code> :  drops CRC24B bits appended while decoding</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_HQ_COMBINE_IN_ENABLE</span></code> :  provides an input for HARQ combining</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_HQ_COMBINE_OUT_ENABLE</span></code> :  provides an input for HARQ combining</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_IN_ENABLE</span></code> :  HARQ memory input is internal</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_OUT_ENABLE</span></code> :  HARQ memory output is internal</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_LOOPBACK</span></code> :  loopback data to/from HARQ memory</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_FILLERS</span></code> :  HARQ memory includes the fillers bits</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_DEC_SCATTER_GATHER</span></code> :  supports scatter-gather for input/output data</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_HARQ_6BIT_COMPRESSION</span></code> :  supports compression of the HARQ input/output</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_LLR_COMPRESSION</span></code> :  supports LLR input compression</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For the turbo encode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_24B_ATTACH</span></code> :  set to attach CRC24B to CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_RATE_MATCH</span></code> :  if set then do not do Rate Match bypass</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_ENC_INTERRUPTS</span></code> :  set for encoder dequeue interrupts</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_RV_INDEX_BYPASS</span></code> :  set to bypass RV index</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_ENC_SCATTER_GATHER</span></code> :  supports scatter-gather for input/output data</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For the turbo decode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_TYPE_24B</span></code> :  check CRC24B from CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_SUBBLOCK_DEINTERLEAVE</span></code> :  perform subblock de-interleave</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_INTERRUPTS</span></code> :  set for decoder dequeue interrupts</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_NEG_LLR_1_BIT_IN</span></code> :  set if negative LLR encoder i/p is supported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_POS_LLR_1_BIT_IN</span></code> :  set if positive LLR encoder i/p is supported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_TB_CRC_24B_KEEP</span></code> :  keep CRC24B bits appended while decoding</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_CRC_24B_DROP</span></code> : option to drop the code block CRC after decoding</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_EARLY_TERMINATION</span></code> :  set early termination feature</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_SCATTER_GATHER</span></code> :  supports scatter-gather for input/output data</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_HALF_ITERATION_EVEN</span></code> :  set half iteration granularity</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>PMD-specific build flags:
+The ACC100 PMD includes some optional build flags which may be used for troubleshooting.
+Recommended build configuration is for these to be kept as default.
+- <code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_BBDEV_SKIP_VALIDATE</span></code>: option to skip API input validation.
+Recommended value is to keep the validation enabled by default
+as a protection for negative scenarios at a cost of some cycles
+spent to enforce these checks.
+- <code class="docutils literal notranslate"><span class="pre">ACC100_EXT_MEM</span></code>: default option with memory external to CPU on the PCIe card DDR itself.
+Alternative build option will use CPU memory (not recommended).</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">6.2. </span>Installation</h2>
+<p>Section 3 of the DPDK manual provides instructions on installing and compiling DPDK.</p>
+<p>DPDK requires hugepages to be configured as detailed in section 2 of the DPDK manual.
+The bbdev test application has been tested with a configuration 40 x 1GB hugepages. The
+hugepage configuration of a server may be examined using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">grep Huge* /proc/meminfo</span>
+</pre></div>
+</div>
+</section>
+<section id="initialization">
+<h2><span class="section-number">6.3. </span>Initialization</h2>
+<p>When the device first powers up, its PCI Physical Functions (PF) can be listed through these
+commands for ACC100 (device id <code class="docutils literal notranslate"><span class="pre">0d5c</span></code>) and ACC101 (device id <code class="docutils literal notranslate"><span class="pre">57c4</span></code>) respectively:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo lspci -vd8086:0d5c</span>
+<span class="go">sudo lspci -vd8086:57c4</span>
+</pre></div>
+</div>
+<p>The physical and virtual functions are compatible with Linux UIO drivers:
+<code class="docutils literal notranslate"><span class="pre">vfio_pci</span></code> and <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code>. However, in order to work the 5G/4G
+FEC device first needs to be bound to one of these linux drivers through DPDK.</p>
+<p>For more details on how to bind the PF device and create VF devices, see
+<a class="reference internal" href="../linux_gsg/linux_drivers.html#linux-gsg-binding-kernel"><span class="std std-ref">Binding and Unbinding Network Ports to/from the Kernel Modules</span></a>.</p>
+<section id="configure-the-vfs-through-pf">
+<h3><span class="section-number">6.3.1. </span>Configure the VFs through PF</h3>
+<p>The PCI virtual functions must be configured before working or getting assigned
+to VMs/Containers. The configuration involves allocating the number of hardware
+queues, priorities, load balance, bandwidth and other settings necessary for the
+device to perform FEC functions.</p>
+<p>This configuration needs to be executed at least once after reboot or PCI FLR and can
+be achieved by using the functions <code class="docutils literal notranslate"><span class="pre">rte_acc10x_configure()</span></code>,
+which sets up the parameters defined in the compatible <code class="docutils literal notranslate"><span class="pre">acc100_conf</span></code> structure.</p>
+</section>
+</section>
+<section id="test-application">
+<h2><span class="section-number">6.4. </span>Test Application</h2>
+<p>BBDEV provides a test application, <code class="docutils literal notranslate"><span class="pre">test-bbdev.py</span></code> and range of test data for testing
+the functionality of the device, depending on the device’s capabilities.</p>
+<p>For more details on how to use the test application,
+see <a class="reference internal" href="../tools/testbbdev.html#test-bbdev-application"><span class="std std-ref">dpdk-test-bbdev Application</span></a>.</p>
+<section id="test-vectors">
+<h3><span class="section-number">6.4.1. </span>Test Vectors</h3>
+<p>In addition to the simple LDPC decoder and LDPC encoder tests, bbdev also provides
+a range of additional tests under the test_vectors folder, which may be useful. The results
+of these tests will depend on the device 5G/4G FEC capabilities which may cause some
+testcases to be skipped, but no failure should be reported.</p>
+</section>
+<section id="alternate-baseband-device-configuration-tool">
+<h3><span class="section-number">6.4.2. </span>Alternate Baseband Device configuration tool</h3>
+<p>On top of the embedded configuration feature supported in test-bbdev using “- -init-device”
+option mentioned above, there is also a tool available to perform that device configuration
+using a companion application.
+The <code class="docutils literal notranslate"><span class="pre">pf_bb_config</span></code> application notably enables then to run bbdev-test from the VF
+and not only limited to the PF as captured above.</p>
+<p>See for more details: <a class="reference external" href="https://github.com/intel/pf-bb-config">https://github.com/intel/pf-bb-config</a></p>
+<p>Specifically for the BBDEV ACC100 PMD, the command below can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./pf_bb_config ACC100 -c acc100/acc100_config_vf_5g.cfg</span>
+<span class="go">./test-bbdev.py -e=&quot;-c 0xff0 -a${VF_PCI_ADDR}&quot; -c validation -n 64 -b 32 -l 1 -v ./ldpc_dec_default.data</span>
+</pre></div>
+</div>
+<p>Specifically for the BBDEV ACC101 PMD, the command below can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./pf_bb_config ACC101 -c acc101/acc101_config_2vf_4g5g.cfg</span>
+<span class="go">./test-bbdev.py -e=&quot;-c 0xff0 -a${VF_PCI_ADDR}&quot; -c validation -n 64 -b 32 -l 1 -v ./ldpc_dec_default.data</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Baseband Device Drivers</a><ul>
+      <li>Previous: <a href="fpga_5gnr_fec.html" title="previous chapter"><span class="section-number">5. </span>Intel(R) FPGA 5GNR FEC Poll Mode Driver</a></li>
+      <li>Next: <a href="vrb1.html" title="next chapter"><span class="section-number">7. </span>Intel® vRAN Boost Poll Mode Driver (PMD)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/bbdevs/acc100.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

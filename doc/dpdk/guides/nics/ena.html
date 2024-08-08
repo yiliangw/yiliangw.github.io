@@ -1,0 +1,388 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>18. ENA Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="19. ENETC Poll Mode Driver" href="enetc.html" />
+    <link rel="prev" title="17. Driver for VM Emulated Devices" href="e1000em.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ena-poll-mode-driver">
+<h1><span class="section-number">18. </span>ENA Poll Mode Driver</h1>
+<p>The ENA PMD is a DPDK poll-mode driver for the Amazon Elastic
+Network Adapter (ENA) family.</p>
+<section id="supported-ena-adapters">
+<h2><span class="section-number">18.1. </span>Supported ENA adapters</h2>
+<p>Current ENA PMD supports the following ENA adapters including:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1d0f:ec20</span></code> - ENA VF</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d0f:ec21</span></code> - ENA VF RSERV0</p></li>
+</ul>
+</section>
+<section id="supported-features">
+<h2><span class="section-number">18.2. </span>Supported features</h2>
+<ul class="simple">
+<li><p>MTU configuration</p></li>
+<li><p>Jumbo frames up to 9K</p></li>
+<li><p>IPv4/TCP/UDP checksum offload</p></li>
+<li><p>TSO offload</p></li>
+<li><p>Multiple receive and transmit queues</p></li>
+<li><p>RSS hash</p></li>
+<li><p>RSS indirection table configuration</p></li>
+<li><p>Low Latency Queue for Tx</p></li>
+<li><p>Basic and extended statistics</p></li>
+<li><p>LSC event notification</p></li>
+<li><p>Watchdog (requires handling of timers in the application)</p></li>
+<li><p>Device reset upon failure</p></li>
+<li><p>Rx interrupts</p></li>
+</ul>
+</section>
+<section id="overview">
+<h2><span class="section-number">18.3. </span>Overview</h2>
+<p>The ENA driver exposes a lightweight management interface with a
+minimal set of memory mapped registers and an extendable command set
+through an Admin Queue.</p>
+<p>The driver supports a wide range of ENA adapters, is link-speed
+independent (i.e., the same driver is used for 10GbE, 25GbE, 40GbE,
+etc.), and it negotiates and supports an extendable feature set.</p>
+<p>ENA adapters allow high speed and low overhead Ethernet traffic
+processing by providing a dedicated Tx/Rx queue pair per CPU core.</p>
+<p>The ENA driver supports industry standard TCP/IP offload features such
+as checksum offload and TCP transmit segmentation offload (TSO).</p>
+<p>Receive-side scaling (RSS) is supported for multi-core scaling.</p>
+<p>Some of the ENA devices support a working mode called Low-latency
+Queue (LLQ), which saves several more microseconds.</p>
+</section>
+<section id="management-interface">
+<h2><span class="section-number">18.4. </span>Management Interface</h2>
+<p>ENA management interface is exposed by means of:</p>
+<ul class="simple">
+<li><p>Device Registers</p></li>
+<li><p>Admin Queue (AQ) and Admin Completion Queue (ACQ)</p></li>
+</ul>
+<p>ENA device memory-mapped PCIe space for registers (MMIO registers)
+are accessed only during driver initialization and are not involved
+in further normal device operation.</p>
+<p>AQ is used for submitting management commands, and the
+results/responses are reported asynchronously through ACQ.</p>
+<p>ENA introduces a very small set of management commands with room for
+vendor-specific extensions. Most of the management operations are
+framed in a generic Get/Set feature command.</p>
+<p>The following admin queue commands are supported:</p>
+<ul class="simple">
+<li><p>Create I/O submission queue</p></li>
+<li><p>Create I/O completion queue</p></li>
+<li><p>Destroy I/O submission queue</p></li>
+<li><p>Destroy I/O completion queue</p></li>
+<li><p>Get feature</p></li>
+<li><p>Set feature</p></li>
+<li><p>Get statistics</p></li>
+</ul>
+<p>Refer to <code class="docutils literal notranslate"><span class="pre">ena_admin_defs.h</span></code> for the list of supported Get/Set Feature
+properties.</p>
+</section>
+<section id="data-path-interface">
+<h2><span class="section-number">18.5. </span>Data Path Interface</h2>
+<p>I/O operations are based on Tx and Rx Submission Queues (Tx SQ and Rx
+SQ correspondingly). Each SQ has a completion queue (CQ) associated
+with it.</p>
+<p>The SQs and CQs are implemented as descriptor rings in contiguous
+physical memory.</p>
+<p>Refer to <code class="docutils literal notranslate"><span class="pre">ena_eth_io_defs.h</span></code> for the detailed structure of the descriptor</p>
+<p>The driver supports multi-queue for both Tx and Rx.</p>
+</section>
+<section id="configuration">
+<h2><span class="section-number">18.6. </span>Configuration</h2>
+<section id="runtime-configuration">
+<h3><span class="section-number">18.6.1. </span>Runtime Configuration</h3>
+<blockquote>
+<div><ul>
+<li><p><strong>large_llq_hdr</strong> (default 0)</p>
+<p>Enables or disables usage of large LLQ headers. This option will have
+effect only if the device also supports large LLQ headers. Otherwise, the
+default value will be used.</p>
+</li>
+<li><p><strong>miss_txc_to</strong> (default 5)</p>
+<p>Number of seconds after which the Tx packet will be considered missing.
+If the missing packets number will exceed dynamically calculated threshold,
+the driver will trigger the device reset which should be handled by the
+application. Checking for missing Tx completions happens in the driver’s
+timer service. Setting this parameter to 0 disables this feature. Maximum
+allowed value is 60 seconds.</p>
+</li>
+<li><p><strong>enable_llq</strong> (default 1)</p>
+<p>Determines whenever the driver should use the LLQ (if it’s available) or
+not.</p>
+<p><strong>NOTE: On the 6th generation AWS instances disabling LLQ may lead to a
+huge performance degradation. In general disabling LLQ is highly not
+recommended!</strong></p>
+</li>
+</ul>
+</div></blockquote>
+</section>
+<section id="ena-configuration-parameters">
+<h3><span class="section-number">18.6.2. </span>ENA Configuration Parameters</h3>
+<blockquote>
+<div><ul>
+<li><p><strong>Number of Queues</strong></p>
+<p>This is the requested number of queues upon initialization, however, the actual
+number of receive and transmit queues to be created will be the minimum between
+the maximal number supported by the device and number of queues requested.</p>
+</li>
+<li><p><strong>Size of Queues</strong></p>
+<p>This is the requested size of receive/transmit queues, while the actual size
+will be the minimum between the requested size and the maximal receive/transmit
+supported by the device.</p>
+</li>
+</ul>
+</div></blockquote>
+</section>
+</section>
+<section id="building-dpdk">
+<h2><span class="section-number">18.7. </span>Building DPDK</h2>
+<p>See the <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">DPDK Getting Started Guide for Linux</span></a> for
+instructions on how to build DPDK.</p>
+<p>By default the ENA PMD library will be built into the DPDK library.</p>
+<p>For configuring and using UIO and VFIO frameworks, please also refer <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">the
+documentation that comes with DPDK suite</span></a>.</p>
+</section>
+<section id="supported-operating-systems">
+<h2><span class="section-number">18.8. </span>Supported Operating Systems</h2>
+<p>Any Linux distribution fulfilling the conditions described in <code class="docutils literal notranslate"><span class="pre">System</span> <span class="pre">Requirements</span></code>
+section of <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">the DPDK documentation</span></a> or refer to <em>DPDK Release Notes</em>.</p>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">18.9. </span>Prerequisites</h2>
+<ol class="arabic">
+<li><p>Prepare the system as recommended by DPDK suite.  This includes environment
+variables, hugepages configuration, tool-chains and configuration.</p></li>
+<li><p>ENA PMD can operate with <code class="docutils literal notranslate"><span class="pre">vfio-pci``(*)</span> <span class="pre">or</span> <span class="pre">``igb_uio</span></code> driver.</p>
+<p>(*) ENAv2 hardware supports Low Latency Queue v2 (LLQv2). This feature
+reduces the latency of the packets by pushing the header directly through
+the PCI to the device, before the DMA is even triggered. For proper work
+kernel PCI driver must support write combining (WC).
+In DPDK <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> it must be enabled by loading module with
+<code class="docutils literal notranslate"><span class="pre">wc_activate=1</span></code> flag (example below). However, mainline’s vfio-pci
+driver in kernel doesn’t have WC support yet (planed to be added).
+If vfio-pci is used user should follow <a class="reference external" href="https://github.com/amzn/amzn-drivers/tree/master/userspace/dpdk/README.md">AWS ENA PMD documentation</a>.</p>
+</li>
+<li><p>Insert <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> or <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> kernel module using the command
+<code class="docutils literal notranslate"><span class="pre">modprobe</span> <span class="pre">vfio-pci</span></code> or <code class="docutils literal notranslate"><span class="pre">modprobe</span> <span class="pre">uio;</span> <span class="pre">insmod</span> <span class="pre">igb_uio.ko</span> <span class="pre">wc_activate=1</span></code>
+respectively.</p></li>
+<li><p>For <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> users only:
+Please make sure that <code class="docutils literal notranslate"><span class="pre">IOMMU</span></code> is enabled in your system,
+or use <code class="docutils literal notranslate"><span class="pre">vfio</span></code> driver in <code class="docutils literal notranslate"><span class="pre">noiommu</span></code> mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo 1 &gt; /sys/module/vfio/parameters/enable_unsafe_noiommu_mode
+</pre></div>
+</div>
+<p>To use <code class="docutils literal notranslate"><span class="pre">noiommu</span></code> mode, the <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> must be built with flag
+<code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_NOIOMMU</span></code>.</p>
+</li>
+<li><p>Bind the intended ENA device to <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> or <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> module.</p></li>
+</ol>
+<p>At this point the system should be ready to run DPDK applications. Once the
+application runs to completion, the ENA can be detached from attached module if
+necessary.</p>
+<p><strong>Rx interrupts support</strong></p>
+<p>ENA PMD supports Rx interrupts, which can be used to wake up lcores waiting for
+input. Please note that it won’t work with <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code>, so to use this feature,
+the <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> should be used.</p>
+<p>ENA handles admin interrupts and AENQ notifications on separate interrupt.
+There is possibility that there won’t be enough event file descriptors to
+handle both admin and Rx interrupts. In that situation the Rx interrupt request
+will fail.</p>
+<p><strong>Note about usage on *.metal instances</strong></p>
+<p>On AWS, the metal instances are supporting IOMMU for both arm64 and x86_64
+hosts.</p>
+<ul>
+<li><dl>
+<dt>x86_64 (e.g. c5.metal, i3.metal):</dt><dd><p>IOMMU should be disabled by default. In that situation, the <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> can
+be used as it is but <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> should be working in no-IOMMU mode (please
+see above).</p>
+<p>When IOMMU is enabled, <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> cannot be used as it’s not supporting this
+feature, while <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> should work without any changes.
+To enable IOMMU on those hosts, please update <code class="docutils literal notranslate"><span class="pre">GRUB_CMDLINE_LINUX</span></code> in file
+<code class="docutils literal notranslate"><span class="pre">/etc/default/grub</span></code> with the below extra boot arguments:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>iommu=1 intel_iommu=on
+</pre></div>
+</div>
+<p>Then, make the changes live by executing as a root:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># grub2-mkconfig &gt; /boot/grub2/grub.cfg
+</pre></div>
+</div>
+<p>Finally, reboot should result in IOMMU being enabled.</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>arm64 (a1.metal):</dt><dd><p>IOMMU should be enabled by default. Unfortunately, <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> isn’t
+supporting SMMU, which is implementation of IOMMU for arm64 architecture and
+<code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> isn’t supporting IOMMU at all, so to use DPDK with ENA on those
+hosts, one must disable IOMMU. This can be done by updating
+<code class="docutils literal notranslate"><span class="pre">GRUB_CMDLINE_LINUX</span></code> in file <code class="docutils literal notranslate"><span class="pre">/etc/default/grub</span></code> with the extra boot
+argument:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>iommu.passthrough=1
+</pre></div>
+</div>
+<p>Then, make the changes live by executing as a root:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># grub2-mkconfig &gt; /boot/grub2/grub.cfg
+</pre></div>
+</div>
+<p>Finally, reboot should result in IOMMU being disabled.
+Without IOMMU, <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> can be used as it is but <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> should be
+working in no-IOMMU mode (please see above).</p>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">18.10. </span>Usage example</h2>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a> to launch
+<strong>testpmd</strong> with Amazon ENA devices managed by librte_net_ena.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:00:06.0 on NUMA socket -1</span>
+<span class="go">EAL: Device 0000:00:06.0 is not NUMA-aware, defaulting socket to 0</span>
+<span class="go">EAL:   probe driver: 1d0f:ec20 net_ena</span>
+
+<span class="go">Interactive-mode selected</span>
+<span class="go">testpmd: create a new mbuf pool &lt;mbuf_pool_socket_0&gt;: n=171456, size=2176, socket=0</span>
+<span class="go">testpmd: preferred mempool ops selected: ring_mp_mc</span>
+<span class="go">Warning! port-topology=paired and odd forward ports number, the last port will pair with itself.</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:00:00:11:00:01</span>
+<span class="go">Checking link statuses...</span>
+
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="e1000em.html" title="previous chapter"><span class="section-number">17. </span>Driver for VM Emulated Devices</a></li>
+      <li>Next: <a href="enetc.html" title="next chapter"><span class="section-number">19. </span>ENETC Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/ena.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

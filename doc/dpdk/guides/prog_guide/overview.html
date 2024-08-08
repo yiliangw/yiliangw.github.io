@@ -1,0 +1,254 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Overview &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. Source Organization" href="source_org.html" />
+    <link rel="prev" title="1. Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="overview">
+<h1><span class="section-number">2. </span>Overview</h1>
+<p>This section gives a global overview of the architecture of Data Plane Development Kit (DPDK).</p>
+<p>The main goal of the DPDK is to provide a simple,
+complete framework for fast packet processing in data plane applications.
+Users may use the code to understand some of the techniques employed,
+to build upon for prototyping or to add their own protocol stacks.
+Alternative ecosystem options that use the DPDK are available.</p>
+<p>The framework creates a set of libraries for specific environments
+through the creation of an Environment Abstraction Layer (EAL),
+which may be specific to a mode of the Intel® architecture (32-bit or 64-bit),
+Linux* user space compilers or a specific platform.
+These environments are created through the use of meson files and configuration files.
+Once the EAL library is created, the user may link with the library to create their own applications.
+Other libraries, outside of EAL, including the Hash,
+Longest Prefix Match (LPM) and rings libraries are also provided.
+Sample applications are provided to help show the user how to use various features of the DPDK.</p>
+<p>The DPDK implements a run to completion model for packet processing,
+where all resources must be allocated prior to calling Data Plane applications,
+running as execution units on logical processing cores.
+The model does not support a scheduler and all devices are accessed by polling.
+The primary reason for not using interrupts is the performance overhead imposed by interrupt processing.</p>
+<p>In addition to the run-to-completion model,
+a pipeline model may also be used by passing packets or messages between cores via the rings.
+This allows work to be performed in stages and may allow more efficient use of code on cores.</p>
+<section id="development-environment">
+<h2><span class="section-number">2.1. </span>Development Environment</h2>
+<p>The DPDK project installation requires Linux and the associated toolchain,
+such as one or more compilers, assembler, meson utility,
+editor and various libraries to create the DPDK components and libraries.</p>
+<p>Once these libraries are created for the specific environment and architecture,
+they may then be used to create the user’s data plane application.</p>
+<p>When creating applications for the Linux user space, the glibc library is used.</p>
+<p>See the <em>DPDK Getting Started Guide</em> for information on setting up the development environment.</p>
+</section>
+<section id="environment-abstraction-layer">
+<h2><span class="section-number">2.2. </span>Environment Abstraction Layer</h2>
+<p>The Environment Abstraction Layer (EAL) provides a generic interface
+that hides the environment specifics from the applications and libraries.
+The services provided by the EAL are:</p>
+<ul class="simple">
+<li><p>DPDK loading and launching</p></li>
+<li><p>Support for multi-process and multi-thread execution types</p></li>
+<li><p>Core affinity/assignment procedures</p></li>
+<li><p>System memory allocation/de-allocation</p></li>
+<li><p>Atomic/lock operations</p></li>
+<li><p>Time reference</p></li>
+<li><p>PCI bus access</p></li>
+<li><p>Trace and debug functions</p></li>
+<li><p>CPU feature identification</p></li>
+<li><p>Interrupt handling</p></li>
+<li><p>Alarm operations</p></li>
+<li><p>Memory management (malloc)</p></li>
+</ul>
+<p>The EAL is fully described in <a class="reference internal" href="env_abstraction_layer.html#environment-abstraction-layer"><span class="std std-ref">Environment Abstraction Layer</span></a>.</p>
+</section>
+<section id="core-components">
+<h2><span class="section-number">2.3. </span>Core Components</h2>
+<p>The <em>core components</em> are a set of libraries that provide all the elements needed
+for high-performance packet processing applications.</p>
+<figure class="align-default" id="id1">
+<span id="figure-architecture-overview"></span><img alt="../_images/architecture-overview.svg" src="../_images/architecture-overview.svg" /><figcaption>
+<p><span class="caption-number">Fig. 2.1 </span><span class="caption-text">Core Components Architecture</span></p>
+</figcaption>
+</figure>
+<section id="ring-manager-librte-ring">
+<h3><span class="section-number">2.3.1. </span>Ring Manager (librte_ring)</h3>
+<p>The ring structure provides a lockless multi-producer, multi-consumer FIFO API in a finite size table.
+It has some advantages over lockless queues; easier to implement, adapted to bulk operations and faster.
+A ring is used by the <a class="reference internal" href="mempool_lib.html#mempool-library"><span class="std std-ref">Memory Pool Manager (librte_mempool)</span></a>
+and may be used as a general communication mechanism between cores
+and/or execution blocks connected together on a logical core.</p>
+<p>This ring buffer and its usage are fully described in <a class="reference internal" href="ring_lib.html#ring-library"><span class="std std-ref">Ring Library</span></a>.</p>
+</section>
+<section id="memory-pool-manager-librte-mempool">
+<h3><span class="section-number">2.3.2. </span>Memory Pool Manager (librte_mempool)</h3>
+<p>The Memory Pool Manager is responsible for allocating pools of objects in memory.
+A pool is identified by name and uses a ring to store free objects.
+It provides some other optional services,
+such as a per-core object cache and an alignment helper to ensure that objects are padded to spread them equally on all RAM channels.</p>
+<p>This memory pool allocator is described in  <a class="reference internal" href="mempool_lib.html#mempool-library"><span class="std std-ref">Mempool Library</span></a>.</p>
+</section>
+<section id="network-packet-buffer-management-librte-mbuf">
+<h3><span class="section-number">2.3.3. </span>Network Packet Buffer Management (librte_mbuf)</h3>
+<p>The mbuf library provides the facility to create and destroy buffers
+that may be used by the DPDK application to store message buffers.
+The message buffers are created at startup time and stored in a mempool, using the DPDK mempool library.</p>
+<p>This library provides an API to allocate/free mbufs, manipulate
+packet buffers which are used to carry network packets.</p>
+<p>Network Packet Buffer Management is described in <a class="reference internal" href="mbuf_lib.html#mbuf-library"><span class="std std-ref">Mbuf Library</span></a>.</p>
+</section>
+<section id="timer-manager-librte-timer">
+<h3><span class="section-number">2.3.4. </span>Timer Manager (librte_timer)</h3>
+<p>This library provides a timer service to DPDK execution units,
+providing the ability to execute a function asynchronously.
+It can be periodic function calls, or just a one-shot call.
+It uses the timer interface provided by the Environment Abstraction Layer (EAL)
+to get a precise time reference and can be initiated on a per-core basis as required.</p>
+<p>The library documentation is available in <a class="reference internal" href="timer_lib.html#timer-library"><span class="std std-ref">Timer Library</span></a>.</p>
+</section>
+</section>
+<section id="ethernet-poll-mode-driver-architecture">
+<h2><span class="section-number">2.4. </span>Ethernet* Poll Mode Driver Architecture</h2>
+<p>The DPDK includes Poll Mode Drivers (PMDs) for 1 GbE, 10 GbE and 40GbE, and para virtualized virtio
+Ethernet controllers which are designed to work without asynchronous, interrupt-based signaling mechanisms.</p>
+<p>See  <a class="reference internal" href="poll_mode_drv.html#poll-mode-driver"><span class="std std-ref">Poll Mode Driver</span></a>.</p>
+</section>
+<section id="packet-forwarding-algorithm-support">
+<h2><span class="section-number">2.5. </span>Packet Forwarding Algorithm Support</h2>
+<p>The DPDK includes Hash (librte_hash) and Longest Prefix Match (LPM,librte_lpm)
+libraries to support the corresponding packet forwarding algorithms.</p>
+<p>See <a class="reference internal" href="hash_lib.html#hash-library"><span class="std std-ref">Hash Library</span></a> and  <a class="reference internal" href="lpm_lib.html#lpm-library"><span class="std std-ref">LPM Library</span></a> for more information.</p>
+</section>
+<section id="librte-net">
+<h2><span class="section-number">2.6. </span>librte_net</h2>
+<p>The librte_net library is a collection of IP protocol definitions and convenience macros.
+It is based on code from the FreeBSD* IP stack and contains protocol numbers (for use in IP headers),
+IP-related macros, IPv4/IPv6 header structures and TCP, UDP and SCTP header structures.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter"><span class="section-number">1. </span>Introduction</a></li>
+      <li>Next: <a href="source_org.html" title="next chapter"><span class="section-number">3. </span>Source Organization</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/overview.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

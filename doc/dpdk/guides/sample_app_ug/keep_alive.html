@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>12. Keep Alive Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="13. Packet copying using DMAdev library" href="dma.html" />
+    <link rel="prev" title="11. IP Reassembly Sample Application" href="ip_reassembly.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="keep-alive-sample-application">
+<h1><span class="section-number">12. </span>Keep Alive Sample Application</h1>
+<p>The Keep Alive application is a simple example of a
+heartbeat/watchdog for packet processing cores. It demonstrates how
+to detect ‘failed’ DPDK cores and notify a fault management entity
+of this failure. Its purpose is to ensure the failure of the core
+does not result in a fault that is not detectable by a management
+entity.</p>
+<section id="overview">
+<h2><span class="section-number">12.1. </span>Overview</h2>
+<p>The application demonstrates how to protect against ‘silent outages’
+on packet processing cores. A Keep Alive Monitor Agent Core (main)
+monitors the state of packet processing cores (worker cores) by
+dispatching pings at a regular time interval (default is 5ms) and
+monitoring the state of the cores. Cores states are: Alive, MIA, Dead
+or Buried. MIA indicates a missed ping, and Dead indicates two missed
+pings within the specified time interval. When a core is Dead, a
+callback function is invoked to restart the packet processing core;
+A real life application might use this callback function to notify a
+higher level fault management entity of the core failure in order to
+take the appropriate corrective action.</p>
+<p>Note: Only the worker cores are monitored. A local (on the host) mechanism
+or agent to supervise the Keep Alive Monitor Agent Core DPDK core is required
+to detect its failure.</p>
+<p>Note: This application is based on the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a>. As
+such, the initialization and run-time paths are very similar to those
+of the L2 forwarding application.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">12.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">l2fwd_keep_alive</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">12.3. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-keepalive [EAL options] \</span>
+<span class="go">        -- -p PORTMASK [-q NQ] [-K PERIOD] [-T PERIOD]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">PORTMASK</span></code>: A hexadecimal bitmask of the ports to configure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">q</span> <span class="pre">NQ</span></code>: A number of queues (=ports) per lcore (default is 1)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">K</span> <span class="pre">PERIOD</span></code>: Heartbeat check period in ms(5ms default; 86400 max)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">PERIOD</span></code>: statistics will be refreshed each PERIOD seconds (0 to
+disable, 10 default, 86400 maximum).</p></li>
+</ul>
+<p>To run the application in linux environment with 4 lcores, 16 ports
+8 RX queues per lcore and a ping interval of 10ms, issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-keepalive -l 0-3 -n 4 -- -q 8 -p ffff -K 10</span>
+</pre></div>
+</div>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on
+running applications and the Environment Abstraction Layer (EAL)
+options.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">12.4. </span>Explanation</h2>
+<p>The following sections provide some explanation of the
+Keep-Alive/’Liveliness’ conceptual scheme. As mentioned in the
+overview section, the initialization and run-time paths are very
+similar to those of the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a>.</p>
+<p>The Keep-Alive/’Liveliness’ conceptual scheme:</p>
+<ul class="simple">
+<li><p>A Keep- Alive Agent Runs every N Milliseconds.</p></li>
+<li><p>DPDK Cores respond to the keep-alive agent.</p></li>
+<li><p>If keep-alive agent detects time-outs, it notifies the
+fault management entity through a callback function.</p></li>
+</ul>
+<p>The following sections provide some explanation of the code aspects
+that are specific to the Keep Alive sample application.</p>
+<p>The keepalive functionality is initialized with a struct
+rte_keepalive and the callback function to invoke in the
+case of a timeout.</p>
+<p>The function that issues the pings keepalive_dispatch_pings()
+is configured to run every check_period milliseconds.</p>
+<p>The rest of the initialization and run-time path follows
+the same paths as the L2 forwarding application. The only
+addition to the main processing loop is the mark alive
+functionality and the example random failures.</p>
+<p>The rte_keepalive_mark_alive function simply sets the core state to alive.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">rte_keepalive_mark_alive</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_keepalive</span><span class="w"> </span><span class="o">*</span><span class="n">keepcfg</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">keepcfg</span><span class="o">-&gt;</span><span class="n">live_data</span><span class="p">[</span><span class="n">rte_lcore_id</span><span class="p">()].</span><span class="n">core_state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_KA_STATE_ALIVE</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="ip_reassembly.html" title="previous chapter"><span class="section-number">11. </span>IP Reassembly Sample Application</a></li>
+      <li>Next: <a href="dma.html" title="next chapter"><span class="section-number">13. </span>Packet copying using DMAdev library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/keep_alive.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

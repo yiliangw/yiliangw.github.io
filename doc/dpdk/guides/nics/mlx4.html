@@ -1,0 +1,588 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>38. NVIDIA MLX4 Ethernet Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="39. NVIDIA MLX5 Ethernet Driver" href="mlx5.html" />
+    <link rel="prev" title="37. Memif Poll Mode Driver" href="memif.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nvidia-mlx4-ethernet-driver">
+<h1><span class="section-number">38. </span>NVIDIA MLX4 Ethernet Driver</h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>NVIDIA acquired Mellanox Technologies in 2020.
+The DPDK documentation and code might still include instances
+of or references to Mellanox trademarks (like BlueField and ConnectX)
+that are now NVIDIA trademarks.</p>
+</div>
+<p>The MLX4 poll mode driver library (<strong>librte_net_mlx4</strong>) implements support
+for <strong>NVIDIA ConnectX-3</strong> and <strong>NVIDIA ConnectX-3 Pro</strong> 10/40 Gbps adapters
+as well as their virtual functions (VF) in SR-IOV context.</p>
+<p>There is also a <a class="reference external" href="https://developer.nvidia.com/networking/dpdk">section dedicated to this poll mode driver</a>.</p>
+<section id="implementation-details">
+<h2><span class="section-number">38.1. </span>Implementation details</h2>
+<p>Most NVIDIA ConnectX-3 devices provide two ports but expose a single PCI
+bus address, thus unlike most drivers, librte_net_mlx4 registers itself as a
+PCI driver that allocates one Ethernet device per detected port.</p>
+<p>For this reason, one cannot block (or allow) a single port without also
+blocking (or allowing) the others on the same device.</p>
+<p>Besides its dependency on libibverbs (that implies libmlx4 and associated
+kernel support), librte_net_mlx4 relies heavily on system calls for control
+operations such as querying/updating the MTU and flow control parameters.</p>
+<p>For security reasons and robustness, this driver only deals with virtual
+memory addresses. The way resources allocations are handled by the kernel
+combined with hardware specifications that allow it to handle virtual memory
+addresses directly ensure that DPDK applications cannot access random
+physical memory (or memory that does not belong to the current process).</p>
+<p>This capability allows the PMD to coexist with kernel network interfaces
+which remain functional, although they stop receiving unicast packets as
+long as they share the same MAC address.</p>
+<p>The <a class="reference internal" href="../prog_guide/rte_flow.html#flow-isolated-mode"><span class="std std-ref">Flow isolated mode</span></a> is supported.</p>
+<p>Compiling librte_net_mlx4 causes DPDK to be linked against libibverbs.</p>
+</section>
+<section id="configuration">
+<h2><span class="section-number">38.2. </span>Configuration</h2>
+<section id="compilation-options">
+<h3><span class="section-number">38.2.1. </span>Compilation options</h3>
+<p>The ibverbs libraries can be linked with this PMD in a number of ways,
+configured by the <code class="docutils literal notranslate"><span class="pre">ibverbs_link</span></code> build option:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">shared</span></code> (default): the PMD depends on some .so files.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dlopen</span></code>: Split the dependencies glue in a separate library
+loaded when needed by dlopen.
+It make dependencies on libibverbs and libmlx4 optional,
+and has no performance impact.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">static</span></code>: Embed static flavor of the dependencies libibverbs and libmlx4
+in the PMD shared library or the executable static binary.</p></li>
+</ul>
+</section>
+<section id="environment-variables">
+<h3><span class="section-number">38.2.2. </span>Environment variables</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">MLX4_GLUE_PATH</span></code></p>
+<p>A list of directories in which to search for the rdma-core “glue” plug-in,
+separated by colons or semi-colons.</p>
+</li>
+</ul>
+</section>
+<section id="run-time-configuration">
+<h3><span class="section-number">38.2.3. </span>Run-time configuration</h3>
+<ul>
+<li><p>librte_net_mlx4 brings kernel network interfaces up during initialization
+because it is affected by their state. Forcing them down prevents packets
+reception.</p></li>
+<li><p><strong>ethtool</strong> operations on related kernel interfaces also affect the PMD.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">port</span></code> parameter [int]</p>
+<p>This parameter provides a physical port to probe and can be specified multiple
+times for additional ports. All ports are probed by default if left
+unspecified.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mr_ext_memseg_en</span></code> parameter [int]</p>
+<p>A nonzero value enables extending memseg when registering DMA memory. If
+enabled, the number of entries in MR (Memory Region) lookup table on datapath
+is minimized and it benefits performance. On the other hand, it worsens memory
+utilization because registered memory is pinned by kernel driver. Even if a
+page in the extended chunk is freed, that doesn’t become reusable until the
+entire memory is freed.</p>
+<p>Enabled by default.</p>
+</li>
+</ul>
+</section>
+<section id="kernel-module-parameters">
+<h3><span class="section-number">38.2.4. </span>Kernel module parameters</h3>
+<p>The <strong>mlx4_core</strong> kernel module has several parameters that affect the
+behavior and/or the performance of librte_net_mlx4. Some of them are described
+below.</p>
+<ul>
+<li><p><strong>num_vfs</strong> (integer or triplet, optionally prefixed by device address
+strings)</p>
+<p>Create the given number of VFs on the specified devices.</p>
+</li>
+<li><p><strong>log_num_mgm_entry_size</strong> (integer)</p>
+<p>Device-managed flow steering (DMFS) is required by DPDK applications. It is
+enabled by using a negative value, the last four bits of which have a
+special meaning.</p>
+<ul class="simple">
+<li><p><strong>-1</strong>: force device-managed flow steering (DMFS).</p></li>
+<li><p><strong>-7</strong>: configure optimized steering mode to improve performance with the
+following limitation: VLAN filtering is not supported with this mode.
+This is the recommended mode in case VLAN filter is not needed.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+<section id="limitations">
+<h2><span class="section-number">38.3. </span>Limitations</h2>
+<ul>
+<li><p>For secondary process:</p>
+<ul class="simple">
+<li><p>Forked secondary process not supported.</p></li>
+<li><p>External memory unregistered in EAL memseg list cannot be used for DMA
+unless such memory has been registered by <code class="docutils literal notranslate"><span class="pre">mlx4_mr_update_ext_mp()</span></code> in
+primary process and remapped to the same virtual address in secondary
+process. If the external memory is registered by primary process but has
+different virtual address in secondary process, unexpected error may happen.</p></li>
+</ul>
+</li>
+<li><p>CRC stripping is supported by default and always reported as “true”.
+The ability to enable/disable CRC stripping requires OFED version
+4.3-1.5.0.0 and above  or rdma-core version v18 and above.</p></li>
+<li><p>TSO (Transmit Segmentation Offload) is supported in OFED version
+4.4 and above.</p></li>
+<li><p>RSS only works on power-of-two number of queues.</p></li>
+<li><p>It is possible to open non-power-of-two queues,
+but the PMD will round down to the highest power-of-two queues by default for RSS.
+Other queues can be utilized through flow API.
+Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./dpdk-testpmd -a 08:00.0 -- -i --rxq 12 --txq 12 --rss-ip
+</pre></div>
+</div>
+<p>The first 8 queues will be used by default for RSS over IP.
+The rest of the queues can be utilized with flow API like the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth / ipv4 / tcp / end actions rss queues 8 9 10 11 end / end
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">38.4. </span>Prerequisites</h2>
+<p>This driver relies on external libraries and kernel drivers for resources
+allocations and initialization. The following dependencies are not part of
+DPDK and must be installed separately:</p>
+<ul>
+<li><p><strong>libibverbs</strong> (provided by rdma-core package)</p>
+<p>User space verbs framework used by librte_net_mlx4. This library provides
+a generic interface between the kernel and low-level user space drivers
+such as libmlx4.</p>
+<p>It allows slow and privileged operations (context initialization, hardware
+resources allocations) to be managed by the kernel and fast operations to
+never leave user space.</p>
+</li>
+<li><p><strong>libmlx4</strong> (provided by rdma-core package)</p>
+<p>Low-level user space driver library for NVIDIA ConnectX-3 devices,
+it is automatically loaded by libibverbs.</p>
+<p>This library basically implements send/receive calls to the hardware
+queues.</p>
+</li>
+<li><p><strong>Kernel modules</strong></p>
+<p>They provide the kernel-side verbs API and low level device drivers that
+manage actual hardware initialization and resources sharing with user
+space processes.</p>
+<p>Unlike most other PMDs, these modules must remain loaded and bound to
+their devices:</p>
+<ul class="simple">
+<li><p>mlx4_core: hardware driver managing NVIDIA ConnectX-3 devices.</p></li>
+<li><p>mlx4_en: Ethernet device driver that provides kernel network interfaces.</p></li>
+<li><p>mlx4_ib: InfiniBand device driver.</p></li>
+<li><p>ib_uverbs: user space driver for verbs (entry point for libibverbs).</p></li>
+</ul>
+</li>
+<li><p><strong>Firmware update</strong></p>
+<p>NVIDIA MLNX_OFED releases include firmware updates for ConnectX-3 adapters.</p>
+<p>Because each release provides new features, these updates must be applied to
+match the kernel modules and libraries they come with.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both libraries are BSD and GPL licensed. Linux kernel modules are GPL
+licensed.</p>
+</div>
+<p>Depending on system constraints and user preferences either RDMA core library
+with a recent enough Linux kernel release (recommended) or NVIDIA MLNX_OFED,
+which provides compatibility with older releases.</p>
+<section id="current-rdma-core-package-and-linux-kernel-recommended">
+<h3><span class="section-number">38.4.1. </span>Current RDMA core package and Linux kernel (recommended)</h3>
+<ul>
+<li><p>Minimal Linux kernel version: 4.14.</p></li>
+<li><p>Minimal RDMA core version: v15 (see <a class="reference external" href="https://raw.githubusercontent.com/linux-rdma/rdma-core/master/README.md">RDMA core installation documentation</a>).</p></li>
+<li><p>Starting with rdma-core v21, static libraries can be built:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cd build
+CFLAGS=-fPIC cmake -DENABLE_STATIC=1 -DNO_PYVERBS=1 -DNO_MAN_PAGES=1 -GNinja ..
+ninja
+ninja install
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="nvidia-mlnx-ofed-as-a-fallback">
+<span id="ofed-as-a-fallback"></span><h3><span class="section-number">38.4.2. </span>NVIDIA MLNX_OFED as a fallback</h3>
+<ul class="simple">
+<li><p><a class="reference external" href="https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/">NVIDIA MLNX_OFED</a> version: <strong>4.4, 4.5, 4.6</strong>.</p></li>
+<li><p>firmware version: <strong>2.42.5000</strong> and above.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Several versions of NVIDIA MLNX_OFED are available. Installing the version
+this DPDK release was developed and tested against is strongly
+recommended. Please check the <a class="reference internal" href="#prerequisites">prerequisites</a>.</p>
+</div>
+<section id="installing-nvidia-mlnx-ofed">
+<h4><span class="section-number">38.4.2.1. </span>Installing NVIDIA MLNX_OFED</h4>
+<ol class="arabic">
+<li><p>Download latest NVIDIA MLNX_OFED.</p></li>
+<li><p>Install the required libraries and kernel modules either by installing
+only the required set, or by installing the entire NVIDIA MLNX_OFED:</p>
+<p>For bare metal use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./mlnxofedinstall --dpdk --upstream-libs
+</pre></div>
+</div>
+<p>For SR-IOV hypervisors use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./mlnxofedinstall --dpdk --upstream-libs --enable-sriov --hypervisor
+</pre></div>
+</div>
+<p>For SR-IOV virtual machine use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./mlnxofedinstall --dpdk --upstream-libs --guest
+</pre></div>
+</div>
+</li>
+<li><p>Verify the firmware is the correct one:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ibv_devinfo
+</pre></div>
+</div>
+</li>
+<li><p>Set all ports links to Ethernet, follow instructions on the screen:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>connectx_port_config
+</pre></div>
+</div>
+</li>
+<li><p>Continue with <a class="reference internal" href="#qsg-2"><span class="std std-ref">section 2 of the Quick Start Guide</span></a>.</p></li>
+</ol>
+</section>
+</section>
+</section>
+<section id="quick-start-guide">
+<span id="qsg"></span><h2><span class="section-number">38.5. </span>Quick Start Guide</h2>
+<ol class="arabic">
+<li><p>Set all ports links to Ethernet:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>PCI=&lt;NIC PCI address&gt;
+echo eth &gt; &quot;/sys/bus/pci/devices/$PCI/mlx4_port0&quot;
+echo eth &gt; &quot;/sys/bus/pci/devices/$PCI/mlx4_port1&quot;
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If using NVIDIA MLNX_OFED one can permanently set the port link
+to Ethernet using connectx_port_config tool provided by it.
+<a class="reference internal" href="#ofed-as-a-fallback"><span class="std std-ref">NVIDIA MLNX_OFED as a fallback</span></a>:</p>
+</div>
+</li>
+</ol>
+<ol class="arabic" id="qsg-2">
+<li><p>In case of bare metal or hypervisor, configure optimized steering mode
+by adding the following line to <code class="docutils literal notranslate"><span class="pre">/etc/modprobe.d/mlx4_core.conf</span></code>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>options mlx4_core log_num_mgm_entry_size=-7
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If VLAN filtering is used, set log_num_mgm_entry_size=-1.
+Performance degradation can occur on this case.</p>
+</div>
+</li>
+<li><p>Restart the driver:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/etc/init.d/openibd restart
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>service openibd restart
+</pre></div>
+</div>
+</li>
+<li><p>Install DPDK and you are ready to go.
+See <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">compilation instructions</span></a>.</p></li>
+</ol>
+</section>
+<section id="performance-tuning">
+<h2><span class="section-number">38.6. </span>Performance tuning</h2>
+<ol class="arabic">
+<li><p>Verify the optimized steering mode is configured:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cat /sys/module/mlx4_core/parameters/log_num_mgm_entry_size
+</pre></div>
+</div>
+</li>
+<li><p>Use the CPU near local NUMA node to which the PCIe adapter is connected,
+for better performance. For VMs, verify that the right CPU
+and NUMA node are pinned according to the above. Run:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lstopo-no-graphics --merge
+</pre></div>
+</div>
+<p>to identify the NUMA node to which the PCIe adapter is connected.</p>
+</li>
+<li><p>If more than one adapter is used, and root complex capabilities allow
+to put both adapters on the same NUMA node without PCI bandwidth degradation,
+it is recommended to locate both adapters on the same NUMA node.
+This in order to forward packets from one to the other without
+NUMA performance penalty.</p></li>
+<li><p>Disable pause frames:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ethtool -A &lt;netdev&gt; rx off tx off
+</pre></div>
+</div>
+</li>
+<li><p>Verify IO non-posted prefetch is disabled by default. This can be checked
+via the BIOS configuration. Please contact you server provider for more
+information about the settings.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On some machines, depends on the machine integrator, it is beneficial
+to set the PCI max read request parameter to 1K. This can be
+done in the following way:</p>
+<p>To query the read request size use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>setpci -s &lt;NIC PCI address&gt; 68.w
+</pre></div>
+</div>
+<p>If the output is different than 3XXX, set it by:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>setpci -s &lt;NIC PCI address&gt; 68.w=3XXX
+</pre></div>
+</div>
+<p>The XXX can be different on different systems. Make sure to configure
+according to the setpci output.</p>
+</div>
+</li>
+<li><p>To minimize overhead of searching Memory Regions:</p>
+<ul class="simple">
+<li><p>‘–socket-mem’ is recommended to pin memory by predictable amount.</p></li>
+<li><p>Configure per-lcore cache when creating Mempools for packet buffer.</p></li>
+<li><p>Refrain from dynamically allocating/freeing memory in run-time.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">38.7. </span>Usage example</h2>
+<p>This section demonstrates how to launch <strong>testpmd</strong> with NVIDIA ConnectX-3
+devices managed by librte_net_mlx4.</p>
+<ol class="arabic">
+<li><p>Load the kernel modules:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>modprobe -a ib_uverbs mlx4_en mlx4_core mlx4_ib
+</pre></div>
+</div>
+<p>Alternatively if MLNX_OFED is fully installed, the following script can
+be run:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/etc/init.d/openibd restart
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>User space I/O kernel modules (uio and igb_uio) are not used and do
+not have to be loaded.</p>
+</div>
+</li>
+<li><p>Make sure Ethernet interfaces are in working order and linked to kernel
+verbs. Related sysfs entries should be present:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ls -d /sys/class/net/*/device/infiniband_verbs/uverbs* | cut -d / -f 5
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>eth2
+eth3
+eth4
+eth5
+</pre></div>
+</div>
+</li>
+<li><p>Optionally, retrieve their PCI bus addresses to be used with the allow argument:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>{
+    for intf in eth2 eth3 eth4 eth5;
+    do
+        (cd &quot;/sys/class/net/${intf}/device/&quot; &amp;&amp; pwd -P);
+    done;
+} |
+sed -n &#39;s,.*/\(.*\),-a \1,p&#39;
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:83:00.0
+-a 0000:83:00.0
+-a 0000:84:00.0
+-a 0000:84:00.0
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>There are only two distinct PCI bus addresses because the NVIDIA
+ConnectX-3 adapters installed on this system are dual port.</p>
+</div>
+</li>
+<li><p>Request huge pages:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-hugepages.py --setup 2G
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd with basic parameters:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-testpmd -l 8-15 -n 4 -a 0000:83:00.0 -a 0000:84:00.0 -- --rxq=2 --txq=2 -i
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[...]
+EAL: PCI device 0000:83:00.0 on NUMA socket 1
+EAL:   probe driver: 15b3:1007 librte_net_mlx4
+PMD: librte_net_mlx4: PCI information matches, using device &quot;mlx4_0&quot; (VF: false)
+PMD: librte_net_mlx4: 2 port(s) detected
+PMD: librte_net_mlx4: port 1 MAC address is 00:02:c9:b5:b7:50
+PMD: librte_net_mlx4: port 2 MAC address is 00:02:c9:b5:b7:51
+EAL: PCI device 0000:84:00.0 on NUMA socket 1
+EAL:   probe driver: 15b3:1007 librte_net_mlx4
+PMD: librte_net_mlx4: PCI information matches, using device &quot;mlx4_1&quot; (VF: false)
+PMD: librte_net_mlx4: 2 port(s) detected
+PMD: librte_net_mlx4: port 1 MAC address is 00:02:c9:b5:ba:b0
+PMD: librte_net_mlx4: port 2 MAC address is 00:02:c9:b5:ba:b1
+Interactive-mode selected
+Configuring Port 0 (socket 0)
+PMD: librte_net_mlx4: 0x867d60: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx4: 0x867d60: RX queues number update: 0 -&gt; 2
+Port 0: 00:02:C9:B5:B7:50
+Configuring Port 1 (socket 0)
+PMD: librte_net_mlx4: 0x867da0: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx4: 0x867da0: RX queues number update: 0 -&gt; 2
+Port 1: 00:02:C9:B5:B7:51
+Configuring Port 2 (socket 0)
+PMD: librte_net_mlx4: 0x867de0: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx4: 0x867de0: RX queues number update: 0 -&gt; 2
+Port 2: 00:02:C9:B5:BA:B0
+Configuring Port 3 (socket 0)
+PMD: librte_net_mlx4: 0x867e20: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx4: 0x867e20: RX queues number update: 0 -&gt; 2
+Port 3: 00:02:C9:B5:BA:B1
+Checking link statuses...
+Port 0 Link Up - speed 10000 Mbps - full-duplex
+Port 1 Link Up - speed 40000 Mbps - full-duplex
+Port 2 Link Up - speed 10000 Mbps - full-duplex
+Port 3 Link Up - speed 40000 Mbps - full-duplex
+Done
+testpmd&gt;
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="memif.html" title="previous chapter"><span class="section-number">37. </span>Memif Poll Mode Driver</a></li>
+      <li>Next: <a href="mlx5.html" title="next chapter"><span class="section-number">39. </span>NVIDIA MLX5 Ethernet Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/mlx4.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,734 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>16. DPAA2 Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="17. Driver for VM Emulated Devices" href="e1000em.html" />
+    <link rel="prev" title="15. DPAA Poll Mode Driver" href="dpaa.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpaa2-poll-mode-driver">
+<h1><span class="section-number">16. </span>DPAA2 Poll Mode Driver</h1>
+<p>The DPAA2 NIC PMD (<strong>librte_net_dpaa2</strong>) provides poll mode driver
+support for the inbuilt NIC found in the <strong>NXP DPAA2</strong> SoC family.</p>
+<p>More information can be found at <a class="reference external" href="http://www.nxp.com/products/microcontrollers-and-processors/arm-processors/qoriq-arm-processors:QORIQ-ARM">NXP Official Website</a>.</p>
+<section id="nxp-dpaa2-data-path-acceleration-architecture-gen2">
+<h2><span class="section-number">16.1. </span>NXP DPAA2 (Data Path Acceleration Architecture Gen2)</h2>
+<p>This section provides an overview of the NXP DPAA2 architecture
+and how it is integrated into the DPDK.</p>
+<p>Contents summary</p>
+<ul class="simple">
+<li><p>DPAA2 overview</p></li>
+<li><p>Overview of DPAA2 objects</p></li>
+<li><p>DPAA2 driver architecture overview</p></li>
+</ul>
+<section id="dpaa2-overview">
+<span id="id1"></span><h3><span class="section-number">16.1.1. </span>DPAA2 Overview</h3>
+<p>Reference: <a class="reference external" href="https://www.kernel.org/doc/readme/drivers-staging-fsl-mc-README.txt">FSL MC BUS in Linux Kernel</a>.</p>
+<p>DPAA2 is a hardware architecture designed for high-speed network
+packet processing.  DPAA2 consists of sophisticated mechanisms for
+processing Ethernet packets, queue management, buffer management,
+autonomous L2 switching, virtual Ethernet bridging, and accelerator
+(e.g. crypto) sharing.</p>
+<p>A DPAA2 hardware component called the Management Complex (or MC) manages the
+DPAA2 hardware resources.  The MC provides an object-based abstraction for
+software drivers to use the DPAA2 hardware.</p>
+<p>The MC uses DPAA2 hardware resources such as queues, buffer pools, and
+network ports to create functional objects/devices such as network
+interfaces, an L2 switch, or accelerator instances.</p>
+<p>The MC provides memory-mapped I/O command interfaces (MC portals)
+which DPAA2 software drivers use to operate on DPAA2 objects:</p>
+<p>The diagram below shows an overview of the DPAA2 resource management
+architecture:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">+--------------------------------------+</span>
+<span class="go">|                  OS                  |</span>
+<span class="go">|                        DPAA2 drivers |</span>
+<span class="go">|                             |        |</span>
+<span class="go">+-----------------------------|--------+</span>
+<span class="go">                              |</span>
+<span class="go">                              | (create,discover,connect</span>
+<span class="go">                              |  config,use,destroy)</span>
+<span class="go">                              |</span>
+<span class="go">                DPAA2         |</span>
+<span class="go">+------------------------| mc portal |-+</span>
+<span class="go">|                             |        |</span>
+<span class="go">|   +- - - - - - - - - - - - -V- - -+  |</span>
+<span class="go">|   |                               |  |</span>
+<span class="go">|   |   Management Complex (MC)     |  |</span>
+<span class="go">|   |                               |  |</span>
+<span class="go">|   +- - - - - - - - - - - - - - - -+  |</span>
+<span class="go">|                                      |</span>
+<span class="go">| Hardware                  Hardware   |</span>
+<span class="go">| Resources                 Objects    |</span>
+<span class="go">| ---------                 -------    |</span>
+<span class="go">| -queues                   -DPRC      |</span>
+<span class="go">| -buffer pools             -DPMCP     |</span>
+<span class="go">| -Eth MACs/ports           -DPIO      |</span>
+<span class="go">| -network interface        -DPNI      |</span>
+<span class="go">|  profiles                 -DPMAC     |</span>
+<span class="go">| -queue portals            -DPBP      |</span>
+<span class="go">| -MC portals                ...       |</span>
+<span class="go">|  ...                                 |</span>
+<span class="go">|                                      |</span>
+<span class="go">+--------------------------------------+</span>
+</pre></div>
+</div>
+<p>The MC mediates operations such as create, discover,
+connect, configuration, and destroy.  Fast-path operations
+on data, such as packet transmit/receive, are not mediated by
+the MC and are done directly using memory mapped regions in
+DPIO objects.</p>
+</section>
+<section id="overview-of-dpaa2-objects">
+<h3><span class="section-number">16.1.2. </span>Overview of DPAA2 Objects</h3>
+<p>The section provides a brief overview of some key DPAA2 objects.
+A simple scenario is described illustrating the objects involved
+in creating a network interfaces.</p>
+<p>DPRC (Datapath Resource Container)</p>
+<blockquote>
+<div><p>A DPRC is a container object that holds all the other
+types of DPAA2 objects.  In the example diagram below there
+are 8 objects of 5 types (DPMCP, DPIO, DPBP, DPNI, and DPMAC)
+in the container.</p>
+</div></blockquote>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">+---------------------------------------------------------+</span>
+<span class="go">| DPRC                                                    |</span>
+<span class="go">|                                                         |</span>
+<span class="go">|  +-------+  +-------+  +-------+  +-------+  +-------+  |</span>
+<span class="go">|  | DPMCP |  | DPIO  |  | DPBP  |  | DPNI  |  | DPMAC |  |</span>
+<span class="go">|  +-------+  +-------+  +-------+  +---+---+  +---+---+  |</span>
+<span class="go">|  | DPMCP |  | DPIO  |                                   |</span>
+<span class="go">|  +-------+  +-------+                                   |</span>
+<span class="go">|  | DPMCP |                                              |</span>
+<span class="go">|  +-------+                                              |</span>
+<span class="go">|                                                         |</span>
+<span class="go">+---------------------------------------------------------+</span>
+</pre></div>
+</div>
+<p>From the point of view of an OS, a DPRC behaves similar to a plug and
+play bus, like PCI.  DPRC commands can be used to enumerate the contents
+of the DPRC, discover the hardware objects present (including mappable
+regions and interrupts).</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">DPRC.1 (bus)</span>
+<span class="go">  |</span>
+<span class="go">  +--+--------+-------+-------+-------+</span>
+<span class="go">     |        |       |       |       |</span>
+<span class="go">   DPMCP.1  DPIO.1  DPBP.1  DPNI.1  DPMAC.1</span>
+<span class="go">   DPMCP.2  DPIO.2</span>
+<span class="go">   DPMCP.3</span>
+</pre></div>
+</div>
+<p>Hardware objects can be created and destroyed dynamically, providing
+the ability to hot plug/unplug objects in and out of the DPRC.</p>
+<p>A DPRC has a mappable MMIO region (an MC portal) that can be used
+to send MC commands.  It has an interrupt for status events (like
+hotplug).</p>
+<p>All objects in a container share the same hardware “isolation context”.
+This means that with respect to an IOMMU the isolation granularity
+is at the DPRC (container) level, not at the individual object
+level.</p>
+<p>DPRCs can be defined statically and populated with objects
+via a config file passed to the MC when firmware starts
+it.  There is also a Linux user space tool called “restool”
+that can be used to create/destroy containers and objects
+dynamically.</p>
+</section>
+<section id="dpaa2-objects-for-an-ethernet-network-interface">
+<h3><span class="section-number">16.1.3. </span>DPAA2 Objects for an Ethernet Network Interface</h3>
+<p>A typical Ethernet NIC is monolithic– the NIC device contains TX/RX
+queuing mechanisms, configuration mechanisms, buffer management,
+physical ports, and interrupts.  DPAA2 uses a more granular approach
+utilizing multiple hardware objects.  Each object provides specialized
+functions. Groups of these objects are used by software to provide
+Ethernet network interface functionality.  This approach provides
+efficient use of finite hardware resources, flexibility, and
+performance advantages.</p>
+<p>The diagram below shows the objects needed for a simple
+network interface configuration on a system with 2 CPUs.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">+---+---+ +---+---+</span>
+<span class="go">   CPU0     CPU1</span>
+<span class="go">+---+---+ +---+---+</span>
+<span class="go">    |         |</span>
+<span class="go">+---+---+ +---+---+</span>
+<span class="go">   DPIO     DPIO</span>
+<span class="go">+---+---+ +---+---+</span>
+<span class="go">      \     /</span>
+<span class="go">       \   /</span>
+<span class="go">        \ /</span>
+<span class="go">     +---+---+</span>
+<span class="go">        DPNI  --- DPBP,DPMCP</span>
+<span class="go">     +---+---+</span>
+<span class="go">         |</span>
+<span class="go">         |</span>
+<span class="go">     +---+---+</span>
+<span class="go">       DPMAC</span>
+<span class="go">     +---+---+</span>
+<span class="go">         |</span>
+<span class="go">      port/PHY</span>
+</pre></div>
+</div>
+<p>Below the objects are described.  For each object a brief description
+is provided along with a summary of the kinds of operations the object
+supports and a summary of key resources of the object (MMIO regions
+and IRQs).</p>
+<p>DPMAC (Datapath Ethernet MAC): represents an Ethernet MAC, a
+hardware device that connects to an Ethernet PHY and allows
+physical transmission and reception of Ethernet frames.</p>
+<ul class="simple">
+<li><p>MMIO regions: none</p></li>
+<li><p>IRQs: DPNI link change</p></li>
+<li><p>commands: set link up/down, link config, get stats, IRQ config, enable, reset</p></li>
+</ul>
+<p>DPNI (Datapath Network Interface): contains TX/RX queues,
+network interface configuration, and RX buffer pool configuration
+mechanisms.  The TX/RX queues are in memory and are identified by
+queue number.</p>
+<ul class="simple">
+<li><p>MMIO regions: none</p></li>
+<li><p>IRQs: link state</p></li>
+<li><p>commands: port config, offload config, queue config, parse/classify config, IRQ config, enable, reset</p></li>
+</ul>
+<p>DPIO (Datapath I/O): provides interfaces to enqueue and dequeue
+packets and do hardware buffer pool management operations.  The DPAA2
+architecture separates the mechanism to access queues (the DPIO object)
+from the queues themselves.  The DPIO provides an MMIO interface to
+enqueue/dequeue packets.  To enqueue something a descriptor is written
+to the DPIO MMIO region, which includes the target queue number.
+There will typically be one DPIO assigned to each CPU.  This allows all
+CPUs to simultaneously perform enqueue/dequeued operations.  DPIOs are
+expected to be shared by different DPAA2 drivers.</p>
+<ul class="simple">
+<li><p>MMIO regions: queue operations, buffer management</p></li>
+<li><p>IRQs: data availability, congestion notification, buffer pool depletion</p></li>
+<li><p>commands: IRQ config, enable, reset</p></li>
+</ul>
+<p>DPBP (Datapath Buffer Pool): represents a hardware buffer
+pool.</p>
+<ul class="simple">
+<li><p>MMIO regions: none</p></li>
+<li><p>IRQs: none</p></li>
+<li><p>commands: enable, reset</p></li>
+</ul>
+<p>DPMCP (Datapath MC Portal): provides an MC command portal.
+Used by drivers to send commands to the MC to manage
+objects.</p>
+<ul class="simple">
+<li><p>MMIO regions: MC command portal</p></li>
+<li><p>IRQs: command completion</p></li>
+<li><p>commands: IRQ config, enable, reset</p></li>
+</ul>
+</section>
+<section id="object-connections">
+<h3><span class="section-number">16.1.4. </span>Object Connections</h3>
+<p>Some objects have explicit relationships that must
+be configured:</p>
+<ul class="simple">
+<li><p>DPNI &lt;–&gt; DPMAC</p></li>
+<li><p>DPNI &lt;–&gt; DPNI</p></li>
+<li><p>DPNI &lt;–&gt; L2-switch-port</p></li>
+</ul>
+<p>A DPNI must be connected to something such as a DPMAC,
+another DPNI, or L2 switch port.  The DPNI connection
+is made via a DPRC command.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">+-------+  +-------+</span>
+<span class="go">| DPNI  |  | DPMAC |</span>
+<span class="go">+---+---+  +---+---+</span>
+<span class="go">    |          |</span>
+<span class="go">    +==========+</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>DPNI &lt;–&gt; DPBP</p></li>
+</ul>
+<p>A network interface requires a ‘buffer pool’ (DPBP object) which provides
+a list of pointers to memory where received Ethernet data is to be copied.
+The Ethernet driver configures the DPBPs associated with the network
+interface.</p>
+</section>
+<section id="interrupts">
+<h3><span class="section-number">16.1.5. </span>Interrupts</h3>
+<p>All interrupts generated by DPAA2 objects are message
+interrupts.  At the hardware level message interrupts
+generated by devices will normally have 3 components–
+1) a non-spoofable ‘device-id’ expressed on the hardware
+bus, 2) an address, 3) a data value.</p>
+<p>In the case of DPAA2 devices/objects, all objects in the
+same container/DPRC share the same ‘device-id’.
+For ARM-based SoC this is the same as the stream ID.</p>
+</section>
+</section>
+<section id="dpaa2-dpdk-poll-mode-driver-overview">
+<h2><span class="section-number">16.2. </span>DPAA2 DPDK - Poll Mode Driver Overview</h2>
+<p>This section provides an overview of the drivers for
+DPAA2– 1) the bus driver and associated “DPAA2 infrastructure”
+drivers and 2) functional object drivers (such as Ethernet).</p>
+<p>As described previously, a DPRC is a container that holds the other
+types of DPAA2 objects.  It is functionally similar to a plug-and-play
+bus controller.</p>
+<p>Each object in the DPRC is a Linux “device” and is bound to a driver.
+The diagram below shows the dpaa2 drivers involved in a networking
+scenario and the objects bound to each driver.  A brief description
+of each driver follows.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">                                   +------------+</span>
+<span class="go">                                   | DPDK DPAA2 |</span>
+<span class="go">                                   |     PMD    |</span>
+<span class="go">                                   +------------+       +------------+</span>
+<span class="go">                                   |  Ethernet  |.......|  Mempool   |</span>
+<span class="go">                . . . . . . . . .  |   (DPNI)   |       |  (DPBP)    |</span>
+<span class="go">               .                   +---+---+----+       +-----+------+</span>
+<span class="go">              .                        ^   |                  .</span>
+<span class="go">             .                         |   |&lt;enqueue,         .</span>
+<span class="go">            .                          |   | dequeue&gt;         .</span>
+<span class="go">           .                           |   |                  .</span>
+<span class="go">          .                        +---+---V----+             .</span>
+<span class="go">         .      . . . . . . . . . .| DPIO driver|             .</span>
+<span class="go">        .      .                   |  (DPIO)    |             .</span>
+<span class="go">       .      .                    +-----+------+             .</span>
+<span class="go">      .      .                     |  QBMAN     |             .</span>
+<span class="go">     .      .                      |  Driver    |             .</span>
+<span class="go">+----+------+-------+              +-----+----- |             .</span>
+<span class="go">|   dpaa2 bus       |                    |                    .</span>
+<span class="go">|   VFIO fslmc-bus  |....................|.....................</span>
+<span class="go">|                   |                    |</span>
+<span class="go">|     /bus/fslmc    |                    |</span>
+<span class="go">+-------------------+                    |</span>
+<span class="go">                                         |</span>
+<span class="go">========================== HARDWARE =====|=======================</span>
+<span class="go">                                       DPIO</span>
+<span class="go">                                         |</span>
+<span class="go">                                       DPNI---DPBP</span>
+<span class="go">                                         |</span>
+<span class="go">                                       DPMAC</span>
+<span class="go">                                         |</span>
+<span class="go">                                        PHY</span>
+<span class="go">=========================================|========================</span>
+</pre></div>
+</div>
+<p>A brief description of each driver is provided below.</p>
+<section id="dpaa2-bus-driver">
+<h3><span class="section-number">16.2.1. </span>DPAA2 bus driver</h3>
+<p>The DPAA2 bus driver is a rte_bus driver which scans the fsl-mc bus.
+Key functions include:</p>
+<ul class="simple">
+<li><p>Reading the container and setting up vfio group</p></li>
+<li><p>Scanning and parsing the various MC objects and adding them to
+their respective device list.</p></li>
+</ul>
+<p>Additionally, it also provides the object driver for generic MC objects.</p>
+</section>
+<section id="dpio-driver">
+<h3><span class="section-number">16.2.2. </span>DPIO driver</h3>
+<p>The DPIO driver is bound to DPIO objects and provides services that allow
+other drivers such as the Ethernet driver to enqueue and dequeue data for
+their respective objects.
+Key services include:</p>
+<ul class="simple">
+<li><p>Data availability notifications</p></li>
+<li><p>Hardware queuing operations (enqueue and dequeue of data)</p></li>
+<li><p>Hardware buffer pool management</p></li>
+</ul>
+<p>To transmit a packet the Ethernet driver puts data on a queue and
+invokes a DPIO API.  For receive, the Ethernet driver registers
+a data availability notification callback.  To dequeue a packet
+a DPIO API is used.</p>
+<p>There is typically one DPIO object per physical CPU for optimum
+performance, allowing different CPUs to simultaneously enqueue
+and dequeue data.</p>
+<p>The DPIO driver operates on behalf of all DPAA2 drivers
+active  –  Ethernet, crypto, compression, etc.</p>
+</section>
+<section id="dpbp-based-mempool-driver">
+<h3><span class="section-number">16.2.3. </span>DPBP based Mempool driver</h3>
+<p>The DPBP driver is bound to a DPBP objects and provides services to
+create a hardware offloaded packet buffer mempool.</p>
+</section>
+<section id="dpaa2-nic-driver">
+<h3><span class="section-number">16.2.4. </span>DPAA2 NIC Driver</h3>
+<p>The Ethernet driver is bound to a DPNI and implements the kernel
+interfaces needed to connect the DPAA2 network interface to
+the network stack.</p>
+<p>Each DPNI corresponds to a DPDK network interface.</p>
+<section id="features">
+<h4><span class="section-number">16.2.4.1. </span>Features</h4>
+<p>Features of the DPAA2 PMD are:</p>
+<ul class="simple">
+<li><p>Multiple queues for TX and RX</p></li>
+<li><p>Receive Side Scaling (RSS)</p></li>
+<li><p>MAC/VLAN filtering</p></li>
+<li><p>Packet type information</p></li>
+<li><p>Checksum offload</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Multicast mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Jumbo frames</p></li>
+<li><p>Link flow control</p></li>
+<li><p>Scattered and gather for TX and RX</p></li>
+<li><p><a class="reference internal" href="#dptmapi"><span class="std std-ref">Traffic Management API</span></a></p></li>
+</ul>
+</section>
+</section>
+</section>
+<section id="supported-dpaa2-socs">
+<h2><span class="section-number">16.3. </span>Supported DPAA2 SoCs</h2>
+<ul class="simple">
+<li><p>LX2160A</p></li>
+<li><p>LS2084A/LS2044A</p></li>
+<li><p>LS2088A/LS2048A</p></li>
+<li><p>LS1088A/LS1048A</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">16.4. </span>Prerequisites</h2>
+<p>See <a class="reference internal" href="../platform/dpaa2.html"><span class="doc">NXP QorIQ DPAA2 Board Support Package</span></a> for setup information</p>
+<ul class="simple">
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some part of fslmc bus code (mc flib - object library) routines are
+dual licensed (BSD &amp; GPLv2), however they are used as BSD in DPDK in userspace.</p>
+</div>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">16.5. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+<ol class="arabic">
+<li><p>Running testpmd:</p>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to run testpmd.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd -c 0xff -n 1 -- -i --portmask=0x3 --nb-cores=1 --no-flush-rx</span>
+
+<span class="go">.....</span>
+<span class="go">EAL: Registered [pci] bus.</span>
+<span class="go">EAL: Registered [fslmc] bus.</span>
+<span class="go">EAL: Detected 8 lcore(s)</span>
+<span class="go">EAL: Probing VFIO support...</span>
+<span class="go">EAL: VFIO support initialized</span>
+<span class="go">.....</span>
+<span class="go">PMD: DPAA2: Processing Container = dprc.2</span>
+<span class="go">EAL: fslmc: DPRC contains = 51 devices</span>
+<span class="go">EAL: fslmc: Bus scan completed</span>
+<span class="go">.....</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:00:00:00:00:01</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Port 1: 00:00:00:00:00:02</span>
+<span class="go">.....</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<ul class="simple">
+<li><p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">drv_loopback=1</span></code> to loopback packets at
+driver level. Any packet received will be reflected back by the
+driver on same port. e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpni.1,drv_loopback=1</span></code></p></li>
+<li><p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">drv_no_prefetch=1</span></code> to disable prefetching
+of the packet pull command which is issued  in the previous cycle.
+e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpni.1,drv_no_prefetch=1</span></code></p></li>
+<li><p>Use dev arg option  <code class="docutils literal notranslate"><span class="pre">drv_tx_conf=1</span></code> to enable TX confirmation mode.
+In this mode tx conf queues need to be polled to free the buffers.
+e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpni.1,drv_tx_conf=1</span></code></p></li>
+<li><p>Use dev arg option  <code class="docutils literal notranslate"><span class="pre">drv_error_queue=1</span></code> to enable Packets in Error queue.
+DPAA2 hardware drops the error packet in hardware. This option enables the
+hardware to not drop the error packet and let the driver dump the error
+packets, so that user can check what is wrong with those packets.
+e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpni.1,drv_error_queue=1</span></code></p></li>
+</ul>
+</section>
+<section id="enabling-logs">
+<h2><span class="section-number">16.6. </span>Enabling logs</h2>
+<p>For enabling logging for DPAA2 PMD, following log-level prefix can be used:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;dpdk app&gt; &lt;EAL args&gt; --log-level=bus.fslmc:&lt;level&gt; -- ...</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Using <code class="docutils literal notranslate"><span class="pre">bus.fslmc</span></code> as log matching criteria, all FSLMC bus logs can be enabled
+which are lower than logging <code class="docutils literal notranslate"><span class="pre">level</span></code>.</p>
+<blockquote>
+<div><p>Or</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;dpdk app&gt; &lt;EAL args&gt; --log-level=pmd.net.dpaa2:&lt;level&gt; -- ...</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Using <code class="docutils literal notranslate"><span class="pre">pmd.net.dpaa2</span></code> as log matching criteria, all PMD logs can be enabled
+which are lower than logging <code class="docutils literal notranslate"><span class="pre">level</span></code>.</p>
+</section>
+<section id="allowing-blocking">
+<h2><span class="section-number">16.7. </span>Allowing &amp; Blocking</h2>
+<p>For blocking a DPAA2 device, following commands can be used.</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;dpdk app&gt; &lt;EAL args&gt; -b &quot;fslmc:dpni.x&quot; -- ...</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Where x is the device object id as configured in resource container.</p>
+</section>
+<section id="running-secondary-debug-app-without-blocklist">
+<h2><span class="section-number">16.8. </span>Running secondary debug app without blocklist</h2>
+<p>dpaa2 hardware imposes limits on some H/W access devices like Management
+Control Port and H/W portal. This causes issue in their shared usages in
+case of multi-process applications. It can overcome by using
+allowlist/blocklist in primary and secondary applications.</p>
+<p>In order to ease usage of standard debugging apps like dpdk-procinfo, dpaa2
+driver reserves extra Management Control Port and H/W portal which can be
+used by debug application to debug any existing application without
+blocking these devices in primary process.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">16.9. </span>Limitations</h2>
+<section id="platform-requirement">
+<h3><span class="section-number">16.9.1. </span>Platform Requirement</h3>
+<p>DPAA2 drivers for DPDK can only work on NXP SoCs as listed in the
+<code class="docutils literal notranslate"><span class="pre">Supported</span> <span class="pre">DPAA2</span> <span class="pre">SoCs</span></code>.</p>
+</section>
+<section id="maximum-packet-length">
+<h3><span class="section-number">16.9.2. </span>Maximum packet length</h3>
+<p>The DPAA2 SoC family support a maximum of a 10240 jumbo frame. The value
+is fixed and cannot be changed. So, even when the <code class="docutils literal notranslate"><span class="pre">rxmode.mtu</span></code>
+member of <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_conf</span></code> is set to a value lower than 10240, frames
+up to 10240 bytes can still reach the host interface.</p>
+</section>
+<section id="other-limitations">
+<h3><span class="section-number">16.9.3. </span>Other Limitations</h3>
+<ul class="simple">
+<li><p>RSS hash key cannot be modified.</p></li>
+<li><p>RSS RETA cannot be configured.</p></li>
+</ul>
+</section>
+</section>
+<section id="traffic-management-api">
+<span id="dptmapi"></span><h2><span class="section-number">16.10. </span>Traffic Management API</h2>
+<p>DPAA2 PMD supports generic DPDK Traffic Management API which allows to
+configure the following features:</p>
+<ol class="arabic simple">
+<li><p>Hierarchical scheduling</p></li>
+<li><p>Traffic shaping</p></li>
+</ol>
+<p>Internally TM is represented by a hierarchy (tree) of nodes.
+Node which has a parent is called a leaf whereas node without
+parent is called a non-leaf (root).</p>
+<p>Nodes hold following types of settings:</p>
+<ul class="simple">
+<li><p>for egress scheduler configuration: weight</p></li>
+<li><p>for egress rate limiter: private shaper</p></li>
+</ul>
+<p>Hierarchy is always constructed from the top, i.e first a root node is added
+then some number of leaf nodes. Number of leaf nodes cannot exceed number
+of configured tx queues.</p>
+<p>After hierarchy is complete it can be committed.</p>
+<p>For an additional description please refer to DPDK <a class="reference internal" href="../prog_guide/traffic_management.html"><span class="doc">Traffic Management API</span></a>.</p>
+<section id="supported-features">
+<h3><span class="section-number">16.10.1. </span>Supported Features</h3>
+<p>The following capabilities are supported:</p>
+<ul>
+<li><p>Level0 (root node), Level1 and Level2 are supported.</p></li>
+<li><p>1 private shaper at root node (port level) is supported.</p></li>
+<li><p>8 TX queues per port supported (1 channel per port)</p></li>
+<li><p>Both SP and WFQ scheduling mechanisms are supported on all 8 queues.</p></li>
+<li><dl class="simple">
+<dt>Congestion notification is supported. It means if there is congestion on</dt><dd><p>the network, DPDK driver will not enqueue any packet (no taildrop or WRED)</p>
+</dd>
+</dl>
+<p>User can also check node, level capabilities using testpmd commands.</p>
+</li>
+</ul>
+</section>
+<section id="usage-example">
+<h3><span class="section-number">16.10.2. </span>Usage example</h3>
+<p>For a detailed usage description please refer to “Traffic Management” section in DPDK <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html"><span class="doc">Testpmd Runtime Functions</span></a>.</p>
+<ol class="arabic">
+<li><p>Run testpmd as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd  -c 0xf -n 1 -- -i --portmask 0x3 --nb-cores=1 --txq=4 --rxq=4</span>
+</pre></div>
+</div>
+</li>
+<li><p>Stop all ports:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port stop all</span>
+</pre></div>
+</div>
+</li>
+<li><p>Add shaper profile:</p>
+<p>One port level shaper and strict priority on all 4 queues of port 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">add port tm node shaper profile 0 1 104857600 64 100 0 0</span>
+<span class="go">add port tm nonleaf node 0 8 -1 0 1 0 1 1 1 0</span>
+<span class="go">add port tm leaf node 0 0 8 0 1 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 1 8 1 1 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 2 8 2 1 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 3 8 3 1 1 -1 0 0 0 0</span>
+<span class="go">port tm hierarchy commit 0 no</span>
+
+<span class="go">or</span>
+</pre></div>
+</div>
+<p>One port level shaper and WFQ on all 4 queues of port 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">add port tm node shaper profile 0 1 104857600 64 100 0 0</span>
+<span class="go">add port tm nonleaf node 0 8 -1 0 1 0 1 1 1 0</span>
+<span class="go">add port tm leaf node 0 0 8 0 200 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 1 8 0 300 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 2 8 0 400 1 -1 0 0 0 0</span>
+<span class="go">add port tm leaf node 0 3 8 0 500 1 -1 0 0 0 0</span>
+<span class="go">port tm hierarchy commit 0 no</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create flows as per the source IP addresses:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">flow create 1 group 0 priority 1 ingress pattern ipv4 src is \</span>
+<span class="go">10.10.10.1 / end actions queue index 0 / end</span>
+<span class="go">flow create 1 group 0 priority 2 ingress pattern ipv4 src is \</span>
+<span class="go">10.10.10.2 / end actions queue index 1 / end</span>
+<span class="go">flow create 1 group 0 priority 3 ingress pattern ipv4 src is \</span>
+<span class="go">10.10.10.3 / end actions queue index 2 / end</span>
+<span class="go">flow create 1 group 0 priority 4 ingress pattern ipv4 src is \</span>
+<span class="go">10.10.10.4 / end actions queue index 3 / end</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start all ports</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port start all</span>
+</pre></div>
+</div>
+</li>
+<li><p>Enable forwarding</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; start</span>
+</pre></div>
+</div>
+</li>
+<li><p>Inject the traffic on port1 as per the configured flows, you will see shaped and scheduled forwarded traffic on port0</p></li>
+</ol>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="dpaa.html" title="previous chapter"><span class="section-number">15. </span>DPAA Poll Mode Driver</a></li>
+      <li>Next: <a href="e1000em.html" title="next chapter"><span class="section-number">17. </span>Driver for VM Emulated Devices</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/dpaa2.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

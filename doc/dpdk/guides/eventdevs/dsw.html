@@ -1,0 +1,218 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. Distributed Software Eventdev Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Software Eventdev Poll Mode Driver" href="sw.html" />
+    <link rel="prev" title="5. NXP DPAA2 Eventdev Driver" href="dpaa2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="distributed-software-eventdev-poll-mode-driver">
+<h1><span class="section-number">6. </span>Distributed Software Eventdev Poll Mode Driver</h1>
+<p>The distributed software event device is an eventdev driver which
+distributes the task of scheduling events among all the eventdev ports
+and the lcore threads using them.</p>
+<section id="features">
+<h2><span class="section-number">6.1. </span>Features</h2>
+<dl class="simple">
+<dt>Queues</dt><dd><ul class="simple">
+<li><p>Atomic</p></li>
+<li><p>Parallel</p></li>
+<li><p>Single-Link</p></li>
+</ul>
+</dd>
+<dt>Ports</dt><dd><ul class="simple">
+<li><p>Load balanced (for Atomic, Ordered, Parallel queues)</p></li>
+<li><p>Single Link (for single-link queues)</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="configuration-and-options">
+<h2><span class="section-number">6.2. </span>Configuration and Options</h2>
+<p>The distributed software eventdev is a vdev device, and as such can be
+created from the application code, or from the EAL command line:</p>
+<ul class="simple">
+<li><p>Call <code class="docutils literal notranslate"><span class="pre">rte_vdev_init(&quot;event_dsw0&quot;)</span></code> from the application</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--vdev=&quot;event_dsw0&quot;</span></code> in the EAL options, which will call
+rte_vdev_init() internally</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_eventdev_application --vdev=&quot;event_dsw0&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="limitations">
+<h2><span class="section-number">6.3. </span>Limitations</h2>
+<section id="port-maintenance">
+<h3><span class="section-number">6.3.1. </span>Port Maintenance</h3>
+<p>The distributed software eventdev uses an internal signaling scheme
+between the ports to achieve load balancing. Therefore, it does not
+set the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DEV_CAP_MAINTENANCE_FREE</span></code> flag.</p>
+<p>During periods when the application thread using a particular port is
+neither attempting to enqueue nor to dequeue events, it must
+repeatedly call rte_event_maintain() on that port.</p>
+<p>Ports left unmaintained for long periods of time will prevent load
+balancing and cause traffic interruptions on flows which are in the
+process of being migrated.</p>
+</section>
+<section id="output-buffering">
+<h3><span class="section-number">6.3.2. </span>Output Buffering</h3>
+<p>For efficiency reasons, the distributed software eventdev might not
+send enqueued events immediately to the destination port, but instead
+store them in an internal buffer in the source port.</p>
+<p>In case no more events are enqueued on a port with buffered events,
+these events will be sent after the application has performed a number
+of enqueue and/or dequeue operations.</p>
+<p>To immediately flush a port’s output buffer, an application may call
+rte_event_maintain() with op set to <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DEV_MAINT_OP_FLUSH</span></code>.</p>
+<p>Repeated calls to rte_event_maintain() will also flush the output
+buffers.</p>
+</section>
+<section id="priorities">
+<h3><span class="section-number">6.3.3. </span>Priorities</h3>
+<p>The distributed software eventdev does not support event priorities.</p>
+</section>
+<section id="ordered-queues">
+<h3><span class="section-number">6.3.4. </span>Ordered Queues</h3>
+<p>The distributed software eventdev does not support the ordered queue type.</p>
+</section>
+<section id="all-types-queues">
+<h3><span class="section-number">6.3.5. </span>“All Types” Queues</h3>
+<p>The distributed software eventdev does not support queues of type
+RTE_EVENT_QUEUE_CFG_ALL_TYPES, which allow both atomic, ordered, and
+parallel events on the same queue.</p>
+</section>
+<section id="dynamic-link-unlink">
+<h3><span class="section-number">6.3.6. </span>Dynamic Link/Unlink</h3>
+<p>The distributed software eventdev does not support calls to
+rte_event_port_link() or rte_event_port_unlink() after
+rte_event_dev_start() has been called.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Event Device Drivers</a><ul>
+      <li>Previous: <a href="dpaa2.html" title="previous chapter"><span class="section-number">5. </span>NXP DPAA2 Eventdev Driver</a></li>
+      <li>Next: <a href="sw.html" title="next chapter"><span class="section-number">7. </span>Software Eventdev Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/eventdevs/dsw.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>49. Libpcap and Ring Based Poll Mode Drivers &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="50. PFE Poll Mode Driver" href="pfe.html" />
+    <link rel="prev" title="48. OCTEON TX Poll Mode driver" href="octeontx.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="libpcap-and-ring-based-poll-mode-drivers">
+<h1><span class="section-number">49. </span>Libpcap and Ring Based Poll Mode Drivers</h1>
+<p>In addition to Poll Mode Drivers (PMDs) for physical and virtual hardware,
+the DPDK also includes pure-software PMDs, two of these drivers are:</p>
+<ul class="simple">
+<li><p>A libpcap -based PMD (<strong>librte_net_pcap</strong>) that reads and writes packets using libpcap,
+- both from files on disk, as well as from physical NIC devices using standard Linux kernel drivers.</p></li>
+<li><p>A ring-based PMD (<strong>librte_net_ring</strong>) that allows a set of software FIFOs (that is, rte_ring)
+to be accessed using the PMD APIs, as though they were physical NICs.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The libpcap -based PMD has an external dependency on the libpcap development files which must
+be installed on the board.</p>
+</div>
+<section id="using-the-drivers-from-the-eal-command-line">
+<h2><span class="section-number">49.1. </span>Using the Drivers from the EAL Command Line</h2>
+<p>For ease of use, the DPDK EAL also has been extended to allow pseudo-Ethernet devices,
+using one or more of these drivers,
+to be created at application startup time during EAL initialization.</p>
+<p>To do so, the –vdev= parameter must be passed to the EAL.
+This takes take options to allow ring and pcap-based Ethernet to be allocated and used transparently by the application.
+This can be used, for example, for testing on a virtual machine where there are no Ethernet ports.</p>
+<section id="libpcap-based-pmd">
+<h3><span class="section-number">49.1.1. </span>Libpcap-based PMD</h3>
+<p>Pcap-based devices can be created using the virtual device –vdev option.
+The device name must start with the net_pcap prefix followed by numbers or letters.
+The name is unique for each device. Each device can have multiple stream options and multiple devices can be used.
+Multiple device definitions can be arranged using multiple –vdev.
+Device name and stream options must be separated by commas as shown below:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,stream_opt0=..,stream_opt1=..&#39; \</span>
+<span class="go">    --vdev=&#39;net_pcap1,stream_opt0=..&#39;</span>
+</pre></div>
+</div>
+<section id="device-streams">
+<h4><span class="section-number">49.1.1.1. </span>Device Streams</h4>
+<p>Multiple ways of stream definitions can be assessed and combined as long as the following two rules are respected:</p>
+<ul class="simple">
+<li><p>A device is provided with two different streams - reception and transmission.</p></li>
+<li><p>A device is provided with one network interface name used for reading and writing packets.</p></li>
+</ul>
+<p>The different stream types are:</p>
+<ul>
+<li><p>rx_pcap: Defines a reception stream based on a pcap file.
+The driver reads each packet within the given pcap file as if it was receiving it from the wire.
+The value is a path to a valid pcap file.</p>
+<blockquote>
+<div><p>rx_pcap=/path/to/file.pcap</p>
+</div></blockquote>
+</li>
+<li><p>tx_pcap: Defines a transmission stream based on a pcap file.
+The driver writes each received packet to the given pcap file.
+The value is a path to a pcap file.
+The file is overwritten if it already exists and it is created if it does not.</p>
+<blockquote>
+<div><p>tx_pcap=/path/to/file.pcap</p>
+</div></blockquote>
+</li>
+<li><p>rx_iface: Defines a reception stream based on a network interface name.
+The driver reads packets from the given interface using the Linux kernel driver for that interface.
+The driver captures both the incoming and outgoing packets on that interface.
+The value is an interface name.</p>
+<blockquote>
+<div><p>rx_iface=eth0</p>
+</div></blockquote>
+</li>
+<li><p>rx_iface_in: Defines a reception stream based on a network interface name.
+The driver reads packets from the given interface using the Linux kernel driver for that interface.
+The driver captures only the incoming packets on that interface.
+The value is an interface name.</p>
+<blockquote>
+<div><p>rx_iface_in=eth0</p>
+</div></blockquote>
+</li>
+<li><p>tx_iface: Defines a transmission stream based on a network interface name.
+The driver sends packets to the given interface using the Linux kernel driver for that interface.
+The value is an interface name.</p>
+<blockquote>
+<div><p>tx_iface=eth0</p>
+</div></blockquote>
+</li>
+<li><p>iface: Defines a device mapping a network interface.
+The driver both reads and writes packets from and to the given interface.
+The value is an interface name.</p>
+<blockquote>
+<div><p>iface=eth0</p>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="runtime-config-options">
+<h4><span class="section-number">49.1.1.2. </span>Runtime Config Options</h4>
+<ul class="simple">
+<li><p>Use PCAP interface physical MAC</p></li>
+</ul>
+<blockquote>
+<div><p>In case <code class="docutils literal notranslate"><span class="pre">iface=</span></code> configuration is set, user may want to use the selected interface’s physical MAC
+address. This can be done with a <code class="docutils literal notranslate"><span class="pre">devarg</span></code> <code class="docutils literal notranslate"><span class="pre">phy_mac</span></code>, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;net_pcap0,iface=eth0,phy_mac=1&#39;
+</pre></div>
+</div>
+</div></blockquote>
+<ul class="simple">
+<li><p>Use the RX PCAP file to infinitely receive packets</p></li>
+</ul>
+<blockquote>
+<div><p>In case <code class="docutils literal notranslate"><span class="pre">rx_pcap=</span></code> configuration is set, user may want to use the selected PCAP file for rudimental
+performance testing. This can be done with a <code class="docutils literal notranslate"><span class="pre">devarg</span></code> <code class="docutils literal notranslate"><span class="pre">infinite_rx</span></code>, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;net_pcap0,rx_pcap=file_rx.pcap,infinite_rx=1&#39;
+</pre></div>
+</div>
+<p>When this mode is used, it is recommended to drop all packets on transmit by not providing a tx_pcap or tx_iface.</p>
+<p>This option is device wide, so all queues on a device will either have this enabled or disabled.
+This option should only be provided once per device.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>Drop all packets on transmit</p></li>
+</ul>
+<blockquote>
+<div><p>The user may want to drop all packets on tx for a device. This can be done by not providing a tx_pcap or tx_iface, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;net_pcap0,rx_pcap=file_rx.pcap&#39;
+</pre></div>
+</div>
+<p>In this case, one tx drop queue is created for each rxq on that device.</p>
+<ul class="simple">
+<li><p>Receive no packets on Rx</p></li>
+</ul>
+<p>The user may want to run without receiving any packets on Rx. This can be done by not providing a rx_pcap or rx_iface, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;net_pcap0,tx_pcap=file_tx.pcap&#39;
+</pre></div>
+</div>
+</div></blockquote>
+<p>In this case, one dummy rx queue is created for each tx queue argument passed</p>
+</section>
+<section id="examples-of-usage">
+<h4><span class="section-number">49.1.1.3. </span>Examples of Usage</h4>
+<p>Read packets from one pcap file and write them to another:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_pcap=file_rx.pcap,tx_pcap=file_tx.pcap&#39; \</span>
+<span class="go">    -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Read packets from a network interface and write them to a pcap file:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_iface=eth0,tx_pcap=file_tx.pcap&#39; \</span>
+<span class="go">    -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Read packets from a pcap file and write them to a network interface:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_pcap=file_rx.pcap,tx_iface=eth1&#39; \</span>
+<span class="go">    -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Forward packets through two network interfaces:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,iface=eth0&#39; --vdev=&#39;net_pcap1,iface=eth1&#39;</span>
+</pre></div>
+</div>
+<p>Enable 2 tx queues on a network interface:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_iface=eth1,tx_iface=eth1,tx_iface=eth1&#39; \</span>
+<span class="go">    -- --txq 2</span>
+</pre></div>
+</div>
+<p>Read only incoming packets from a network interface and write them back to the same network interface:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_iface_in=eth1,tx_iface=eth1&#39;</span>
+</pre></div>
+</div>
+</section>
+<section id="using-libpcap-based-pmd-with-the-testpmd-application">
+<h4><span class="section-number">49.1.1.4. </span>Using libpcap-based PMD with the testpmd Application</h4>
+<p>One of the first things that testpmd does before starting to forward packets is to flush the RX streams
+by reading the first 512 packets on every RX stream and discarding them.
+When using a libpcap-based PMD this behavior can be turned off using the following command line option:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--no-flush-rx</span>
+</pre></div>
+</div>
+<p>It is also available in the runtime command line:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">set flush_rx on/off</span>
+</pre></div>
+</div>
+<p>It is useful for the case where the rx_pcap is being used and no packets are meant to be discarded.
+Otherwise, the first 512 packets from the input pcap file will be discarded by the RX flushing operation.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 \</span>
+<span class="go">    --vdev &#39;net_pcap0,rx_pcap=file_rx.pcap,tx_pcap=file_tx.pcap&#39; \</span>
+<span class="go">    -- --port-topology=chained --no-flush-rx</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The network interface provided to the PMD should be up. The PMD will return
+an error if interface is down, and the PMD itself won’t change the status
+of the external network interface.</p>
+</div>
+</section>
+</section>
+<section id="rings-based-pmd">
+<h3><span class="section-number">49.1.2. </span>Rings-based PMD</h3>
+<p>To run a DPDK application on a machine without any Ethernet devices, a pair of ring-based rte_ethdevs can be used as below.
+The device names passed to the –vdev option must start with net_ring and take no additional parameters.
+Multiple devices may be specified, separated by commas.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd -l 1-3 -n 4 --vdev=net_ring0 --vdev=net_ring1 -- -i</span>
+<span class="go">EAL: Detected lcore 1 as core 1 on socket 0</span>
+<span class="go">...</span>
+
+<span class="go">Interactive-mode selected</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+
+<span class="go">testpmd&gt; start tx_first</span>
+<span class="go">io packet forwarding - CRC stripping disabled - packets/burst=16</span>
+<span class="go">nb forwarding cores=1 - nb forwarding ports=2</span>
+<span class="go">RX queues=1 - RX desc=128 - RX free threshold=0</span>
+<span class="go">RX threshold registers: pthresh=8 hthresh=8 wthresh=4</span>
+<span class="go">TX queues=1 - TX desc=512 - TX free threshold=0</span>
+<span class="go">TX threshold registers: pthresh=36 hthresh=0 wthresh=0</span>
+<span class="go">TX RS bit threshold=0 - TXQ flags=0x0</span>
+
+<span class="go">testpmd&gt; stop</span>
+<span class="go">Telling cores to stop...</span>
+<span class="go">Waiting for lcores to finish...</span>
+</pre></div>
+</div>
+<img alt="../_images/forward_stats.png" src="../_images/forward_stats.png" />
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">+++++++++++++++ Accumulated forward statistics for allports++++++++++</span>
+<span class="go">RX-packets: 462384736  RX-dropped: 0 RX-total: 462384736</span>
+<span class="go">TX-packets: 462384768  TX-dropped: 0 TX-total: 462384768</span>
+<span class="go">+++++++++++++++++++++++++++++++++++++++++++++++++++++</span>
+
+<span class="go">Done.</span>
+</pre></div>
+</div>
+</section>
+<section id="using-the-poll-mode-driver-from-an-application">
+<h3><span class="section-number">49.1.3. </span>Using the Poll Mode Driver from an Application</h3>
+<p>Both drivers can provide similar APIs to allow the user to create a PMD, that is,
+rte_ethdev structure, instances at run-time in the end-application,
+for example, using rte_eth_from_rings() or rte_eth_from_pcaps() APIs.
+For the rings-based PMD, this functionality could be used, for example,
+to allow data exchange between cores using rings to be done in exactly the
+same way as sending or receiving packets from an Ethernet device.
+For the libpcap-based PMD, it allows an application to open one or more pcap files
+and use these as a source of packet input to the application.</p>
+<section id="usage-examples">
+<h4><span class="section-number">49.1.3.1. </span>Usage Examples</h4>
+<p>To create two pseudo-Ethernet ports where all traffic sent to a port is looped back
+for reception on the same port (error handling omitted for clarity):</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define RING_SIZE 256</span>
+<span class="cp">#define NUM_RINGS 2</span>
+<span class="cp">#define SOCKET0 0</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_ring</span><span class="w"> </span><span class="o">*</span><span class="n">ring</span><span class="p">[</span><span class="n">NUM_RINGS</span><span class="p">];</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">port0</span><span class="p">,</span><span class="w"> </span><span class="n">port1</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ring</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_ring_create</span><span class="p">(</span><span class="s">&quot;R0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">RING_SIZE</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">,</span><span class="w"> </span><span class="n">RING_F_SP_ENQ</span><span class="o">|</span><span class="n">RING_F_SC_DEQ</span><span class="p">);</span><span class="w"></span>
+<span class="n">ring</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_ring_create</span><span class="p">(</span><span class="s">&quot;R1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">RING_SIZE</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">,</span><span class="w"> </span><span class="n">RING_F_SP_ENQ</span><span class="o">|</span><span class="n">RING_F_SC_DEQ</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* create two ethdev&#39;s */</span><span class="w"></span>
+
+<span class="n">port0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_from_rings</span><span class="p">(</span><span class="s">&quot;net_ring0&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_RINGS</span><span class="p">,</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_RINGS</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">);</span><span class="w"></span>
+<span class="n">port1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_from_rings</span><span class="p">(</span><span class="s">&quot;net_ring1&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_RINGS</span><span class="p">,</span><span class="w"> </span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_RINGS</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>To create two pseudo-Ethernet ports where the traffic is switched between them,
+that is, traffic sent to port 0 is read back from port 1 and vice-versa,
+the final two lines could be changed as below:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">port0</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_from_rings</span><span class="p">(</span><span class="s">&quot;net_ring0&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ring</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ring</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">);</span><span class="w"></span>
+<span class="n">port1</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_from_rings</span><span class="p">(</span><span class="s">&quot;net_ring1&quot;</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ring</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ring</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">SOCKET0</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This type of configuration could be useful in a pipeline model, for example,
+where one may want to have inter-core communication using pseudo Ethernet devices rather than raw rings,
+for reasons of API consistency.</p>
+<p>Enqueuing and dequeuing items from an rte_ring using the rings-based PMD may be slower than using the native rings API.
+This is because DPDK Ethernet drivers make use of function pointers to call the appropriate enqueue or dequeue functions,
+while the rte_ring specific functions are direct function calls in the code and are often inlined by the compiler.</p>
+<blockquote>
+<div><p>Once an ethdev has been created, for either a ring or a pcap-based PMD,
+it should be configured and started in the same way as a regular Ethernet device, that is,
+by calling rte_eth_dev_configure() to set the number of receive and transmit queues,
+then calling rte_eth_rx_queue_setup() / tx_queue_setup() for each of those queues and
+finally calling rte_eth_dev_start() to allow transmission and reception of packets to begin.</p>
+</div></blockquote>
+</section>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="octeontx.html" title="previous chapter"><span class="section-number">48. </span>OCTEON TX Poll Mode driver</a></li>
+      <li>Next: <a href="pfe.html" title="next chapter"><span class="section-number">50. </span>PFE Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/pcap_ring.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

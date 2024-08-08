@@ -1,0 +1,682 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Running the Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. Testpmd Runtime Functions" href="testpmd_funcs.html" />
+    <link rel="prev" title="2. Compiling the Application" href="build_app.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="running-the-application">
+<h1><span class="section-number">3. </span>Running the Application</h1>
+<section id="eal-command-line-options">
+<h2><span class="section-number">3.1. </span>EAL Command-line Options</h2>
+<p>Please refer to <a class="reference internal" href="../linux_gsg/linux_eal_parameters.html"><span class="doc">EAL parameters (Linux)</span></a>
+or <a class="reference internal" href="../freebsd_gsg/freebsd_eal_parameters.html"><span class="doc">EAL parameters (FreeBSD)</span></a> for
+a list of available EAL command-line options.</p>
+</section>
+<section id="testpmd-command-line-options">
+<h2><span class="section-number">3.2. </span>Testpmd Command-line Options</h2>
+<p>The following are the command-line options for the testpmd applications.
+They must be separated from the EAL options, shown in the previous section, with a <code class="docutils literal notranslate"><span class="pre">--</span></code> separator:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./dpdk-testpmd -l 0-3 -n 4 -- -i --portmask=0x1 --nb-cores=2</span>
+</pre></div>
+</div>
+<p>The command line options are:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">-i,</span> <span class="pre">--interactive</span></code></p>
+<p>Run testpmd in interactive mode.
+In this mode, the testpmd starts with a prompt that can be used to start and stop forwarding,
+configure the application and display stats on the current packet processing session.
+See <a class="reference internal" href="testpmd_funcs.html#testpmd-runtime"><span class="std std-ref">Testpmd Runtime Functions</span></a> for more details.</p>
+<p>In non-interactive mode,
+the application starts with the configuration specified on the command-line and
+immediately enters forwarding mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-h,</span> <span class="pre">--help</span></code></p>
+<p>Display a help message and quit.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-a,</span> <span class="pre">--auto-start</span></code></p>
+<p>Start forwarding on initialization.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx-first</span></code></p>
+<p>Start forwarding, after sending a burst of packets first.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This flag should be only used in non-interactive mode.</p>
+</div>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--stats-period</span> <span class="pre">PERIOD</span></code></p>
+<p>Display statistics every PERIOD seconds, if interactive mode is disabled.
+The default value is 0, which means that the statistics will not be displayed.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--display-xstats</span> <span class="pre">xstat_name1[,...]</span></code></p>
+<p>Display comma-separated list of extended statistics every PERIOD seconds
+as specified in <code class="docutils literal notranslate"><span class="pre">--stats-period</span></code> or when used with interactive commands
+that show Rx/Tx statistics (i.e. ‘show port stats’).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb-cores=N</span></code></p>
+<p>Set the number of forwarding cores,
+where 1 &lt;= N &lt;= “number of cores” or <code class="docutils literal notranslate"><span class="pre">RTE_MAX_LCORE</span></code> from the configuration file.
+The default value is 1.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb-ports=N</span></code></p>
+<p>Set the number of forwarding ports,
+where 1 &lt;= N &lt;= “number of ports” on the board or <code class="docutils literal notranslate"><span class="pre">RTE_MAX_ETHPORTS</span></code> from the configuration file.
+The default value is the number of ports on the board.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--coremask=0xXX</span></code></p>
+<p>Set the hexadecimal bitmask of the cores running the packet forwarding test.
+The main lcore is reserved for command line parsing only and cannot be masked on for packet forwarding.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--portmask=0xXX</span></code></p>
+<p>Set the hexadecimal bitmask of the ports used by the packet forwarding test.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--portlist=X</span></code></p>
+<blockquote>
+<div><p>Set the forwarding ports based on the user input used by the packet forwarding test.
+‘-’ denotes a range of ports to set including the two specified port IDs
+‘,’ separates multiple port values.
+Possible examples like –portlist=0,1 or –portlist=0-2 or –portlist=0,1-2 etc</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--numa</span></code></p>
+<p>Enable NUMA-aware allocation of RX/TX rings and of RX memory buffers
+(mbufs). [Default setting]</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-numa</span></code></p>
+<p>Disable NUMA-aware allocation of RX/TX rings and of RX memory buffers (mbufs).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--port-numa-config=(port,socket)[,(port,socket)]</span></code></p>
+<p>Specify the socket on which the memory pool to be used by the port will be allocated.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ring-numa-config=(port,flag,socket)[,(port,flag,socket)]</span></code></p>
+<p>Specify the socket on which the TX/RX rings for the port will be allocated.
+Where flag is 1 for RX, 2 for TX, and 3 for RX and TX.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--socket-num=N</span></code></p>
+<p>Set the socket from which all memory is allocated in NUMA mode,
+where 0 &lt;= N &lt; number of sockets on the board.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mbuf-size=N[,N1[,...Nn]</span></code></p>
+<p>Set the data size of the mbufs used to N bytes, where N &lt; 65536.
+The default value is 2048. If multiple mbuf-size values are specified the
+extra memory pools will be created for allocating mbufs to receive packets
+with buffer splitting features.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--total-num-mbufs=N</span></code></p>
+<p>Set the number of mbufs to be allocated in the mbuf pools, where N &gt; 1024.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max-pkt-len=N</span></code></p>
+<p>Set the maximum packet size to N bytes, where N &gt;= 64. The default value is 1518.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max-lro-pkt-size=N</span></code></p>
+<p>Set the maximum LRO aggregated packet size to N bytes, where N &gt;= 64.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--eth-peers-configfile=name</span></code></p>
+<p>Use a configuration file containing the Ethernet addresses of the peer ports.
+The configuration file should contain the Ethernet addresses on separate lines:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>XX:XX:XX:XX:XX:01
+XX:XX:XX:XX:XX:02
+...
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--eth-peer=N,XX:XX:XX:XX:XX:XX</span></code></p>
+<p>Set the MAC address <code class="docutils literal notranslate"><span class="pre">XX:XX:XX:XX:XX:XX</span></code> of the peer port N,
+where 0 &lt;= N &lt; <code class="docutils literal notranslate"><span class="pre">RTE_MAX_ETHPORTS</span></code>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx-ip=SRC,DST</span></code></p>
+<p>Set the source and destination IP address used when doing transmit only test.
+The defaults address values are source 198.18.0.1 and
+destination 198.18.0.2. These are special purpose addresses
+reserved for benchmarking (RFC 5735).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx-udp=SRC[,DST]</span></code></p>
+<p>Set the source and destination UDP port number for transmit test only test.
+The default port is the port 9 which is defined for the discard protocol
+(RFC 863).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--disable-crc-strip</span></code></p>
+<p>Disable hardware CRC stripping.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-lro</span></code></p>
+<p>Enable large receive offload.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-rx-cksum</span></code></p>
+<p>Enable hardware RX checksum offload.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-scatter</span></code></p>
+<p>Enable scatter (multi-segment) RX.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-hw-vlan</span></code></p>
+<p>Enable hardware VLAN.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-hw-vlan-filter</span></code></p>
+<p>Enable hardware VLAN filter.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-hw-vlan-strip</span></code></p>
+<p>Enable hardware VLAN strip.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-hw-vlan-extend</span></code></p>
+<p>Enable hardware VLAN extend.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-hw-qinq-strip</span></code></p>
+<p>Enable hardware QINQ strip.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-drop-en</span></code></p>
+<p>Enable per-queue packet drop for packets with no descriptors.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--disable-rss</span></code></p>
+<p>Disable RSS (Receive Side Scaling).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--port-topology=mode</span></code></p>
+<p>Set port topology, where mode is <code class="docutils literal notranslate"><span class="pre">paired</span></code> (the default), <code class="docutils literal notranslate"><span class="pre">chained</span></code> or <code class="docutils literal notranslate"><span class="pre">loop</span></code>.</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">paired</span></code> mode, the forwarding is between pairs of ports, for example: (0,1), (2,3), (4,5).</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">chained</span></code> mode, the forwarding is to the next available port in the port mask, for example: (0,1), (1,2), (2,0).</p>
+<p>The ordering of the ports can be changed using the portlist testpmd runtime function.</p>
+<p>In <code class="docutils literal notranslate"><span class="pre">loop</span></code> mode, ingress traffic is simply transmitted back on the same interface.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--forward-mode=mode</span></code></p>
+<p>Set the forwarding mode where <code class="docutils literal notranslate"><span class="pre">mode</span></code> is one of the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>io (the default)
+mac
+macswap
+flowgen
+rxonly
+txonly
+csum
+icmpecho
+ieee1588
+tm
+noisy
+5tswap
+shared-rxq
+recycle_mbufs
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rss-ip</span></code></p>
+<p>Set RSS functions for IPv4/IPv6 only.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rss-udp</span></code></p>
+<p>Set RSS functions for IPv4/IPv6 and UDP.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxq=N</span></code></p>
+<p>Set the number of RX queues per port to N, where 1 &lt;= N &lt;= 65535.
+The default value is 1.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxd=N</span></code></p>
+<p>Set the number of descriptors in the RX rings to N, where N &gt; 0.
+The default value is 128.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txq=N</span></code></p>
+<p>Set the number of TX queues per port to N, where 1 &lt;= N &lt;= 65535.
+The default value is 1.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txd=N</span></code></p>
+<p>Set the number of descriptors in the TX rings to N, where N &gt; 0.
+The default value is 512.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hairpinq=N</span></code></p>
+<p>Set the number of hairpin queues per port to N, where 1 &lt;= N &lt;= 65535.
+The default value is 0. The number of hairpin queues are added to the
+number of TX queues and to the number of RX queues. then the first
+RX hairpin is binded to the first TX hairpin, the second RX hairpin is
+binded to the second TX hairpin and so on. The index of the first
+RX hairpin queue is the number of RX queues as configured using –rxq.
+The index of the first TX hairpin queue is the number of TX queues
+as configured using –txq.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--burst=N</span></code></p>
+<p>Set the number of packets per burst to N, where 1 &lt;= N &lt;= 512.
+The default value is 32.
+If set to 0, driver default is used if defined. Else, if driver
+default is not defined, default of 32 is used.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--flowgen-clones=N</span></code></p>
+<p>Set the number of each packet clones to be sent in <cite>flowgen</cite> mode.
+Sending clones reduces host CPU load on creating packets and may help
+in testing extreme speeds or maxing out Tx packet performance.
+N should be not zero, but less than ‘burst’ parameter.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--flowgen-flows=N</span></code></p>
+<p>Set the number of flows to be generated in <cite>flowgen</cite> mode, where
+1 &lt;= N &lt;= INT32_MAX.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mbcache=N</span></code></p>
+<p>Set the cache of mbuf memory pools to N, where 0 &lt;= N &lt;= 512.
+The default value is 16.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxpt=N</span></code></p>
+<p>Set the prefetch threshold register of RX rings to N, where N &gt;= 0.
+The default value is 8.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxht=N</span></code></p>
+<p>Set the host threshold register of RX rings to N, where N &gt;= 0.
+The default value is 8.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxfreet=N</span></code></p>
+<p>Set the free threshold of RX descriptors to N, where 0 &lt;= N &lt; value of –rxd.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxwt=N</span></code></p>
+<p>Set the write-back threshold register of RX rings to N, where N &gt;= 0.
+The default value is 4.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txpt=N</span></code></p>
+<p>Set the prefetch threshold register of TX rings to N, where N &gt;= 0.
+The default value is 36.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txht=N</span></code></p>
+<p>Set the host threshold register of TX rings to N, where N &gt;= 0.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txwt=N</span></code></p>
+<p>Set the write-back threshold register of TX rings to N, where N &gt;= 0.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txfreet=N</span></code></p>
+<p>Set the transmit free threshold of TX rings to N, where 0 &lt;= N &lt;= value of <code class="docutils literal notranslate"><span class="pre">--txd</span></code>.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txrst=N</span></code></p>
+<p>Set the transmit RS bit threshold of TX rings to N, where 0 &lt;= N &lt;= value of <code class="docutils literal notranslate"><span class="pre">--txd</span></code>.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-flush-rx</span></code></p>
+<p>Don’t flush the RX streams before starting forwarding. Used mainly with the PCAP PMD.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxoffs=X[,Y]</span></code></p>
+<p>Set the offsets of packet segments on receiving if split
+feature is engaged. Affects only the queues configured
+with split offloads (currently BUFFER_SPLIT is supported only).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxpkts=X[,Y]</span></code></p>
+<p>Set the length of segments to scatter packets on receiving if split
+feature is engaged. Affects only the queues configured
+with split offloads (currently BUFFER_SPLIT is supported only).
+Optionally the multiple memory pools can be specified with –mbuf-size
+command line parameter and the mbufs to receive will be allocated
+sequentially from these extra memory pools.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txpkts=X[,Y]</span></code></p>
+<p>Set TX segment sizes or total packet length. Valid for <code class="docutils literal notranslate"><span class="pre">tx-only</span></code>
+and <code class="docutils literal notranslate"><span class="pre">flowgen</span></code> forwarding modes.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--multi-rx-mempool</span></code></p>
+<blockquote>
+<div><p>Enable multiple mbuf pools per Rx queue.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txonly-multi-flow</span></code></p>
+<p>Generate multiple flows in txonly mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxq-share=[X]</span></code></p>
+<p>Create queues in shared Rx queue mode if device supports.
+Shared Rx queues are grouped per X ports. X defaults to UINT32_MAX,
+implies all ports join share group 1. Forwarding engine “shared-rxq”
+should be used for shared Rx queues. This engine does Rx only and
+update stream statistics accordingly.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--eth-link-speed</span></code></p>
+<p>Set a forced link speed to the ethernet port:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>10 - 10Mbps (not supported)
+100 - 100Mbps (not supported)
+1000 - 1Gbps
+2500 - 2.5Gbps
+5000 - 5Gbps
+10000 - 10Gbps
+25000 - 25Gbps
+40000 - 40Gbps
+50000 - 50Gbps
+100000 - 100Gbps
+200000 - 200Gbps
+400000 - 400Gbps
+...
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--disable-link-check</span></code></p>
+<p>Disable check on link status when starting/stopping ports.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--disable-device-start</span></code></p>
+<p>Do not automatically start all ports. This allows testing
+configuration of rx and tx queues before device is started
+for the first time.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-lsc-interrupt</span></code></p>
+<p>Disable LSC interrupts for all ports, even those supporting it.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-rmv-interrupt</span></code></p>
+<p>Disable RMV interrupts for all ports, even those supporting it.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--bitrate-stats=N</span></code></p>
+<p>Set the logical core N to perform bitrate calculation.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--print-event</span> <span class="pre">&lt;unknown|intr_lsc|queue_state|intr_reset|vf_mbox|macsec|intr_rmv|dev_probed|dev_released|flow_aged|err_recovering|recovery_success|recovery_failed|all&gt;</span></code></p>
+<p>Enable printing the occurrence of the designated event. Using all will
+enable all of them.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mask-event</span> <span class="pre">&lt;unknown|intr_lsc|queue_state|intr_reset|vf_mbox|macsec|intr_rmv|dev_probed|dev_released|flow_aged|err_recovering|recovery_success|recovery_failed|all&gt;</span></code></p>
+<p>Disable printing the occurrence of the designated event. Using all will
+disable all of them.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--flow-isolate-all</span></code></p>
+<p>Providing this parameter requests flow API isolated mode on all ports at
+initialization time. It ensures all traffic is received through the
+configured flow rules only (see flow command).</p>
+<p>Ports that do not support this mode are automatically discarded.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--disable-flow-flush</span></code></p>
+<p>Disable port flow flush when stopping port.
+This allows testing keep flow rules or shared flow objects across restart.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx-offloads=0xXXXXXXXX</span></code></p>
+<p>Set the hexadecimal bitmask of TX queue offloads.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rx-offloads=0xXXXXXXXX</span></code></p>
+<p>Set the hexadecimal bitmask of RX queue offloads.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hot-plug</span></code></p>
+<p>Enable device event monitor mechanism for hotplug.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vxlan-gpe-port=N</span></code></p>
+<p>Set the UDP port number of tunnel VXLAN-GPE to N.
+The default value is 4790.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--geneve-parsed-port=N</span></code></p>
+<p>Set the UDP port number that is used for parsing the GENEVE protocol to N.
+HW may be configured with another tunnel Geneve port.
+The default value is 6081.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mlockall</span></code></p>
+<p>Enable locking all memory.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-mlockall</span></code></p>
+<p>Disable locking all memory.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mp-alloc</span> <span class="pre">&lt;native|anon|xmem|xmemhuge&gt;</span></code></p>
+<p>Select mempool allocation mode:</p>
+<ul class="simple">
+<li><p>native: create and populate mempool using native DPDK memory</p></li>
+<li><p>anon: create mempool using native DPDK memory, but populate using
+anonymous memory</p></li>
+<li><p>xmem: create and populate mempool using externally and anonymously
+allocated area</p></li>
+<li><p>xmemhuge: create and populate mempool using externally and anonymously
+allocated hugepage area</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-forward-mode=mode</span></code></p>
+<p>Set the noisy vnf forwarding mode where <code class="docutils literal notranslate"><span class="pre">mode</span></code> is one of the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>io (the default)
+mac
+macswap
+5tswap
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-tx-sw-buffer-size</span></code></p>
+<p>Set the number of maximum elements  of the FIFO queue to be created
+for buffering packets. Only available with the noisy forwarding mode.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-tx-sw-buffer-flushtime=N</span></code></p>
+<p>Set the time before packets in the FIFO queue is flushed.
+Only available with the noisy forwarding mode. The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-lkup-memory=N</span></code></p>
+<p>Set the size of the noisy neighbor simulation memory buffer in MB to N.
+Only available with the noisy forwarding mode. The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-lkup-num-reads=N</span></code></p>
+<p>Set the number of reads to be done in noisy neighbor simulation memory buffer to N.
+Only available with the noisy forwarding mode. The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-lkup-num-writes=N</span></code></p>
+<p>Set the number of writes to be done in noisy neighbor simulation memory buffer to N.
+Only available with the noisy forwarding mode. The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--noisy-lkup-num-reads-writes=N</span></code></p>
+<p>Set the number of r/w accesses to be done in noisy neighbor simulation memory buffer to N.
+Only available with the noisy forwarding mode. The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-iova-contig</span></code></p>
+<p>Enable to create mempool which is not IOVA contiguous. Valid only with –mp-alloc=anon.
+The default value is 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rx-mq-mode</span></code></p>
+<p>Set the hexadecimal bitmask of RX multi queue mode which can be enabled.
+The default value is 0x7:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>RTE_ETH_MQ_RX_RSS_FLAG | RTE_ETH_MQ_RX_DCB_FLAG | RTE_ETH_MQ_RX_VMDQ_FLAG
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--record-core-cycles</span></code></p>
+<p>Enable measurement of CPU cycles per packet.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--record-burst-stats</span></code></p>
+<p>Enable display of RX and TX burst stats.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hairpin-mode=0xXXXX</span></code></p>
+<p>Set the hairpin port configuration with bitmask, only valid when hairpin queues number is set:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>bit 18 - hairpin TX queues will use RTE memory
+bit 16 - hairpin TX queues will use locked device memory
+bit 13 - hairpin RX queues will use RTE memory
+bit 12 - hairpin RX queues will use locked device memory
+bit 9 - force memory settings of hairpin TX queue
+bit 8 - force memory settings of hairpin RX queue
+bit 4 - explicit Tx flow rule
+bit 1 - two hairpin ports paired
+bit 0 - two hairpin ports loop
+</pre></div>
+</div>
+<p>The default value is 0. Hairpin will use single port mode and implicit Tx flow mode.</p>
+</li>
+</ul>
+<section id="testpmd-multi-process-command-line-options">
+<h3><span class="section-number">3.2.1. </span>Testpmd Multi-Process Command-line Options</h3>
+<p>The following are the command-line options for testpmd multi-process support:</p>
+<ul class="simple">
+<li><p>primary process:</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./dpdk-testpmd -a xxx --proc-type=auto -l 0-1 -- -i --rxq=4 --txq=4 \</span>
+<span class="go">    --num-procs=2 --proc-id=0</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>secondary process:</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./dpdk-testpmd -a xxx --proc-type=auto -l 2-3 -- -i --rxq=4 --txq=4 \</span>
+<span class="go">    --num-procs=2 --proc-id=1</span>
+</pre></div>
+</div>
+<p>The command line options are:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--num-procs=N</span></code></p>
+<p>The number of processes which will be used.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--proc-id=ID</span></code></p>
+<p>The ID of the current process (ID &lt; num-procs). ID should be different in
+primary process and secondary process, which starts from ‘0’.</p>
+</li>
+</ul>
+<p>Calculation rule for queue:
+All queues are allocated to different processes based on <code class="docutils literal notranslate"><span class="pre">proc_num</span></code> and
+<code class="docutils literal notranslate"><span class="pre">proc_id</span></code>.
+Calculation rule for the testpmd to allocate queues to each process:
+*   start(queue start id) = proc_id * nb_q / num_procs；</p>
+<ul class="simple">
+<li><p>end(queue end id) = start + nb_q / num_procs；</p></li>
+</ul>
+<p>For example, if testpmd is configured to have 4 Tx and Rx queues,
+queues 0 and 1 will be used by the primary process and
+queues 2 and 3 will be used by the secondary process.</p>
+<p>The number of queues should be a multiple of the number of processes. If not,
+redundant queues will exist after queues are allocated to processes. If RSS
+is enabled, packet loss occurs when traffic is sent to all processes at the same
+time. Some traffic goes to redundant queues and cannot be forwarded.</p>
+<p>All the dev ops is supported in primary process. While secondary process is
+not permitted to allocate or release shared memory, so some ops are not supported
+as follows:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">dev_configure</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dev_start</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dev_stop</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dev_reset</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_queue_setup</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_queue_setup</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_queue_release</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_queue_release</span></code></p></li>
+</ul>
+<p>So, any command from testpmd which calls those APIs will not be supported in
+secondary process, like:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">port config all rxq|txq|rxd|txd &lt;value&gt;</span>
+<span class="go">port config &lt;port_id&gt; rx_offload xxx on/off</span>
+<span class="go">port config &lt;port_id&gt; tx_offload xxx on/off</span>
+</pre></div>
+</div>
+<p>etc.</p>
+<p>When secondary is running, port in primary is not permitted to be stopped.
+Reconfigure operation is only valid in primary.</p>
+<p>Stats is supported, stats will not change when one quits and starts, as they
+share the same buffer to store the stats. Flow rules are maintained in process
+level: primary and secondary has its own flow list (but one flow list in HW).
+The two can see all the queues, so setting the flow rules for the other is OK.
+But in the testpmd primary process receiving or transmitting packets from the
+queue allocated for secondary process is not permitted, and same for secondary
+process.</p>
+<p>Flow API and RSS are supported.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Testpmd Application User Guide</a><ul>
+      <li>Previous: <a href="build_app.html" title="previous chapter"><span class="section-number">2. </span>Compiling the Application</a></li>
+      <li>Next: <a href="testpmd_funcs.html" title="next chapter"><span class="section-number">4. </span>Testpmd Runtime Functions</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/testpmd_app_ug/run_app.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,446 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>26. HNS3 Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="27. I40E Poll Mode Driver" href="i40e.html" />
+    <link rel="prev" title="25. HINIC Poll Mode Driver" href="hinic.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="hns3-poll-mode-driver">
+<h1><span class="section-number">26. </span>HNS3 Poll Mode Driver</h1>
+<p>The hns3 PMD (<strong>librte_net_hns3</strong>) provides poll mode driver support
+for the inbuilt HiSilicon Network Subsystem(HNS) network engine
+found in the HiSilicon Kunpeng 920 SoC and Kunpeng 930 SoC .</p>
+<section id="features">
+<h2><span class="section-number">26.1. </span>Features</h2>
+<p>Features of the HNS3 PMD are:</p>
+<ul class="simple">
+<li><p>Multiple queues for TX and RX</p></li>
+<li><p>Receive Side Scaling (RSS)</p></li>
+<li><p>Packet type information</p></li>
+<li><p>Checksum offload</p></li>
+<li><p>TSO offload</p></li>
+<li><p>LRO offload</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Multicast mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Jumbo frames</p></li>
+<li><p>Link state information</p></li>
+<li><p>Interrupt mode for RX</p></li>
+<li><p>VLAN stripping and inserting</p></li>
+<li><p>QinQ inserting</p></li>
+<li><p>DCB</p></li>
+<li><p>Scattered and gather for TX and RX</p></li>
+<li><p>Vector Poll mode driver</p></li>
+<li><p>SR-IOV VF</p></li>
+<li><p>Multi-process</p></li>
+<li><p>MAC/VLAN filter</p></li>
+<li><p>MTU update</p></li>
+<li><p>NUMA support</p></li>
+<li><p>Generic flow API</p></li>
+<li><p>IEEE1588/802.1AS timestamping</p></li>
+<li><p>Basic stats</p></li>
+<li><p>Extended stats</p></li>
+<li><p>Traffic Management API</p></li>
+<li><p>Speed capabilities</p></li>
+<li><p>Link Auto-negotiation</p></li>
+<li><p>Link flow control</p></li>
+<li><p>Dump register</p></li>
+<li><p>Dump private info from device</p></li>
+<li><p>FW version</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">26.2. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Get the information about Kunpeng920 chip using
+<a class="reference external" href="https://www.hisilicon.com/en/products/Kunpeng">https://www.hisilicon.com/en/products/Kunpeng</a>.</p></li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to
+setup the basic DPDK environment.</p></li>
+</ul>
+<section id="link-status-event-pre-conditions">
+<h3><span class="section-number">26.2.1. </span>Link status event Pre-conditions</h3>
+<p>Firmware 1.8.0.0 and later versions support reporting link changes to the PF.
+Therefore, to use the LSC for the PF driver, ensure that the firmware version
+also supports reporting link changes.
+If the VF driver needs to support LSC, special patch must be added:
+<a class="reference external" href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=18b6e31f8bf4ac7af7b057228f38a5a530378e4e">https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=18b6e31f8bf4ac7af7b057228f38a5a530378e4e</a>.</p>
+<p>Note: The patch has been uploaded to 5.13 of the Linux kernel mainline.</p>
+</section>
+</section>
+<section id="configuration">
+<h2><span class="section-number">26.3. </span>Configuration</h2>
+<section id="compilation-options">
+<h3><span class="section-number">26.3.1. </span>Compilation Options</h3>
+<p>The following options can be modified in the <code class="docutils literal notranslate"><span class="pre">config/rte_config.h</span></code> file.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_HNS3_MAX_TQP_NUM_PER_PF</span></code> (default <code class="docutils literal notranslate"><span class="pre">256</span></code>)</p>
+<p>Number of MAX queues reserved for PF on HIP09 and HIP10.
+The MAX queue number is also determined by the value the firmware report.</p>
+</li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h3><span class="section-number">26.3.2. </span>Runtime Configuration</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_func_hint</span></code> (default <code class="docutils literal notranslate"><span class="pre">none</span></code>)</p>
+<p>Used to select Rx burst function, supported value are <code class="docutils literal notranslate"><span class="pre">vec</span></code>, <code class="docutils literal notranslate"><span class="pre">sve</span></code>,
+<code class="docutils literal notranslate"><span class="pre">simple</span></code>, <code class="docutils literal notranslate"><span class="pre">common</span></code>.
+<code class="docutils literal notranslate"><span class="pre">vec</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">vec</span></code> Rx function which indicates the
+default vector algorithm, neon for Kunpeng Arm platform.
+<code class="docutils literal notranslate"><span class="pre">sve</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">sve</span></code> Rx function which indicates the
+sve algorithm.
+<code class="docutils literal notranslate"><span class="pre">simple</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">simple</span></code> Rx function which indicates
+the scalar simple algorithm.
+<code class="docutils literal notranslate"><span class="pre">common</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">common</span></code> Rx function which indicates
+the scalar scattered algorithm.</p>
+<p>When provided parameter is not supported, <code class="docutils literal notranslate"><span class="pre">vec</span></code> usage condition will
+be first checked, if meets, use the <code class="docutils literal notranslate"><span class="pre">vec</span></code>. Then, <code class="docutils literal notranslate"><span class="pre">simple</span></code>, at last
+<code class="docutils literal notranslate"><span class="pre">common</span></code>.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:7d:00.0,rx_func_hint=simple
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_func_hint</span></code> (default <code class="docutils literal notranslate"><span class="pre">none</span></code>)</p>
+<p>Used to select Tx burst function, supported value are <code class="docutils literal notranslate"><span class="pre">vec</span></code>, <code class="docutils literal notranslate"><span class="pre">sve</span></code>,
+<code class="docutils literal notranslate"><span class="pre">simple</span></code>, <code class="docutils literal notranslate"><span class="pre">common</span></code>.
+<code class="docutils literal notranslate"><span class="pre">vec</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">vec</span></code> Tx function which indicates the
+default vector algorithm, neon for Kunpeng Arm platform.
+<code class="docutils literal notranslate"><span class="pre">sve</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">sve</span></code> Tx function which indicates the
+sve algorithm.
+<code class="docutils literal notranslate"><span class="pre">simple</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">simple</span></code> Tx function which indicates
+the scalar simple algorithm.
+<code class="docutils literal notranslate"><span class="pre">common</span></code>, if supported use the <code class="docutils literal notranslate"><span class="pre">common</span></code> Tx function which indicates
+the scalar algorithm.</p>
+<p>When provided parameter is not supported, <code class="docutils literal notranslate"><span class="pre">vec</span></code> usage condition will
+be first checked, if meets, use the <code class="docutils literal notranslate"><span class="pre">vec</span></code>. Then, <code class="docutils literal notranslate"><span class="pre">simple</span></code>, at last
+<code class="docutils literal notranslate"><span class="pre">common</span></code>.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:7d:00.0,tx_func_hint=common
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dev_caps_mask</span></code> (default <code class="docutils literal notranslate"><span class="pre">0</span></code>)</p>
+<p>Used to mask the capability which queried from firmware.
+This args take hexadecimal bitmask where each bit represents whether mask
+corresponding capability. eg. If the capability is 0xFFFF queried from
+firmware, and the args value is 0xF which means the bit0~bit3 should be
+masked off, then the capability will be 0xFFF0.
+Its main purpose is to debug and avoid problems.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:7d:00.0,dev_caps_mask=0xF
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mbx_time_limit_ms</span></code> (default <code class="docutils literal notranslate"><span class="pre">500</span></code>)</p>
+<p>Used to define the mailbox time limit by user.
+Current, the max waiting time for MBX response is 500ms, but in
+some scenarios, it is not enough. Since it depends on the response
+of the kernel mode driver, and its response time is related to the
+scheduling of the system. In this special scenario, most of the
+cores are isolated, and only a few cores are used for system
+scheduling. When a large number of services are started, the
+scheduling of the system will be very busy, and the reply of the
+mbx message will time out, which will cause our PMD initialization
+to fail. So provide access to set mailbox time limit for user.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:7d:00.0,mbx_time_limit_ms=600
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fdir_vlan_match_mode</span></code> (default <code class="docutils literal notranslate"><span class="pre">strict</span></code>)</p>
+<p>Used to select VLAN match mode. This runtime config can be <code class="docutils literal notranslate"><span class="pre">strict</span></code>
+or <code class="docutils literal notranslate"><span class="pre">nostrict</span></code> and is only valid for PF devices.
+If driver works on <code class="docutils literal notranslate"><span class="pre">strict</span></code> mode (default mode), hardware does strictly
+match the input flow base on VLAN number.</p>
+<p>For the following scenarios with two rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">rule0:</span>
+<span class="go">  pattern: eth type is 0x0806</span>
+<span class="go">  actions: queue index 3</span>
+<span class="go">rule1:</span>
+<span class="go">  pattern: eth type is 0x0806 / vlan vid is 20</span>
+<span class="go">  actions: queue index 4</span>
+</pre></div>
+</div>
+<p>If application select <code class="docutils literal notranslate"><span class="pre">strict</span></code> mode, only the ARP packets with VLAN
+20 are directed to queue 4, and the ARP packets with other VLAN ID
+cannot be directed to the specified queue. If application want to all
+ARP packets with or without VLAN to be directed to the specified queue,
+application can select <code class="docutils literal notranslate"><span class="pre">nostrict</span></code> mode and just need to set rule0.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:7d:00.0,fdir_vlan_match_mode=nostrict
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">26.4. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="sample-application-notes">
+<h2><span class="section-number">26.5. </span>Sample Application Notes</h2>
+<section id="vlan-filter">
+<h3><span class="section-number">26.5.1. </span>VLAN filter</h3>
+<p>VLAN filter only works when Promiscuous mode is off.</p>
+<p>To start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>, and add VLAN 10 to port 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-15 -n 4 -- -i --forward-mode=mac</span>
+<span class="go">...</span>
+
+<span class="go">testpmd&gt; set promisc 0 off</span>
+<span class="go">testpmd&gt; vlan set filter on 0</span>
+<span class="go">testpmd&gt; rx_vlan add 10 0</span>
+</pre></div>
+</div>
+</section>
+<section id="flow-director">
+<h3><span class="section-number">26.5.2. </span>Flow Director</h3>
+<p>The Flow Director works in receive mode to identify specific flows or sets of
+flows and route them to specific queues.
+The Flow Director filters can match the different fields for different type of
+packet: flow type, specific input set per flow type.</p>
+<p>Start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-15 -n 4 -- -i --rxq=8 --txq=8 \</span>
+<span class="go">                               --nb-cores=8 --nb-ports=1</span>
+</pre></div>
+</div>
+<p>Add a rule to direct <code class="docutils literal notranslate"><span class="pre">ipv4-udp</span></code> packet whose <code class="docutils literal notranslate"><span class="pre">dst_ip=2.2.2.5,</span> <span class="pre">src_ip=2.2.2.3,</span>
+<span class="pre">src_port=32,</span> <span class="pre">dst_port=32</span></code> to queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth / ipv4 src is 2.2.2.3 \</span>
+<span class="go">         dst is 2.2.2.5 / udp src is 32 dst is 32 / end \</span>
+<span class="go">         actions mark id 1 / queue index 1 / end</span>
+</pre></div>
+</div>
+</section>
+<section id="generic-flow-api">
+<h3><span class="section-number">26.5.3. </span>Generic flow API</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RSS</span> <span class="pre">Flow</span></code></p>
+<p>RSS Flow supports for creating rule base on input tuple, hash key, queues
+and hash algorithm. But hash key, queues and hash algorithm are the global
+configuration for hardware which will affect other rules.
+The rule just setting input tuple is completely independent.</p>
+<p>Run <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-testpmd -a 0000:7d:00.0 -l 10-18 -- -i --rxq=8 --txq=8</span>
+</pre></div>
+</div>
+<p>All IP packets can be distributed to 8 queues.</p>
+<p>Set IPv4-TCP packet is distributed to 8 queues based on L3/L4 SRC only.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth / ipv4 / tcp / end actions \</span>
+<span class="go">         rss types ipv4-tcp l4-src-only l3-src-only end queues end / end</span>
+</pre></div>
+</div>
+<p>Disable IPv4 packet RSS hash.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth / ipv4 / end actions rss \</span>
+<span class="go">         types none end queues end / end</span>
+</pre></div>
+</div>
+<p>Set hash function as symmetric Toeplitz.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern end actions rss types end \</span>
+<span class="go">         queues end func symmetric_toeplitz / end</span>
+</pre></div>
+</div>
+<p>In this case, all packets that enabled RSS are hashed using symmetric
+Toeplitz algorithm.</p>
+<p>Flush all RSS rules</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow flush 0</span>
+</pre></div>
+</div>
+<p>The RSS configurations of hardwre is back to the one ethdev ops set.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="statistics">
+<h2><span class="section-number">26.6. </span>Statistics</h2>
+<p>HNS3 supports various methods to report statistics:</p>
+<p>Port statistics can be queried using <code class="docutils literal notranslate"><span class="pre">rte_eth_stats_get()</span></code>. The number
+of packets received or sent successfully by the PMD. While the received and
+sent packet bytes are through SW only. The imissed counter is the amount of
+packets that could not be delivered to SW because a queue was full. The oerror
+counter is the amount of packets that are dropped by HW in Tx.</p>
+<p>Extended statistics can be queried using <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get()</span></code>. The extended
+statistics expose a wider set of counters counted by the device. The extended
+port statistics contains packets statistics per queue, Mac statistics, HW reset
+count and IO error count.</p>
+<p>Finally per-flow statistics can by queried using <code class="docutils literal notranslate"><span class="pre">rte_flow_query</span></code> when attaching
+a count action for specific flow. The flow counter counts the number of packets
+received successfully by the port and match the specific flow.</p>
+</section>
+<section id="performance-tuning">
+<h2><span class="section-number">26.7. </span>Performance tuning</h2>
+<section id="hardware-configuration">
+<h3><span class="section-number">26.7.1. </span>Hardware configuration</h3>
+<p>32 GB DIMMs is used to ensure that each channel is fully configured.
+Dynamic CPU Tuning is disabled.</p>
+</section>
+<section id="queue-depth-configuration">
+<h3><span class="section-number">26.7.2. </span>Queue depth configuration</h3>
+<p>According to the actual test, the performance is best when the queue depth
+ranges from 1024 to 2048.</p>
+</section>
+<section id="io-burst-configuration">
+<h3><span class="section-number">26.7.3. </span>IO burst configuration</h3>
+<p>According to the actual test, the performance is best when IO burst is set to 64.
+IO burst is the number of packets per burst.</p>
+</section>
+<section id="queue-number-configuration">
+<h3><span class="section-number">26.7.4. </span>Queue number configuration</h3>
+<p>When the number of port queues corresponds to the number of CPU cores, the
+performance will be better.</p>
+</section>
+<section id="hugepage-configuration">
+<h3><span class="section-number">26.7.5. </span>Hugepage configuration</h3>
+<p>For 4K systems, 1 GB hugepages are recommended. For 64 KB systems, 512 MB
+hugepages are recommended.</p>
+</section>
+<section id="cpu-core-isolation">
+<h3><span class="section-number">26.7.6. </span>CPU core isolation</h3>
+<p>To reduce the possibility of context switching, kernel isolation parameter should
+be provided to avoid scheduling the CPU core used by DPDK application threads for
+other tasks. Before starting the Linux OS, add the kernel isolation boot parameter.
+For example, “isolcpus=1-18 nohz_full=1-18 rcu_nocbs=1-18”.</p>
+</section>
+</section>
+<section id="limitations-or-known-issues">
+<h2><span class="section-number">26.8. </span>Limitations or Known issues</h2>
+<p>Currently, we only support VF device driven by DPDK driver when PF is driven
+by kernel mode hns3 ethdev driver. VF is not supported when PF is driven by
+DPDK driver.</p>
+<p>For sake of Rx/Tx performance, IEEE 1588 is not supported when using vec or
+sve burst function. When enabling IEEE 1588, Rx/Tx burst mode should be
+simple or common. It is recommended that enable IEEE 1588 before ethdev
+start. In this way, the correct Rx/Tx burst function can be selected.</p>
+<p>Build with ICC is not supported yet.
+X86-32, Power8, ARMv7 and BSD are not supported yet.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="hinic.html" title="previous chapter"><span class="section-number">25. </span>HINIC Poll Mode Driver</a></li>
+      <li>Next: <a href="i40e.html" title="next chapter"><span class="section-number">27. </span>I40E Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/hns3.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

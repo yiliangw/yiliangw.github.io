@@ -1,0 +1,500 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>15. dpdk-test-mldev Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="16. dpdk-graph Application" href="graph.html" />
+    <link rel="prev" title="14. dpdk-test-regex Tool" href="testregex.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-test-mldev-application">
+<h1><span class="section-number">15. </span>dpdk-test-mldev Application</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-test-mldev</span></code> tool is a Data Plane Development Kit (DPDK) application
+that allows testing various mldev use cases.
+This application has a generic framework to add new mldev based test cases
+to verify functionality
+and measure the performance of inference execution on DPDK ML devices.</p>
+<section id="application-and-options">
+<h2><span class="section-number">15.1. </span>Application and Options</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-test-mldev [EAL Options] -- [application options]</span>
+</pre></div>
+</div>
+<section id="eal-options">
+<h3><span class="section-number">15.1.1. </span>EAL Options</h3>
+<p>The following are the EAL command-line options that can be used
+with the <code class="docutils literal notranslate"><span class="pre">dpdk-test-mldev</span></code> application.
+See the DPDK Getting Started Guides for more information on these options.</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">-c</span> <span class="pre">&lt;COREMASK&gt;</span></code> or <code class="docutils literal notranslate"><span class="pre">-l</span> <span class="pre">&lt;CORELIST&gt;</span></code></dt><dd><p>Set the hexadecimal bitmask of the cores to run on.
+The corelist is a list of cores to use.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-a</span> <span class="pre">&lt;PCI_ID&gt;</span></code></dt><dd><p>Attach a PCI based ML device.
+Specific to drivers using a PCI based ML device.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--vdev</span> <span class="pre">&lt;driver&gt;</span></code></dt><dd><p>Add a virtual mldev device.
+Specific to drivers using a ML virtual device.</p>
+</dd>
+</dl>
+</section>
+<section id="application-options">
+<h3><span class="section-number">15.1.2. </span>Application Options</h3>
+<p>The following are the command-line options supported by the test application.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">--test</span> <span class="pre">&lt;name&gt;</span></code></dt><dd><p>Name of the test to execute.
+ML tests are divided into three groups: Device, Model and Inference tests.
+Test name should be one of the following supported tests.</p>
+<p><strong>ML Device Tests</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>device_ops
+</pre></div>
+</div>
+<p><strong>ML Model Tests</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>model_ops
+</pre></div>
+</div>
+<p><strong>ML Inference Tests</strong></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>inference_ordered
+inference_interleave
+</pre></div>
+</div>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--dev_id</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the device ID of the ML device to be used for the test.
+Default value is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--socket_id</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the socket ID of the application resources.
+Default value is <code class="docutils literal notranslate"><span class="pre">SOCKET_ID_ANY</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--models</span> <span class="pre">&lt;model_list&gt;</span></code></dt><dd><p>Set the list of model files to be used for the tests.
+Application expects the <code class="docutils literal notranslate"><span class="pre">model_list</span></code> in comma separated form
+(i.e. <code class="docutils literal notranslate"><span class="pre">--models</span> <span class="pre">model_A.bin,model_B.bin</span></code>).
+Maximum number of models supported by the test is <code class="docutils literal notranslate"><span class="pre">8</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--filelist</span> <span class="pre">&lt;file_list&gt;</span></code></dt><dd><p>Set the list of model, input, output and reference files to be used for the tests.
+Application expects the <code class="docutils literal notranslate"><span class="pre">file_list</span></code> to be in comma separated form
+(i.e. <code class="docutils literal notranslate"><span class="pre">--filelist</span> <span class="pre">&lt;model,input,output&gt;[,reference]</span></code>).</p>
+<p>Multiple filelist entries can be specified when running the tests with multiple models.
+Both quantized and dequantized outputs are written to the disk.
+Dequantized output file would have the name specified by the user through <code class="docutils literal notranslate"><span class="pre">--filelist</span></code> option.
+A suffix <code class="docutils literal notranslate"><span class="pre">.q</span></code> is appended to quantized output filename.
+Maximum number of filelist entries supported by the test is <code class="docutils literal notranslate"><span class="pre">8</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--quantized_io</span></code></dt><dd><p>Disable IO quantization and dequantization.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--repetitions</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the number of inference repetitions to be executed in the test per each model.
+Default value is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--burst_size</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the burst size to be used when enqueuing / dequeuing inferences.
+Default value is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--queue_pairs</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the number of queue-pairs to be used for inference enqueue and dequeue operations.
+Default value is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--queue_size</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the size of queue-pair to be created for inference enqueue / dequeue operations.
+Queue size would translate into <code class="docutils literal notranslate"><span class="pre">rte_ml_dev_qp_conf::nb_desc</span></code> field during queue-pair creation.
+Default value is <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--tolerance</span> <span class="pre">&lt;n&gt;</span></code></dt><dd><p>Set the tolerance value in percentage to be used for output validation.
+Default value is <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--stats</span></code></dt><dd><p>Enable reporting device extended stats.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--debug</span></code></dt><dd><p>Enable the tests to run in debug mode.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--help</span></code></dt><dd><p>Print help message.</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="ml-device-tests">
+<h2><span class="section-number">15.2. </span>ML Device Tests</h2>
+<p>ML device tests are functional tests to validate ML device API.
+Device tests validate the ML device handling configure, close, start and stop APIs.</p>
+<section id="id1">
+<h3><span class="section-number">15.2.1. </span>Application Options</h3>
+<p>Supported command line options for the <code class="docutils literal notranslate"><span class="pre">device_ops</span></code> test are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--debug
+--test
+--dev_id
+--socket_id
+--queue_pairs
+--queue_size
+</pre></div>
+</div>
+</section>
+<section id="device-ops-test">
+<h3><span class="section-number">15.2.2. </span>DEVICE_OPS Test</h3>
+<p>Device ops test validates the device configuration and reconfiguration support.
+The test configures ML device based on the options
+<code class="docutils literal notranslate"><span class="pre">--queue_pairs</span></code> and <code class="docutils literal notranslate"><span class="pre">--queue_size</span></code> specified by the user,
+and later reconfigures the ML device with the number of queue pairs and queue size
+based on the maximum specified through the device info.</p>
+<section id="example">
+<h4><span class="section-number">15.2.2.1. </span>Example</h4>
+<p>Command to run <code class="docutils literal notranslate"><span class="pre">device_ops</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=device_ops</span>
+</pre></div>
+</div>
+<p>Command to run <code class="docutils literal notranslate"><span class="pre">device_ops</span></code> test with user options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=device_ops --queue_pairs &lt;M&gt; --queue_size &lt;N&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="ml-model-tests">
+<h2><span class="section-number">15.3. </span>ML Model Tests</h2>
+<p>Model tests are functional tests to validate ML model API.
+Model tests validate the functioning of load, start, stop and unload ML models.</p>
+<section id="id2">
+<h3><span class="section-number">15.3.1. </span>Application Options</h3>
+<p>Supported command line options for the <code class="docutils literal notranslate"><span class="pre">model_ops</span></code> test are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--debug
+--test
+--dev_id
+--socket_id
+--models
+</pre></div>
+</div>
+<p>List of model files to be used for the <code class="docutils literal notranslate"><span class="pre">model_ops</span></code> test can be specified
+through the option <code class="docutils literal notranslate"><span class="pre">--models</span> <span class="pre">&lt;model_list&gt;</span></code> as a comma separated list.
+Maximum number of models supported in the test is <code class="docutils literal notranslate"><span class="pre">8</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--models</span> <span class="pre">&lt;model_list&gt;</span></code> is a mandatory option for running this test.</p></li>
+<li><p>Options not supported by the test are ignored if specified.</p></li>
+</ul>
+</div>
+</section>
+<section id="model-ops-test">
+<h3><span class="section-number">15.3.2. </span>MODEL_OPS Test</h3>
+<p>The test is a collection of multiple sub-tests,
+each with a different order of slow-path operations
+when handling with <cite>N</cite> number of models.</p>
+<p><strong>Sub-test A:</strong>
+executes the sequence of load / start / stop / unload for a model in order,
+followed by next model.</p>
+<figure class="align-default" id="id7">
+<span id="figure-mldev-model-ops-subtest-a"></span><img alt="../_images/mldev_model_ops_subtest_a.svg" src="../_images/mldev_model_ops_subtest_a.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.3 </span><span class="caption-text">Execution sequence of model_ops subtest A.</span></p>
+</figcaption>
+</figure>
+<p><strong>Sub-test B:</strong>
+executes load for all models, followed by a start for all models.
+Upon successful start of all models, stop is invoked for all models followed by unload.</p>
+<figure class="align-default" id="id8">
+<span id="figure-mldev-model-ops-subtest-b"></span><img alt="../_images/mldev_model_ops_subtest_b.svg" src="../_images/mldev_model_ops_subtest_b.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.4 </span><span class="caption-text">Execution sequence of model_ops subtest B.</span></p>
+</figcaption>
+</figure>
+<p><strong>Sub-test C:</strong>
+loads all models, followed by a start and stop of all models in order.
+Upon completion of stop, unload is invoked for all models.</p>
+<figure class="align-default" id="id9">
+<span id="figure-mldev-model-ops-subtest-c"></span><img alt="../_images/mldev_model_ops_subtest_c.svg" src="../_images/mldev_model_ops_subtest_c.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.5 </span><span class="caption-text">Execution sequence of model_ops subtest C.</span></p>
+</figcaption>
+</figure>
+<p><strong>Sub-test D:</strong>
+executes load and start for all models available.
+Upon successful start of all models, stop is executed for the models.</p>
+<figure class="align-default" id="id10">
+<span id="figure-mldev-model-ops-subtest-d"></span><img alt="../_images/mldev_model_ops_subtest_d.svg" src="../_images/mldev_model_ops_subtest_d.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.6 </span><span class="caption-text">Execution sequence of model_ops subtest D.</span></p>
+</figcaption>
+</figure>
+<section id="id3">
+<h4><span class="section-number">15.3.2.1. </span>Example</h4>
+<p>Command to run <code class="docutils literal notranslate"><span class="pre">model_ops</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=model_ops --models model_1.bin,model_2.bin,model_3.bin, model_4.bin</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="ml-inference-tests">
+<h2><span class="section-number">15.4. </span>ML Inference Tests</h2>
+<p>Inference tests are a set of tests to validate end-to-end inference execution on ML device.
+These tests executes the full sequence of operations required to run inferences
+with one or multiple models.</p>
+<section id="id4">
+<h3><span class="section-number">15.4.1. </span>Application Options</h3>
+<p>Supported command line options for inference tests are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--debug
+--test
+--dev_id
+--socket_id
+--filelist
+--repetitions
+--burst_size
+--queue_pairs
+--queue_size
+--tolerance
+--stats
+</pre></div>
+</div>
+<p>List of files to be used for the inference tests can be specified
+through the option <code class="docutils literal notranslate"><span class="pre">--filelist</span> <span class="pre">&lt;file_list&gt;</span></code> as a comma separated list.
+A filelist entry would be of the format
+<code class="docutils literal notranslate"><span class="pre">--filelist</span> <span class="pre">&lt;model_file,input_file,output_file&gt;[,reference_file]</span></code>
+and is used to specify the list of files required to test with a single model.
+Multiple filelist entries are supported by the test, one entry per model.
+Maximum number of file entries supported by the test is <code class="docutils literal notranslate"><span class="pre">8</span></code>.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">--burst_size</span> <span class="pre">&lt;num&gt;</span></code> option is specified for the test,
+enqueue and dequeue burst would try to enqueue or dequeue
+<code class="docutils literal notranslate"><span class="pre">num</span></code> number of inferences per each call respectively.</p>
+<p>In the inference test, a pair of lcores are mapped to each queue pair.
+Minimum number of lcores required for the tests is equal to <code class="docutils literal notranslate"><span class="pre">(queue_pairs</span> <span class="pre">*</span> <span class="pre">2</span> <span class="pre">+</span> <span class="pre">1)</span></code>.</p>
+<p>Output validation of inference would be enabled only
+when a reference file is specified through the <code class="docutils literal notranslate"><span class="pre">--filelist</span></code> option.
+Application would additionally consider the tolerance value
+provided through <code class="docutils literal notranslate"><span class="pre">--tolerance</span></code> option during validation.
+When the tolerance values is 0, CRC32 hash of inference output
+and reference output are compared.
+When the tolerance is non-zero, element wise comparison of output is performed.
+Validation is considered as successful only
+when all the elements of the output tensor are with in the tolerance range specified.</p>
+<p>Enabling <code class="docutils literal notranslate"><span class="pre">--stats</span></code> would print the extended stats supported by the driver.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--filelist</span> <span class="pre">&lt;file_list&gt;</span></code> is a mandatory option for running inference tests.</p></li>
+<li><p>Options not supported by the tests are ignored if specified.</p></li>
+<li><p>Element wise comparison is not supported when
+the output dtype is either fp8, fp16 or bfloat16.
+This is applicable only when the tolerance is greater than zero
+and for pre-quantized models only.</p></li>
+</ul>
+</div>
+</section>
+<section id="inference-ordered-test">
+<h3><span class="section-number">15.4.2. </span>INFERENCE_ORDERED Test</h3>
+<p>This is a functional test for validating the end-to-end inference execution on ML device.
+This test configures ML device and queue pairs
+as per the queue-pair related options (queue_pairs and queue_size) specified by the user.
+Upon successful configuration of the device and queue pairs,
+the first model specified through the filelist is loaded to the device
+and inferences are enqueued by a pool of worker threads to the ML device.
+Total number of inferences enqueued for the model are equal to the repetitions specified.
+A dedicated pool of worker threads would dequeue the inferences from the device.
+The model is unloaded upon completion of all inferences for the model.
+The test would continue loading and executing inference requests for all models
+specified through <code class="docutils literal notranslate"><span class="pre">filelist</span></code> option in an ordered manner.</p>
+<figure class="align-default" id="id11">
+<span id="figure-mldev-inference-ordered"></span><img alt="../_images/mldev_inference_ordered.svg" src="../_images/mldev_inference_ordered.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.7 </span><span class="caption-text">Execution of inference_ordered on single model.</span></p>
+</figcaption>
+</figure>
+<section id="id5">
+<h4><span class="section-number">15.4.2.1. </span>Example</h4>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_ordered</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_ordered --filelist model.bin,input.bin,output.bin</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_ordered</span></code> test with a specific burst size:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_ordered --filelist model.bin,input.bin,output.bin \</span>
+<span class="go">     --burst_size 12</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_ordered</span></code> test with multiple queue-pairs and queue size:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_ordered --filelist model.bin,input.bin,output.bin \</span>
+<span class="go">     --queue_pairs 4 --queue_size 16</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_ordered</span></code> with output validation using tolerance of <code class="docutils literal notranslate"><span class="pre">1%</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_ordered --filelist model.bin,input.bin,output.bin,reference.bin \</span>
+<span class="go">     --tolerance 1.0</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="inference-interleave-test">
+<h3><span class="section-number">15.4.3. </span>INFERENCE_INTERLEAVE Test</h3>
+<p>This is a stress test for validating the end-to-end inference execution on ML device.
+The test configures the ML device and queue pairs
+as per the queue-pair related options (queue_pairs and queue_size) specified by the user.
+Upon successful configuration of the device and queue pairs,
+all models specified through the filelist are loaded to the device.
+Inferences for multiple models are enqueued by a pool of worker threads in parallel.
+Inference execution by the device is interleaved between multiple models.
+Total number of inferences enqueued for a model are equal to the repetitions specified.
+An additional pool of threads would dequeue the inferences from the device.
+Models would be unloaded upon completion of inferences for all models loaded.</p>
+<figure class="align-default" id="id12">
+<span id="figure-mldev-inference-interleave"></span><img alt="../_images/mldev_inference_interleave.svg" src="../_images/mldev_inference_interleave.svg" /><figcaption>
+<p><span class="caption-number">Fig. 15.8 </span><span class="caption-text">Execution of inference_interleave on single model.</span></p>
+</figcaption>
+</figure>
+<section id="id6">
+<h4><span class="section-number">15.4.3.1. </span>Example</h4>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_interleave</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_interleave --filelist model.bin,input.bin,output.bin</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_interleave</span></code> test with multiple models:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_interleave --filelist model_A.bin,input_A.bin,output_A.bin \</span>
+<span class="go">     --filelist model_B.bin,input_B.bin,output_B.bin</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_interleave</span></code> test
+with a specific burst size, multiple queue-pairs and queue size:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_interleave --filelist model.bin,input.bin,output.bin \</span>
+<span class="go">     --queue_pairs 8 --queue_size 12 --burst_size 16</span>
+</pre></div>
+</div>
+<p>Example command to run <code class="docutils literal notranslate"><span class="pre">inference_interleave</span></code> test
+with multiple models and output validation using tolerance of <code class="docutils literal notranslate"><span class="pre">2.0%</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-mldev -c 0xf -a &lt;PCI_ID&gt; -- \</span>
+<span class="go">     --test=inference_interleave \</span>
+<span class="go">     --filelist model_A.bin,input_A.bin,output_A.bin,reference_A.bin \</span>
+<span class="go">     --filelist model_B.bin,input_B.bin,output_B.bin,reference_B.bin \</span>
+<span class="go">     --tolerance 2.0</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="debug-mode">
+<h2><span class="section-number">15.5. </span>Debug mode</h2>
+<p>ML tests can be executed in debug mode by enabling the option <code class="docutils literal notranslate"><span class="pre">--debug</span></code>.
+Execution of tests in debug mode would enable additional prints.</p>
+<p>When a validation failure is observed, output from that buffer is written to the disk,
+with the filenames having similar convention when the test has passed.
+Additionally index of the buffer would be appended to the filenames.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DPDK Tools User Guides</a><ul>
+      <li>Previous: <a href="testregex.html" title="previous chapter"><span class="section-number">14. </span>dpdk-test-regex Tool</a></li>
+      <li>Next: <a href="graph.html" title="next chapter"><span class="section-number">16. </span>dpdk-graph Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/testmldev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

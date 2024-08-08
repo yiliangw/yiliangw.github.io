@@ -1,0 +1,21 @@
+var searchData=
+[
+  ['compressdev_5fclose_5ft_13479',['compressdev_close_t',['../rte__compressdev__pmd_8h.html#a093b1f6dedd54d1271edf4d35851a894',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fconfigure_5ft_13480',['compressdev_configure_t',['../rte__compressdev__pmd_8h.html#a4332ab08663ce09e9f924c36c6894924',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5finfo_5fget_5ft_13481',['compressdev_info_get_t',['../rte__compressdev__pmd_8h.html#a57d0eb0897d92afe06f8c4e5f9d41460',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fprivate_5fxform_5fcreate_5ft_13482',['compressdev_private_xform_create_t',['../rte__compressdev__pmd_8h.html#a727605122403719bdd7f9c18c67756b9',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fprivate_5fxform_5ffree_5ft_13483',['compressdev_private_xform_free_t',['../rte__compressdev__pmd_8h.html#a2f00aebab2a650b7f951896cd13a13c8',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fqueue_5fpair_5frelease_5ft_13484',['compressdev_queue_pair_release_t',['../rte__compressdev__pmd_8h.html#adfc2772ffab99704c170bb2e1b57c8b5',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fqueue_5fpair_5fsetup_5ft_13485',['compressdev_queue_pair_setup_t',['../rte__compressdev__pmd_8h.html#acc51ba2c6532b93fc6d62fe0759c3c9a',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstart_5ft_13486',['compressdev_start_t',['../rte__compressdev__pmd_8h.html#a694d00e50c16582642321bd4aaced8f4',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstats_5fget_5ft_13487',['compressdev_stats_get_t',['../rte__compressdev__pmd_8h.html#afcd3eab7bf7fb307a2d4a19256c3c9d1',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstats_5freset_5ft_13488',['compressdev_stats_reset_t',['../rte__compressdev__pmd_8h.html#a20249a654a1a87f250b4f4692f7982d6',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstop_5ft_13489',['compressdev_stop_t',['../rte__compressdev__pmd_8h.html#a5e785f1449bab70d457a8ea517873caf',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstream_5fcreate_5ft_13490',['compressdev_stream_create_t',['../rte__compressdev__pmd_8h.html#ada67fbe3332360e79a978efdecf56016',1,'rte_compressdev_pmd.h']]],
+  ['compressdev_5fstream_5ffree_5ft_13491',['compressdev_stream_free_t',['../rte__compressdev__pmd_8h.html#a71c1e521c4121d6b58361c322fc1791e',1,'rte_compressdev_pmd.h']]],
+  ['cryptodev_5fsym_5fraw_5fdequeue_5fburst_5ft_13492',['cryptodev_sym_raw_dequeue_burst_t',['../rte__cryptodev_8h.html#a04acfcbece6a54c2490bf40659b6c449',1,'rte_cryptodev.h']]],
+  ['cryptodev_5fsym_5fraw_5fdequeue_5ft_13493',['cryptodev_sym_raw_dequeue_t',['../rte__cryptodev_8h.html#aba1e585662bf153d4846edf94003eea6',1,'rte_cryptodev.h']]],
+  ['cryptodev_5fsym_5fraw_5fenqueue_5fburst_5ft_13494',['cryptodev_sym_raw_enqueue_burst_t',['../rte__cryptodev_8h.html#a803ae37fa50e8e0d63555e98c7136840',1,'rte_cryptodev.h']]],
+  ['cryptodev_5fsym_5fraw_5fenqueue_5ft_13495',['cryptodev_sym_raw_enqueue_t',['../rte__cryptodev_8h.html#abc71602143ef54ad684ae4e3d0e7b797',1,'rte_cryptodev.h']]],
+  ['cryptodev_5fsym_5fraw_5foperation_5fdone_5ft_13496',['cryptodev_sym_raw_operation_done_t',['../rte__cryptodev_8h.html#ae5c78a92747d0c5883818a31e91d7a13',1,'rte_cryptodev.h']]]
+];

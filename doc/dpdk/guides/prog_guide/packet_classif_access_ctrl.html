@@ -1,0 +1,643 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>58. Packet Classification and Access Control &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="59. Packet Framework" href="packet_framework.html" />
+    <link rel="prev" title="57. Power Management" href="power_man.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packet-classification-and-access-control">
+<h1><span class="section-number">58. </span>Packet Classification and Access Control</h1>
+<p>The DPDK provides an Access Control library that gives the ability
+to classify an input packet based on a set of classification rules.</p>
+<p>The ACL library is used to perform an N-tuple search over a set of rules with multiple categories
+and find the best match (highest priority) for each category.
+The library API provides the following basic operations:</p>
+<ul class="simple">
+<li><p>Create a new Access Control (AC) context.</p></li>
+<li><p>Add rules into the context.</p></li>
+<li><p>For all rules in the context, build the runtime structures necessary to perform packet classification.</p></li>
+<li><p>Perform input packet classifications.</p></li>
+<li><p>Destroy an AC context and its runtime structures and free the associated memory.</p></li>
+</ul>
+<section id="overview">
+<h2><span class="section-number">58.1. </span>Overview</h2>
+<section id="rule-definition">
+<h3><span class="section-number">58.1.1. </span>Rule definition</h3>
+<p>The current implementation allows the user for each AC context to specify its own rule (set of fields)
+over which packet classification will be performed.
+Though there are few restrictions on the rule fields layout:</p>
+<ul class="simple">
+<li><p>First field in the rule definition has to be one byte long.</p></li>
+<li><p>All subsequent fields has to be grouped into sets of 4 consecutive bytes.</p></li>
+</ul>
+<p>This is done mainly for performance reasons - search function processes the first input byte as part of the flow setup and then the inner loop of the search function is unrolled to process four input bytes at a time.</p>
+<p>To define each field inside an AC rule, the following structure is used:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_field_def</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">type</span><span class="p">;</span><span class="w">         </span><span class="cm">/*&lt; type - ACL_FIELD_TYPE. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">size</span><span class="p">;</span><span class="w">         </span><span class="cm">/*&lt; size of field 1,2,4, or 8. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">field_index</span><span class="p">;</span><span class="w">  </span><span class="cm">/*&lt; index of field inside the rule. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">input_index</span><span class="p">;</span><span class="w">  </span><span class="cm">/*&lt; 0-N input index. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w">      </span><span class="cm">/*&lt; offset to start of field. */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>type
+The field type is one of three choices:</p>
+<ul>
+<li><p>_MASK - for fields such as IP addresses that have a value and a mask defining the number of relevant bits.</p></li>
+<li><p>_RANGE - for fields such as ports that have a lower and upper value for the field.</p></li>
+<li><p>_BITMASK - for fields such as protocol identifiers that have a value and a bit mask.</p></li>
+</ul>
+</li>
+<li><p>size
+The size parameter defines the length of the field in bytes. Allowable values are 1, 2, 4, or 8 bytes.
+Note that due to the grouping of input bytes, 1 or 2 byte fields must be defined as consecutive fields
+that make up 4 consecutive input bytes.
+Also, it is best to define fields of 8 or more bytes as 4 byte fields so that
+the build processes can eliminate fields that are all wild.</p></li>
+<li><p>field_index
+A zero-based value that represents the position of the field inside the rule; 0 to N-1 for N fields.</p></li>
+<li><p>input_index
+As mentioned above, all input fields, except the very first one, must be in groups of 4 consecutive bytes.
+The input index specifies to which input group that field belongs to.</p></li>
+<li><p>offset
+The offset field defines the offset for the field.
+This is the offset from the beginning of the buffer parameter for the search.</p></li>
+</ul>
+<p>For example, to define classification for the following IPv4 5-tuple structure:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">proto</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ip_src</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ip_dst</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">port_src</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">port_dst</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The following array of field definitions can be used:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_field_def</span><span class="w"> </span><span class="n">ipv4_defs</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* first input field - always one byte long. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_BITMASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="p">,</span><span class="w"> </span><span class="n">proto</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* next input field (IPv4 source address) - 4 consecutive bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="p">,</span><span class="w"> </span><span class="n">ip_src</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* next input field (IPv4 destination address) - 4 consecutive bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="p">,</span><span class="w"> </span><span class="n">ip_dst</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Next 2 fields (src &amp; dst ports) form 4 consecutive bytes.</span>
+<span class="cm">     * They share the same input index.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_RANGE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint16_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="p">,</span><span class="w"> </span><span class="n">port_src</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_RANGE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint16_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ipv4_5tuple</span><span class="p">,</span><span class="w"> </span><span class="n">port_dst</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>A typical example of such an IPv4 5-tuple rule is a follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>source addr/mask  destination addr/mask  source ports dest ports protocol/mask
+192.168.1.0/24    192.168.2.31/32        0:65535      1234:1234  17/0xff
+</pre></div>
+</div>
+<p>Any IPv4 packets with protocol ID 17 (UDP), source address 192.168.1.[0-255], destination address 192.168.2.31,
+source port [0-65535] and destination port 1234 matches the above rule.</p>
+<p>To define classification for the IPv6 2-tuple: &lt;protocol, IPv6 source address&gt; over the following IPv6 header structure:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">vtc_flow</span><span class="p">;</span><span class="w">     </span><span class="cm">/* IP version, traffic class &amp; flow label. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">payload_len</span><span class="p">;</span><span class="w">  </span><span class="cm">/* IP packet length - includes sizeof(ip_header). */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">proto</span><span class="p">;</span><span class="w">         </span><span class="cm">/* Protocol, next header. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">hop_limits</span><span class="p">;</span><span class="w">    </span><span class="cm">/* Hop limits. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">src_addr</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span><span class="w">  </span><span class="cm">/* IP address of source host. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dst_addr</span><span class="p">[</span><span class="mi">16</span><span class="p">];</span><span class="w">  </span><span class="cm">/* IP address of destination host(s). */</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="n">__rte_packed</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The following array of field definitions can be used:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_field_def</span><span class="w"> </span><span class="n">ipv6_2tuple_defs</span><span class="p">[</span><span class="mi">5</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_BITMASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">proto</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">src_addr</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">src_addr</span><span class="p">[</span><span class="mi">4</span><span class="p">]),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">src_addr</span><span class="p">[</span><span class="mi">8</span><span class="p">]),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv6_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">src_addr</span><span class="p">[</span><span class="mi">12</span><span class="p">]),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>A typical example of such an IPv6 2-tuple rule is a follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>source addr/mask                              protocol/mask
+2001:db8:1234:0000:0000:0000:0000:0000/48     6/0xff
+</pre></div>
+</div>
+<p>Any IPv6 packets with protocol ID 6 (TCP), and source address inside the range
+[2001:db8:1234:0000:0000:0000:0000:0000 - 2001:db8:1234:ffff:ffff:ffff:ffff:ffff] matches the above rule.</p>
+<p>In the following example the last element of the search key is 8-bit long.
+So it is a case where the 4 consecutive bytes of an input field are not fully occupied.
+The structure for the classification is:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">acl_key</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">ip_proto</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ip_src</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">ip_dst</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">tos</span><span class="p">;</span><span class="w">      </span><span class="cm">/*&lt; This is partially using a 32-bit input element */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The following array of field definitions can be used:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_field_def</span><span class="w"> </span><span class="n">ipv4_defs</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* first input field - always one byte long. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_BITMASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint8_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">acl_key</span><span class="p">,</span><span class="w"> </span><span class="n">ip_proto</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* next input field (IPv4 source address) - 4 consecutive bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">acl_key</span><span class="p">,</span><span class="w"> </span><span class="n">ip_src</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* next input field (IPv4 destination address) - 4 consecutive bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_MASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">acl_key</span><span class="p">,</span><span class="w"> </span><span class="n">ip_dst</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Next element of search key (Type of Service) is indeed 1 byte long.</span>
+<span class="cm">     * Anyway we need to allocate all the 4 consecutive bytes for it.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_FIELD_TYPE_BITMASK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="kt">uint32_t</span><span class="p">),</span><span class="w"> </span><span class="cm">/* All the 4 consecutive bytes are allocated */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">input_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">offsetof</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">acl_key</span><span class="p">,</span><span class="w"> </span><span class="n">tos</span><span class="p">),</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>A typical example of such an IPv4 4-tuple rule is as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>source addr/mask  destination addr/mask  tos/mask protocol/mask
+192.168.1.0/24    192.168.2.31/32        1/0xff   6/0xff
+</pre></div>
+</div>
+<p>Any IPv4 packets with protocol ID 6 (TCP), source address 192.168.1.[0-255], destination address 192.168.2.31,
+ToS 1 matches the above rule.</p>
+<p>When creating a set of rules, for each rule, additional information must be supplied also:</p>
+<ul class="simple">
+<li><p><strong>priority</strong>: A weight to measure the priority of the rules (higher is better).
+If the input tuple matches more than one rule, then the rule with the higher priority is returned.
+Note that if the input tuple matches more than one rule and these rules have equal priority,
+it is undefined which rule is returned as a match.
+It is recommended to assign a unique priority for each rule.</p></li>
+<li><p><strong>category_mask</strong>: Each rule uses a bit mask value to select the relevant category(s) for the rule.
+When a lookup is performed, the result for each category is returned.
+This effectively provides a “parallel lookup” by enabling a single search to return multiple results if,
+for example, there were four different sets of ACL rules, one for access control, one for routing, and so on.
+Each set could be assigned its own category and by combining them into a single database,
+one lookup returns a result for each of the four sets.</p></li>
+<li><p><strong>userdata</strong>: A user-defined value.
+For each category, a successful match returns the userdata field of the highest priority matched rule.
+When no rules match, returned value is zero.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When adding new rules into an ACL context, all fields must be in host byte order (LSB).
+When the search is performed for an input tuple, all fields in that tuple must be in network byte order (MSB).</p>
+</div>
+</section>
+<section id="rt-memory-size-limit">
+<h3><span class="section-number">58.1.2. </span>RT memory size limit</h3>
+<p>Build phase (rte_acl_build()) creates for a given set of rules internal structure for further run-time traversal.
+With current implementation it is a set of multi-bit tries (with stride == 8).
+Depending on the rules set, that could consume significant amount of memory.
+In attempt to conserve some space ACL build process tries to split the given
+rule-set into several non-intersecting subsets and construct a separate trie
+for each of them.
+Depending on the rule-set, it might reduce RT memory requirements but might
+increase classification time.
+There is a possibility at build-time to specify maximum memory limit for internal RT structures for given AC context.
+It could be done via <strong>max_size</strong> field of the <strong>rte_acl_config</strong> structure.
+Setting it to the value greater than zero, instructs rte_acl_build() to:</p>
+<ul class="simple">
+<li><p>attempt to minimize number of tries in the RT table, but</p></li>
+<li><p>make sure that size of RT table wouldn’t exceed given value.</p></li>
+</ul>
+<p>Setting it to zero makes rte_acl_build() to use the default behavior:
+try to minimize size of the RT structures, but doesn’t expose any hard limit on it.</p>
+<p>That gives the user the ability to decisions about performance/space trade-off.
+For example:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">acx</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_config</span><span class="w"> </span><span class="n">cfg</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * assuming that acx points to already created and</span>
+<span class="cm"> * populated with rules AC context and cfg filled properly.</span>
+<span class="cm"> */</span><span class="w"></span>
+
+<span class="w"> </span><span class="cm">/* try to build AC context, with RT structures less then 8MB. */</span><span class="w"></span>
+<span class="w"> </span><span class="n">cfg</span><span class="p">.</span><span class="n">max_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0x800000</span><span class="p">;</span><span class="w"></span>
+<span class="w"> </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_build</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cfg</span><span class="p">);</span><span class="w"></span>
+
+<span class="w"> </span><span class="cm">/*</span>
+<span class="cm">  * RT structures can&#39;t fit into 8MB for given context.</span>
+<span class="cm">  * Try to build without exposing any hard limit.</span>
+<span class="cm">  */</span><span class="w"></span>
+<span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="n">ERANGE</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">cfg</span><span class="p">.</span><span class="n">max_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_build</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cfg</span><span class="p">);</span><span class="w"></span>
+<span class="w"> </span><span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="classification-methods">
+<h3><span class="section-number">58.1.3. </span>Classification methods</h3>
+<p>After rte_acl_build() over given AC context has finished successfully, it can be used to perform classification - search for a rule with highest priority over the input data.
+There are several implementations of classify algorithm:</p>
+<ul class="simple">
+<li><p><strong>RTE_ACL_CLASSIFY_SCALAR</strong>: generic implementation, doesn’t require any specific HW support.
+Requires max SIMD bitwidth to be at least 64.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_SSE</strong>: vector implementation, can process up to 8 flows in parallel. Requires SSE 4.1 support.
+Requires max SIMD bitwidth to be at least 128.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_AVX2</strong>: vector implementation, can process up to 16 flows in parallel. Requires AVX2 support.
+Requires max SIMD bitwidth to be at least 256.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_NEON</strong>: vector implementation, can process up to 8 flows
+in parallel. Requires NEON support. Requires max SIMD bitwidth to be at least 128.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_ALTIVEC</strong>: vector implementation, can process up to 8
+flows in parallel. Requires ALTIVEC support. Requires max SIMD bitwidth to be at least 128.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_AVX512X16</strong>: vector implementation, can process up to 16
+flows in parallel. Uses 256-bit width SIMD registers.
+Requires AVX512 support. Requires max SIMD bitwidth to be at least 256.</p></li>
+<li><p><strong>RTE_ACL_CLASSIFY_AVX512X32</strong>: vector implementation, can process up to 32
+flows in parallel. Uses 512-bit width SIMD registers.
+Requires AVX512 support. Requires max SIMD bitwidth to be at least 512.</p></li>
+</ul>
+<p>It is purely a runtime decision which method to choose, there is no build-time difference.
+All implementations operates over the same internal RT structures and use similar principles. The main difference is that vector implementations can manually exploit IA SIMD instructions and process several input data flows in parallel.
+At startup ACL library determines the highest available classify method for the given platform and sets it as default one. Though the user has an ability to override the default classifier function for a given ACL context or perform particular search using non-default classify method. In that case it is user responsibility to make sure that given platform supports selected classify implementation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Runtime algorithm selection obeys EAL max SIMD bitwidth parameter.
+For more details about expected behaviour please see <a class="reference internal" href="env_abstraction_layer.html#max-simd-bitwidth"><span class="std std-ref">Max SIMD bitwidth</span></a></p>
+</div>
+</section>
+</section>
+<section id="application-programming-interface-api-usage">
+<h2><span class="section-number">58.2. </span>Application Programming Interface (API) Usage</h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For more details about the Access Control API, please refer to the <em>DPDK API Reference</em>.</p>
+</div>
+<p>The following example demonstrates IPv4, 5-tuple classification for rules defined above
+with multiple categories in more detail.</p>
+<section id="classify-with-multiple-categories">
+<h3><span class="section-number">58.2.1. </span>Classify with Multiple Categories</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">acx</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_config</span><span class="w"> </span><span class="n">cfg</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* define a structure for the rule with up to 5 fields. */</span><span class="w"></span>
+
+<span class="n">RTE_ACL_RULE_DEF</span><span class="p">(</span><span class="n">acl_ipv4_rule</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">ipv4_defs</span><span class="p">));</span><span class="w"></span>
+
+<span class="cm">/* AC context creation parameters. */</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="n">prm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;ACL_example&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">socket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SOCKET_ID_ANY</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">rule_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ACL_RULE_SZ</span><span class="p">(</span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">ipv4_defs</span><span class="p">)),</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* number of fields per rule. */</span><span class="w"></span>
+
+<span class="w">    </span><span class="p">.</span><span class="n">max_rule_num</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span><span class="p">,</span><span class="w"> </span><span class="cm">/* maximum number of rules in the AC context. */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">acl_ipv4_rule</span><span class="w"> </span><span class="n">acl_rules</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* matches all packets traveling to 192.168.0.0/16, applies for categories: 0,1 */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">userdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">category_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">priority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* destination IPv4 */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_IPV4</span><span class="p">(</span><span class="mi">192</span><span class="p">,</span><span class="mi">168</span><span class="p">,</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">),.</span><span class="w"> </span><span class="n">mask_range</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* source port */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* destination port */</span><span class="w"></span>
+<span class="w">       </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* matches all packets traveling to 192.168.1.0/24, applies for categories: 0 */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">userdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">category_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">priority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* destination IPv4 */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_IPV4</span><span class="p">(</span><span class="mi">192</span><span class="p">,</span><span class="mi">168</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">0</span><span class="p">),.</span><span class="w"> </span><span class="n">mask_range</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">24</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* source port */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* destination port */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* matches all packets traveling from 10.1.1.1, applies for categories: 1 */</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">userdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">category_mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">priority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* source IPv4 */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_IPV4</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),.</span><span class="w"> </span><span class="n">mask_range</span><span class="p">.</span><span class="n">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">32</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* source port */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* destination port */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">field</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">value</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="p">.</span><span class="n">mask_range</span><span class="p">.</span><span class="n">u16</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xffff</span><span class="p">,},</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+
+<span class="p">};</span><span class="w"></span>
+
+
+<span class="cm">/* create an empty AC context  */</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">((</span><span class="n">acx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">prm</span><span class="p">))</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* handle context create failure. */</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* add rules to the context */</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_add_rules</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="n">acl_rules</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">acl_rules</span><span class="p">));</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="cm">/* handle error at adding ACL rules. */</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* prepare AC build config. */</span><span class="w"></span>
+
+<span class="n">cfg</span><span class="p">.</span><span class="n">num_categories</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="p">;</span><span class="w"></span>
+<span class="n">cfg</span><span class="p">.</span><span class="n">num_fields</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">ipv4_defs</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">memcpy</span><span class="p">(</span><span class="n">cfg</span><span class="p">.</span><span class="n">defs</span><span class="p">,</span><span class="w"> </span><span class="n">ipv4_defs</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="w"> </span><span class="p">(</span><span class="n">ipv4_defs</span><span class="p">));</span><span class="w"></span>
+
+<span class="cm">/* build the runtime structures for added rules, with 2 categories. */</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_build</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cfg</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="cm">/* handle error at build runtime structures for ACL context. */</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>For a tuple with source IP address: 10.1.1.1 and destination IP address: 192.168.1.15,
+once the following lines are executed:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span><span class="w"> </span><span class="cm">/* make classify for 4 categories. */</span><span class="w"></span>
+
+<span class="n">rte_acl_classify</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">results</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>then the results[] array contains:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>For category 0, both rules 1 and 2 match, but rule 2 has higher priority,
+therefore results[0] contains the userdata for rule 2.</p></li>
+<li><p>For category 1, both rules 1 and 3 match, but rule 3 has higher priority,
+therefore results[1] contains the userdata for rule 3.</p></li>
+<li><p>For categories 2 and 3, there are no matches, so results[2] and results[3] contain zero,
+which indicates that no matches were found for those categories.</p></li>
+</ul>
+<p>For a tuple with source IP address: 192.168.1.1 and destination IP address: 192.168.2.11,
+once the following lines are executed:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span><span class="w"> </span><span class="cm">/* make classify by 4 categories. */</span><span class="w"></span>
+
+<span class="n">rte_acl_classify</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">results</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>the results[] array contains:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>For categories 0 and 1, only rule 1 matches.</p></li>
+<li><p>For categories 2 and 3, there are no matches.</p></li>
+</ul>
+<p>For a tuple with source IP address: 10.1.1.1 and destination IP address: 201.212.111.12,
+once the following lines are executed:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span><span class="w"> </span><span class="cm">/* make classify by 4 categories. */</span><span class="w"></span>
+<span class="n">rte_acl_classify</span><span class="p">(</span><span class="n">acx</span><span class="p">,</span><span class="w"> </span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">results</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">4</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>the results[] array contains:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">results</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>For category 1, only rule 3 matches.</p></li>
+<li><p>For categories 0, 2 and 3, there are no matches.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="power_man.html" title="previous chapter"><span class="section-number">57. </span>Power Management</a></li>
+      <li>Next: <a href="packet_framework.html" title="next chapter"><span class="section-number">59. </span>Packet Framework</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/packet_classif_access_ctrl.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

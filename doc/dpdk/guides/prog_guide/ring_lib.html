@@ -1,0 +1,523 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>10. Ring Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="11. Stack Library" href="stack_lib.html" />
+    <link rel="prev" title="9. RCU Library" href="rcu_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ring-library">
+<span id="id1"></span><h1><span class="section-number">10. </span>Ring Library</h1>
+<p>The ring allows the management of queues.
+Instead of having a linked list of infinite size, the rte_ring has the following properties:</p>
+<ul class="simple">
+<li><p>FIFO</p></li>
+<li><p>Maximum size is fixed, the objects are stored in a table</p></li>
+<li><p>Objects can be pointers or elements of multiple of 4 byte size</p></li>
+<li><p>Lockless implementation</p></li>
+<li><p>Multi-consumer or single-consumer dequeue</p></li>
+<li><p>Multi-producer or single-producer enqueue</p></li>
+<li><p>Bulk dequeue - Dequeues the specified count of objects if successful; otherwise fails</p></li>
+<li><p>Bulk enqueue - Enqueues the specified count of objects if successful; otherwise fails</p></li>
+<li><p>Burst dequeue - Dequeue the maximum available objects if the specified count cannot be fulfilled</p></li>
+<li><p>Burst enqueue - Enqueue the maximum available objects if the specified count cannot be fulfilled</p></li>
+</ul>
+<p>The advantages of this data structure over a linked list queue are as follows:</p>
+<ul class="simple">
+<li><p>Faster; only requires a single 32 bit Compare-And-Swap instruction instead of several pointer size Compare-And-Swap instructions.</p></li>
+<li><p>Simpler than a full lockless queue.</p></li>
+<li><p>Adapted to bulk enqueue/dequeue operations.
+As objects are stored in a table, a dequeue of several objects will not produce as many cache misses as in a linked queue.
+Also, a bulk dequeue of many objects does not cost more than a dequeue of a simple object.</p></li>
+</ul>
+<p>The disadvantages:</p>
+<ul class="simple">
+<li><p>Size is fixed</p></li>
+<li><p>Having many rings costs more in terms of memory than a linked list queue. An empty ring contains at least N objects.</p></li>
+</ul>
+<p>A simplified representation of a Ring is shown in with consumer and producer head and tail pointers to objects stored in the data structure.</p>
+<figure class="align-default" id="id5">
+<span id="figure-ring1"></span><img alt="../_images/ring1.svg" src="../_images/ring1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.1 </span><span class="caption-text">Ring Structure</span></p>
+</figcaption>
+</figure>
+<section id="references-for-ring-implementation-in-freebsd">
+<h2><span class="section-number">10.1. </span>References for Ring Implementation in FreeBSD*</h2>
+<p>The following code was added in FreeBSD 8.0, and is used in some network device drivers (at least in Intel drivers):</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="http://svn.freebsd.org/viewvc/base/release/8.0.0/sys/sys/buf_ring.h?revision=199625&amp;amp;view=markup">bufring.h in FreeBSD</a></p></li>
+<li><p><a class="reference external" href="http://svn.freebsd.org/viewvc/base/release/8.0.0/sys/kern/subr_bufring.c?revision=199625&amp;amp;view=markup">bufring.c in FreeBSD</a></p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="lockless-ring-buffer-in-linux">
+<h2><span class="section-number">10.2. </span>Lockless Ring Buffer in Linux*</h2>
+<p>The following is a link describing the <a class="reference external" href="http://lwn.net/Articles/340400/">Linux Lockless Ring Buffer Design</a>.</p>
+</section>
+<section id="additional-features">
+<h2><span class="section-number">10.3. </span>Additional Features</h2>
+<section id="name">
+<h3><span class="section-number">10.3.1. </span>Name</h3>
+<p>A ring is identified by a unique name.
+It is not possible to create two rings with the same name (rte_ring_create() returns NULL if this is attempted).</p>
+</section>
+</section>
+<section id="use-cases">
+<h2><span class="section-number">10.4. </span>Use Cases</h2>
+<p>Use cases for the Ring library include:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Communication between applications in the DPDK</p></li>
+<li><p>Used by memory pool allocator</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="anatomy-of-a-ring-buffer">
+<h2><span class="section-number">10.5. </span>Anatomy of a Ring Buffer</h2>
+<p>This section explains how a ring buffer operates.
+The ring structure is composed of two head and tail couples; one is used by producers and one is used by the consumers.
+The figures of the following sections refer to them as prod_head, prod_tail, cons_head and cons_tail.</p>
+<p>Each figure represents a simplified state of the ring, which is a circular buffer.
+The content of the function local variables is represented on the top of the figure,
+and the content of ring structure is represented on the bottom of the figure.</p>
+<section id="single-producer-enqueue">
+<h3><span class="section-number">10.5.1. </span>Single Producer Enqueue</h3>
+<p>This section explains what occurs when a producer adds an object to the ring.
+In this example, only the producer head and tail (prod_head and prod_tail) are modified,
+and there is only one producer.</p>
+<p>The initial state is to have a prod_head and prod_tail pointing at the same location.</p>
+<section id="enqueue-first-step">
+<h4><span class="section-number">10.5.1.1. </span>Enqueue First Step</h4>
+<p>First, <em>ring-&gt;prod_head</em> and ring-&gt;cons_tail are copied in local variables.
+The prod_next local variable points to the next element of the table, or several elements after in case of bulk enqueue.</p>
+<p>If there is not enough room in the ring (this is detected by checking cons_tail), it returns an error.</p>
+<figure class="align-default" id="id6">
+<span id="figure-ring-enqueue1"></span><img alt="../_images/ring-enqueue1.svg" src="../_images/ring-enqueue1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.2 </span><span class="caption-text">Enqueue first step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="enqueue-second-step">
+<h4><span class="section-number">10.5.1.2. </span>Enqueue Second Step</h4>
+<p>The second step is to modify <em>ring-&gt;prod_head</em> in ring structure to point to the same location as prod_next.</p>
+<p>The added object is copied in the ring (obj4).</p>
+<figure class="align-default" id="id7">
+<span id="figure-ring-enqueue2"></span><img alt="../_images/ring-enqueue2.svg" src="../_images/ring-enqueue2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.3 </span><span class="caption-text">Enqueue second step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="enqueue-last-step">
+<h4><span class="section-number">10.5.1.3. </span>Enqueue Last Step</h4>
+<p>Once the object is added in the ring, ring-&gt;prod_tail in the ring structure is modified to point to the same location as <em>ring-&gt;prod_head</em>.
+The enqueue operation is finished.</p>
+<figure class="align-default" id="id8">
+<span id="figure-ring-enqueue3"></span><img alt="../_images/ring-enqueue3.svg" src="../_images/ring-enqueue3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.4 </span><span class="caption-text">Enqueue last step</span></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="single-consumer-dequeue">
+<h3><span class="section-number">10.5.2. </span>Single Consumer Dequeue</h3>
+<p>This section explains what occurs when a consumer dequeues an object from the ring.
+In this example, only the consumer head and tail (cons_head and cons_tail) are modified and there is only one consumer.</p>
+<p>The initial state is to have a cons_head and cons_tail pointing at the same location.</p>
+<section id="dequeue-first-step">
+<h4><span class="section-number">10.5.2.1. </span>Dequeue First Step</h4>
+<p>First, ring-&gt;cons_head and ring-&gt;prod_tail are copied in local variables.
+The cons_next local variable points to the next element of the table, or several elements after in the case of bulk dequeue.</p>
+<p>If there are not enough objects in the ring (this is detected by checking prod_tail), it returns an error.</p>
+<figure class="align-default" id="id9">
+<span id="figure-ring-dequeue1"></span><img alt="../_images/ring-dequeue1.svg" src="../_images/ring-dequeue1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.5 </span><span class="caption-text">Dequeue first step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="dequeue-second-step">
+<h4><span class="section-number">10.5.2.2. </span>Dequeue Second Step</h4>
+<p>The second step is to modify ring-&gt;cons_head in the ring structure to point to the same location as cons_next.</p>
+<p>The dequeued object (obj1) is copied in the pointer given by the user.</p>
+<figure class="align-default" id="id10">
+<span id="figure-ring-dequeue2"></span><img alt="../_images/ring-dequeue2.svg" src="../_images/ring-dequeue2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.6 </span><span class="caption-text">Dequeue second step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="dequeue-last-step">
+<h4><span class="section-number">10.5.2.3. </span>Dequeue Last Step</h4>
+<p>Finally, ring-&gt;cons_tail in the ring structure is modified to point to the same location as ring-&gt;cons_head.
+The dequeue operation is finished.</p>
+<figure class="align-default" id="id11">
+<span id="figure-ring-dequeue3"></span><img alt="../_images/ring-dequeue3.svg" src="../_images/ring-dequeue3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.7 </span><span class="caption-text">Dequeue last step</span></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="multiple-producers-enqueue">
+<h3><span class="section-number">10.5.3. </span>Multiple Producers Enqueue</h3>
+<p>This section explains what occurs when two producers concurrently add an object to the ring.
+In this example, only the producer head and tail (prod_head and prod_tail) are modified.</p>
+<p>The initial state is to have a prod_head and prod_tail pointing at the same location.</p>
+<section id="multiple-producers-enqueue-first-step">
+<h4><span class="section-number">10.5.3.1. </span>Multiple Producers Enqueue First Step</h4>
+<p>On both cores, <em>ring-&gt;prod_head</em> and ring-&gt;cons_tail are copied in local variables.
+The prod_next local variable points to the next element of the table,
+or several elements after in the case of bulk enqueue.</p>
+<p>If there is not enough room in the ring (this is detected by checking cons_tail), it returns an error.</p>
+<figure class="align-default" id="id12">
+<span id="figure-ring-mp-enqueue1"></span><img alt="../_images/ring-mp-enqueue1.svg" src="../_images/ring-mp-enqueue1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.8 </span><span class="caption-text">Multiple producer enqueue first step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="multiple-producers-enqueue-second-step">
+<h4><span class="section-number">10.5.3.2. </span>Multiple Producers Enqueue Second Step</h4>
+<p>The second step is to modify ring-&gt;prod_head in the ring structure to point to the same location as prod_next.
+This operation is done using a Compare And Swap (CAS) instruction, which does the following operations atomically:</p>
+<ul class="simple">
+<li><p>If ring-&gt;prod_head is different to local variable prod_head,
+the CAS operation fails, and the code restarts at first step.</p></li>
+<li><p>Otherwise, ring-&gt;prod_head is set to local prod_next,
+the CAS operation is successful, and processing continues.</p></li>
+</ul>
+<p>In the figure, the operation succeeded on core 1, and step one restarted on core 2.</p>
+<figure class="align-default" id="id13">
+<span id="figure-ring-mp-enqueue2"></span><img alt="../_images/ring-mp-enqueue2.svg" src="../_images/ring-mp-enqueue2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.9 </span><span class="caption-text">Multiple producer enqueue second step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="multiple-producers-enqueue-third-step">
+<h4><span class="section-number">10.5.3.3. </span>Multiple Producers Enqueue Third Step</h4>
+<p>The CAS operation is retried on core 2 with success.</p>
+<p>The core 1 updates one element of the ring(obj4), and the core 2 updates another one (obj5).</p>
+<figure class="align-default" id="id14">
+<span id="figure-ring-mp-enqueue3"></span><img alt="../_images/ring-mp-enqueue3.svg" src="../_images/ring-mp-enqueue3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.10 </span><span class="caption-text">Multiple producer enqueue third step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="multiple-producers-enqueue-fourth-step">
+<h4><span class="section-number">10.5.3.4. </span>Multiple Producers Enqueue Fourth Step</h4>
+<p>Each core now wants to update ring-&gt;prod_tail.
+A core can only update it if ring-&gt;prod_tail is equal to the prod_head local variable.
+This is only true on core 1. The operation is finished on core 1.</p>
+<figure class="align-default" id="id15">
+<span id="figure-ring-mp-enqueue4"></span><img alt="../_images/ring-mp-enqueue4.svg" src="../_images/ring-mp-enqueue4.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.11 </span><span class="caption-text">Multiple producer enqueue fourth step</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="multiple-producers-enqueue-last-step">
+<h4><span class="section-number">10.5.3.5. </span>Multiple Producers Enqueue Last Step</h4>
+<p>Once ring-&gt;prod_tail is updated by core 1, core 2 is allowed to update it too.
+The operation is also finished on core 2.</p>
+<figure class="align-default" id="id16">
+<span id="figure-ring-mp-enqueue5"></span><img alt="../_images/ring-mp-enqueue5.svg" src="../_images/ring-mp-enqueue5.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.12 </span><span class="caption-text">Multiple producer enqueue last step</span></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="modulo-32-bit-indexes">
+<h3><span class="section-number">10.5.4. </span>Modulo 32-bit Indexes</h3>
+<p>In the preceding figures, the prod_head, prod_tail, cons_head and cons_tail indexes are represented by arrows.
+In the actual implementation, these values are not between 0 and size(ring)-1 as would be assumed.
+The indexes are between 0 and 2^32 -1, and we mask their value when we access the object table (the ring itself).
+32-bit modulo also implies that operations on indexes (such as, add/subtract) will automatically do 2^32 modulo
+if the result overflows the 32-bit number range.</p>
+<p>The following are two examples that help to explain how indexes are used in a ring.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To simplify the explanation, operations with modulo 16-bit are used instead of modulo 32-bit.
+In addition, the four indexes are defined as unsigned 16-bit integers,
+as opposed to unsigned 32-bit integers in the more realistic case.</p>
+</div>
+<figure class="align-default" id="id17">
+<span id="figure-ring-modulo1"></span><img alt="../_images/ring-modulo1.svg" src="../_images/ring-modulo1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.13 </span><span class="caption-text">Modulo 32-bit indexes - Example 1</span></p>
+</figcaption>
+</figure>
+<p>This ring contains 11000 entries.</p>
+<figure class="align-default" id="id18">
+<span id="figure-ring-modulo2"></span><img alt="../_images/ring-modulo2.svg" src="../_images/ring-modulo2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 10.14 </span><span class="caption-text">Modulo 32-bit indexes - Example 2</span></p>
+</figcaption>
+</figure>
+<p>This ring contains 12536 entries.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For ease of understanding, we use modulo 65536 operations in the above examples.
+In real execution cases, this is redundant for low efficiency, but is done automatically when the result overflows.</p>
+</div>
+<p>The code always maintains a distance between producer and consumer between 0 and size(ring)-1.
+Thanks to this property, we can do subtractions between 2 index values in a modulo-32bit base:
+that’s why the overflow of the indexes is not a problem.</p>
+<p>At any time, entries and free_entries are between 0 and size(ring)-1,
+even if only the first term of subtraction has overflowed:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">entries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">prod_tail</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">cons_head</span><span class="p">);</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">free_entries</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">mask</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cons_tail</span><span class="w"> </span><span class="o">-</span><span class="n">prod_head</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="producer-consumer-synchronization-modes">
+<h2><span class="section-number">10.6. </span>Producer/consumer synchronization modes</h2>
+<p>rte_ring supports different synchronization modes for producers and consumers.
+These modes can be specified at ring creation/init time via <code class="docutils literal notranslate"><span class="pre">flags</span></code>
+parameter.
+That should help users to configure ring in the most suitable way for his
+specific usage scenarios.
+Currently supported modes:</p>
+<section id="mp-mc-default-one">
+<span id="ring-library-mpmc-mode"></span><h3><span class="section-number">10.6.1. </span>MP/MC (default one)</h3>
+<p>Multi-producer (/multi-consumer) mode. This is a default enqueue (/dequeue)
+mode for the ring. In this mode multiple threads can enqueue (/dequeue)
+objects to (/from) the ring. For ‘classic’ DPDK deployments (with one thread
+per core) this is usually the most suitable and fastest synchronization mode.
+As a well known limitation - it can perform quite pure on some overcommitted
+scenarios.</p>
+</section>
+<section id="sp-sc">
+<span id="ring-library-spsc-mode"></span><h3><span class="section-number">10.6.2. </span>SP/SC</h3>
+<p>Single-producer (/single-consumer) mode. In this mode only one thread at a time
+is allowed to enqueue (/dequeue) objects to (/from) the ring.</p>
+</section>
+<section id="mp-rts-mc-rts">
+<span id="ring-library-mt-rts-mode"></span><h3><span class="section-number">10.6.3. </span>MP_RTS/MC_RTS</h3>
+<p>Multi-producer (/multi-consumer) with Relaxed Tail Sync (RTS) mode.
+The main difference from the original MP/MC algorithm is that
+tail value is increased not by every thread that finished enqueue/dequeue,
+but only by the last one.
+That allows threads to avoid spinning on ring tail value,
+leaving actual tail value change to the last thread at a given instance.
+That technique helps to avoid the Lock-Waiter-Preemption (LWP) problem on tail
+update and improves average enqueue/dequeue times on overcommitted systems.
+To achieve that RTS requires 2 64-bit CAS for each enqueue(/dequeue) operation:
+one for head update, second for tail update.
+In comparison the original MP/MC algorithm requires one 32-bit CAS
+for head update and waiting/spinning on tail value.</p>
+</section>
+<section id="mp-hts-mc-hts">
+<span id="ring-library-mt-hts-mode"></span><h3><span class="section-number">10.6.4. </span>MP_HTS/MC_HTS</h3>
+<p>Multi-producer (/multi-consumer) with Head/Tail Sync (HTS) mode.
+In that mode enqueue/dequeue operation is fully serialized:
+at any given moment only one enqueue/dequeue operation can proceed.
+This is achieved by allowing a thread to proceed with changing <code class="docutils literal notranslate"><span class="pre">head.value</span></code>
+only when <code class="docutils literal notranslate"><span class="pre">head.value</span> <span class="pre">==</span> <span class="pre">tail.value</span></code>.
+Both head and tail values are updated atomically (as one 64-bit value).
+To achieve that 64-bit CAS is used by head update routine.
+That technique also avoids the Lock-Waiter-Preemption (LWP) problem on tail
+update and helps to improve ring enqueue/dequeue behavior in overcommitted
+scenarios. Another advantage of fully serialized producer/consumer -
+it provides the ability to implement MT safe peek API for rte_ring.</p>
+</section>
+</section>
+<section id="ring-peek-api">
+<h2><span class="section-number">10.7. </span>Ring Peek API</h2>
+<p>For ring with serialized producer/consumer (HTS sync mode) it is possible
+to split public enqueue/dequeue API into two phases:</p>
+<ul class="simple">
+<li><p>enqueue/dequeue start</p></li>
+<li><p>enqueue/dequeue finish</p></li>
+</ul>
+<p>That allows user to inspect objects in the ring without removing them
+from it (aka MT safe peek) and reserve space for the objects in the ring
+before actual enqueue.
+Note that this API is available only for two sync modes:</p>
+<ul class="simple">
+<li><p>Single Producer/Single Consumer (SP/SC)</p></li>
+<li><p>Multi-producer/Multi-consumer with Head/Tail Sync (HTS)</p></li>
+</ul>
+<p>It is a user responsibility to create/init ring with appropriate sync modes
+selected. As an example of usage:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* read 1 elem from the ring: */</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_ring_dequeue_bulk_start</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">obj</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* examine object */</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">object_examine</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">KEEP</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* decided to keep it in the ring. */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_ring_dequeue_finish</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">else</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* decided to remove it from the ring. */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_ring_dequeue_finish</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note that between <code class="docutils literal notranslate"><span class="pre">_start_</span></code> and <code class="docutils literal notranslate"><span class="pre">_finish_</span></code> none other thread can proceed
+with enqueue(/dequeue) operation till <code class="docutils literal notranslate"><span class="pre">_finish_</span></code> completes.</p>
+</section>
+<section id="ring-peek-zero-copy-api">
+<h2><span class="section-number">10.8. </span>Ring Peek Zero Copy API</h2>
+<p>Along with the advantages of the peek APIs, zero copy APIs provide the ability
+to copy the data to the ring memory directly without the need for temporary
+storage (for ex: array of mbufs on the stack).</p>
+<p>These APIs make it possible to split public enqueue/dequeue API into 3 phases:</p>
+<ul class="simple">
+<li><p>enqueue/dequeue start</p></li>
+<li><p>copy data to/from the ring</p></li>
+<li><p>enqueue/dequeue finish</p></li>
+</ul>
+<p>Note that this API is available only for two sync modes:</p>
+<ul class="simple">
+<li><p>Single Producer/Single Consumer (SP/SC)</p></li>
+<li><p>Multi-producer/Multi-consumer with Head/Tail Sync (HTS)</p></li>
+</ul>
+<p>It is a user responsibility to create/init ring with appropriate sync modes.
+Following is an example of usage:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* Reserve space on the ring */</span><span class="w"></span>
+<span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_ring_enqueue_zc_burst_start</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">zcd</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* Pkt I/O core polls packets from the NIC */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">n</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">nb_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_rx_burst</span><span class="p">(</span><span class="n">portid</span><span class="p">,</span><span class="w"> </span><span class="n">queueid</span><span class="p">,</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">ptr1</span><span class="p">,</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">n1</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nb_rx</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">n1</span><span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span><span class="n">n</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">n1</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">nb_rx</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">rte_eth_rx_burst</span><span class="p">(</span><span class="n">portid</span><span class="p">,</span><span class="w"> </span><span class="n">queueid</span><span class="p">,</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">ptr2</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                                    </span><span class="n">n</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">zcd</span><span class="o">-&gt;</span><span class="n">n1</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Provide packets to the packet processing cores */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_ring_enqueue_zc_finish</span><span class="p">(</span><span class="n">r</span><span class="p">,</span><span class="w"> </span><span class="n">nb_rx</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note that between <code class="docutils literal notranslate"><span class="pre">_start_</span></code> and <code class="docutils literal notranslate"><span class="pre">_finish_</span></code> no other thread can proceed
+with enqueue(/dequeue) operation till <code class="docutils literal notranslate"><span class="pre">_finish_</span></code> completes.</p>
+</section>
+<section id="references">
+<h2><span class="section-number">10.9. </span>References</h2>
+<blockquote>
+<div><ul class="simple">
+<li><p><a class="reference external" href="http://svn.freebsd.org/viewvc/base/release/8.0.0/sys/sys/buf_ring.h?revision=199625&amp;amp;view=markup">bufring.h in FreeBSD</a> (version 8)</p></li>
+<li><p><a class="reference external" href="http://svn.freebsd.org/viewvc/base/release/8.0.0/sys/kern/subr_bufring.c?revision=199625&amp;amp;view=markup">bufring.c in FreeBSD</a> (version 8)</p></li>
+<li><p><a class="reference external" href="http://lwn.net/Articles/340400/">Linux Lockless Ring Buffer Design</a></p></li>
+</ul>
+</div></blockquote>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="rcu_lib.html" title="previous chapter"><span class="section-number">9. </span>RCU Library</a></li>
+      <li>Next: <a href="stack_lib.html" title="next chapter"><span class="section-number">11. </span>Stack Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/ring_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

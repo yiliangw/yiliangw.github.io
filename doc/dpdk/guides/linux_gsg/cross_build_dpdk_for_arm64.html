@@ -1,0 +1,428 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. Cross compiling DPDK for aarch64 and aarch32 &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. Cross compiling DPDK for LoongArch" href="cross_build_dpdk_for_loongarch.html" />
+    <link rel="prev" title="3. Compiling the DPDK Target from Source" href="build_dpdk.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cross-compiling-dpdk-for-aarch64-and-aarch32">
+<h1><span class="section-number">4. </span>Cross compiling DPDK for aarch64 and aarch32</h1>
+<p>This chapter describes how to cross compile DPDK for aarch64 on x86 build
+machine and compile 32-bit aarch32 DPDK on aarch64 build machine.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Whilst it is recommended to natively build DPDK on aarch64 (just
+like with x86), it is also possible to cross compile DPDK for aarch64.
+An aarch64 cross compiler GNU toolchain or an LLVM/clang toolchain
+may be used for cross-compilation.</p>
+</div>
+<section id="prerequisites">
+<h2><span class="section-number">4.1. </span>Prerequisites</h2>
+<section id="numa-library">
+<h3><span class="section-number">4.1.1. </span>NUMA library</h3>
+<p>NUMA is required by most modern machines, not needed for non-NUMA architectures.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For compiling the NUMA lib, run libtool –version to ensure the libtool version &gt;= 2.2,
+otherwise the compilation will fail with errors.</p>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/numactl/numactl.git</span>
+<span class="go">cd numactl</span>
+<span class="go">git checkout v2.0.13 -b v2.0.13</span>
+<span class="go">./autogen.sh</span>
+<span class="go">autoconf -i</span>
+<span class="go">./configure --host=aarch64-linux-gnu CC=aarch64-none-linux-gnu-gcc --prefix=&lt;numa install dir&gt;</span>
+<span class="go">make install</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The compiler is <code class="docutils literal notranslate"><span class="pre">aarch64-none-linux-gnu-gcc</span></code> if you download GCC
+using the below guide. If you’re using a different compiler,
+make sure you’re using the proper executable name.</p>
+</div>
+<p>The numa header files and lib file is generated in the include and lib folder
+respectively under <code class="docutils literal notranslate"><span class="pre">&lt;numa</span> <span class="pre">install</span> <span class="pre">dir&gt;</span></code>.</p>
+</section>
+<section id="meson-prerequisites">
+<h3><span class="section-number">4.1.2. </span>Meson prerequisites</h3>
+<p>Meson depends on pkgconfig to find the dependencies.
+The package <code class="docutils literal notranslate"><span class="pre">pkg-config-aarch64-linux-gnu</span></code> is required for aarch64.
+To install it in Ubuntu:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo apt install pkg-config-aarch64-linux-gnu
+</pre></div>
+</div>
+<p>For aarch32, install <code class="docutils literal notranslate"><span class="pre">pkg-config-arm-linux-gnueabihf</span></code>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo apt install pkg-config-arm-linux-gnueabihf
+</pre></div>
+</div>
+</section>
+</section>
+<section id="gnu-toolchain">
+<h2><span class="section-number">4.2. </span>GNU toolchain</h2>
+<section id="get-the-cross-toolchain">
+<span id="obtain-gnu-toolchain"></span><h3><span class="section-number">4.2.1. </span>Get the cross toolchain</h3>
+<p>The latest GNU cross compiler toolchain can be downloaded from:
+<a class="reference external" href="https://developer.arm.com/open-source/gnu-toolchain/gnu-a/downloads">https://developer.arm.com/open-source/gnu-toolchain/gnu-a/downloads</a>.</p>
+<p>It is always recommended to check and get the latest compiler tool
+from the page and use it to generate better code.
+As of this writing 9.2-2019.12 is the newest,
+the following description is an example of this version.</p>
+<p>For aarch64:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>wget https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
+tar -xvf gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu.tar.xz
+export PATH=$PATH:&lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/bin
+</pre></div>
+</div>
+<p>For aarch32:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>wget https://developer.arm.com/-/media/Files/downloads/gnu-a/9.2-2019.12/binrel/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz
+tar -xvf gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf.tar.xz
+export PATH=$PATH:&lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-arm-none-linux-gnueabihf/bin
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For the host requirements and other info, refer to the release note section:
+<a class="reference external" href="https://releases.linaro.org/components/toolchain/binaries/">https://releases.linaro.org/components/toolchain/binaries/</a></p>
+</div>
+</section>
+<section id="augment-the-gnu-toolchain-with-numa-support">
+<span id="id1"></span><h3><span class="section-number">4.2.2. </span>Augment the GNU toolchain with NUMA support</h3>
+<p>Copy the NUMA header files and lib to the cross compiler’s directories:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cp &lt;numa_install_dir&gt;/include/numa*.h &lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc/usr/include/</span>
+<span class="go">cp &lt;numa_install_dir&gt;/lib/libnuma.a &lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/lib/gcc/aarch64-none-linux-gnu/9.2.1/</span>
+<span class="go">cp &lt;numa_install_dir&gt;/lib/libnuma.so &lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/lib/gcc/aarch64-none-linux-gnu/9.2.1/</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Using LDFLAGS and CFLAGS is not a viable alternative to copying the files.
+The Meson docs say it is not recommended, as there are many caveats
+to their use with Meson, especially when rebuilding the project.
+A viable alternative would be to use the <code class="docutils literal notranslate"><span class="pre">c_args</span></code> and <code class="docutils literal notranslate"><span class="pre">c_link_args</span></code>
+options with Meson 0.51.0 and higher:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">-Dc_args=-I&lt;numa_install_dir&gt;/include -Dc_link_args=-L&lt;numa_install_dir&gt;/lib</span>
+</pre></div>
+</div>
+</div>
+<p>For Meson versions lower than 0.51.0, the <code class="docutils literal notranslate"><span class="pre">c_args</span></code> and <code class="docutils literal notranslate"><span class="pre">c_link_args</span></code>
+options do not apply to cross compilation.
+However, the compiler/linker flags may be added to cross files under [properties]:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">c_args = [&#39;-I&lt;numa_install_dir&gt;/include&#39;]</span>
+<span class="go">c_link_args = [&#39;-L&lt;numa_install_dir&gt;/lib&#39;]</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-compiling-dpdk-with-gnu-toolchain-using-meson">
+<h3><span class="section-number">4.2.3. </span>Cross Compiling DPDK with GNU toolchain using Meson</h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The names of GCC binaries in cross files differ from the downloaded ones,
+which have an extra <code class="docutils literal notranslate"><span class="pre">-none-</span></code> in their name.
+Please modify the cross file binaries accordingly
+when using the downloaded cross compilers.</p>
+<p>An example cross file with modified names and added NUMA paths
+would look like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[binaries]</span>
+<span class="go">c = &#39;aarch64-none-linux-gnu-gcc&#39;</span>
+<span class="go">cpp = &#39;aarch64-none-linux-gnu-cpp&#39;</span>
+<span class="go">ar = &#39;aarch64-none-linux-gnu-gcc-ar&#39;</span>
+<span class="go">strip = &#39;aarch64-none-linux-gnu-strip&#39;</span>
+<span class="go">pkgconfig = &#39;aarch64-linux-gnu-pkg-config&#39; # the downloaded binaries</span>
+<span class="gp">   # </span><span class="k">do</span> not contain a pkgconfig binary, so it is not modified
+<span class="go">pcap-config = &#39;&#39;</span>
+
+<span class="go">[host_machine]</span>
+<span class="go">system = &#39;linux&#39;</span>
+<span class="go">cpu_family = &#39;aarch64&#39;</span>
+<span class="go">cpu = &#39;armv8-a&#39;</span>
+<span class="go">endian = &#39;little&#39;</span>
+
+<span class="go">[properties]</span>
+<span class="gp"># </span>Generate binaries that are portable across all Armv8 machines
+<span class="go">platform = &#39;generic&#39;</span>
+<span class="go">c_args = [&#39;-I&lt;numa_install_dir&gt;/include&#39;]  # replace &lt;numa_install_dir&gt;</span>
+<span class="go">c_link_args = [&#39;-L&lt;numa_install_dir&gt;/lib&#39;] # with your path</span>
+</pre></div>
+</div>
+</div>
+<p>To cross-compile DPDK on a desired target machine we can use the following
+command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup cross-build --cross-file &lt;target_machine_configuration&gt;
+ninja -C cross-build
+</pre></div>
+</div>
+<p>For example if the target machine is aarch64 we can use the following
+command, provided the cross file has been modified accordingly:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup aarch64-build-gcc --cross-file config/arm/arm64_armv8_linux_gcc
+ninja -C aarch64-build-gcc
+</pre></div>
+</div>
+<p>If the target machine is aarch32 we can use the following command,
+provided the cross file has been modified accordingly:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup aarch32-build --cross-file config/arm/arm32_armv8_linux_gcc
+ninja -C aarch32-build
+</pre></div>
+</div>
+</section>
+</section>
+<section id="llvm-clang-toolchain">
+<h2><span class="section-number">4.3. </span>LLVM/Clang toolchain</h2>
+<section id="obtain-the-cross-tool-chain">
+<h3><span class="section-number">4.3.1. </span>Obtain the cross tool chain</h3>
+<p>The latest LLVM/Clang cross compiler toolchain can be downloaded from:
+<a class="reference external" href="https://developer.arm.com/tools-and-software/open-source-software/developer-tools/llvm-toolchain">https://developer.arm.com/tools-and-software/open-source-software/developer-tools/llvm-toolchain</a>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Ubuntu binaries
+<span class="go">wget https://github.com/llvm/llvm-project/releases/download/llvmorg-10.0.0/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz</span>
+</pre></div>
+</div>
+<p>The LLVM/Clang toolchain does not implement the standard c library.
+The GNU toolchain ships an implementation we can use.
+Refer to <a class="reference internal" href="#obtain-gnu-toolchain">obtain_GNU_toolchain</a> to get the GNU toolchain.</p>
+</section>
+<section id="unzip-and-add-into-the-path">
+<h3><span class="section-number">4.3.2. </span>Unzip and add into the PATH</h3>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tar -xvf clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz</span>
+<span class="go">export PATH=$PATH:&lt;cross_install_dir&gt;/clang+llvm-10.0.0-x86_64-linux-gnu-ubuntu-18.04/bin</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-compiling-dpdk-with-llvm-clang-toolchain-using-meson">
+<h3><span class="section-number">4.3.3. </span>Cross Compiling DPDK with LLVM/Clang toolchain using Meson</h3>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To use the NUMA library follow the same steps as for
+<a class="reference internal" href="#augment-the-gnu-toolchain-with-numa-support">augment_the_gnu_toolchain_with_numa_support</a>.</p>
+</div>
+<p>The paths to GNU stdlib must be specified in a cross file.
+Augmenting the default cross-file’s <code class="docutils literal notranslate"><span class="pre">c_args</span></code> and <code class="docutils literal notranslate"><span class="pre">c_link_args</span></code>
+<code class="docutils literal notranslate"><span class="pre">config/arm/arm64_armv8_linux_clang_ubuntu1804</span></code> would look like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">...</span>
+<span class="go">c_args = [&#39;-target&#39;, &#39;aarch64-linux-gnu&#39;, &#39;--sysroot&#39;, &#39;&lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc&#39;]</span>
+<span class="go">c_link_args = [&#39;-target&#39;, &#39;aarch64-linux-gnu&#39;, &#39;-fuse-ld=lld&#39;, &#39;--sysroot&#39;, &#39;&lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu/aarch64-none-linux-gnu/libc&#39;, &#39;--gcc-toolchain=&lt;cross_install_dir&gt;/gcc-arm-9.2-2019.12-x86_64-aarch64-none-linux-gnu&#39;]</span>
+</pre></div>
+</div>
+<p>Assuming the file with augmented <code class="docutils literal notranslate"><span class="pre">c_args</span></code> and <code class="docutils literal notranslate"><span class="pre">c_link_args</span></code>
+is named <code class="docutils literal notranslate"><span class="pre">arm64_armv8_linux_clang</span></code>,
+use the following command to cross-compile DPDK for the target machine:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup aarch64-build-clang --cross-file config/arm/arm64_armv8_linux_clang
+ninja -C aarch64-build-clang
+</pre></div>
+</div>
+</section>
+<section id="cross-compiling-dpdk-with-llvm-clang-toolchain-using-meson-on-ubuntu-18-04">
+<h3><span class="section-number">4.3.4. </span>Cross Compiling DPDK with LLVM/Clang toolchain using Meson on Ubuntu 18.04</h3>
+<p>On most popular Linux distribution it is not necessary to download
+the toolchains, but rather use the packages provided by said distributions.
+On Ubuntu 18.04, these packages are needed:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo apt-get install pkg-config-aarch64-linux-gnu clang llvm llvm-dev lld</span>
+<span class="go">libc6-dev-arm64-cross libatomic1-arm64-cross libgcc-8-dev-arm64-cross</span>
+</pre></div>
+</div>
+<p>Use the following command to cross-compile DPDK for the target machine:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup aarch64-build-clang --cross-file config/arm/arm64_armv8_linux_clang_ubuntu1804
+ninja -C aarch64-build-clang
+</pre></div>
+</div>
+</section>
+</section>
+<section id="building-for-an-aarch64-soc-on-an-aarch64-build-machine">
+<h2><span class="section-number">4.4. </span>Building for an aarch64 SoC on an aarch64 build machine</h2>
+<p>If you wish to build on an aarch64 build machine for a different aarch64 SoC,
+you don’t need a separate cross toolchain, just a different set of
+configuration options. To build for an aarch64 SoC, use the -Dplatform meson
+option:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup soc_build -Dplatform=&lt;target_soc&gt;
+</pre></div>
+</div>
+<p>Substitute &lt;target_soc&gt; with one of the supported SoCs</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>generic:         Generic un-optimized build for armv8 aarch64 execution mode.
+generic_aarch32: Generic un-optimized build for armv8 aarch32 execution mode.
+altra:           Ampere Altra/AltraMax
+ampereone:       Ampere AmpereOne
+armada:          Marvell ARMADA
+bluefield:       NVIDIA BlueField
+bluefield3:      NVIDIA BlueField-3
+cdx:             AMD CDX
+centriq2400:     Qualcomm Centriq 2400
+cn9k:            Marvell OCTEON 9
+cn10k:           Marvell OCTEON 10
+dpaa:            NXP DPAA
+emag:            Ampere eMAG
+ft2000plus:      Phytium FT-2000+
+tys2500:         Phytium TengYun S2500
+graviton2:       AWS Graviton2
+graviton3:       AWS Graviton3
+hip10:           HiSilicon HIP10
+kunpeng920:      HiSilicon Kunpeng 920
+kunpeng930:      HiSilicon Kunpeng 930
+n1sdp:           Arm Neoverse N1SDP
+n2:              Arm Neoverse N2
+stingray:        Broadcom Stingray
+thunderx2:       Marvell ThunderX2 T99
+thunderxt88:     Marvell ThunderX T88
+thunderxt83:     Marvell ThunderX T83
+</pre></div>
+</div>
+<p>These SoCs are also used in cross files, e.g.:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[properties]
+# Generate binaries that are portable across all Armv8 machines
+platform = &#39;generic&#39;
+</pre></div>
+</div>
+</section>
+<section id="supported-soc-configuration">
+<h2><span class="section-number">4.5. </span>Supported SoC configuration</h2>
+<p>The SoC configuration is a combination of implementer and CPU part number
+configuration and SoC-specific configuration:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>soc_&lt;name&gt; = {
+   &#39;description&#39;: &#39;SoC Description&#39;,  # mandatory
+   &#39;implementer&#39;: &lt;implementer_id&gt;,   # mandatory
+   &#39;part_number&#39;: &lt;part_number&gt;,      # mandatory
+   &#39;numa&#39;: false,  # optional, specify for non-NUMA SoCs
+   &#39;enable_drivers&#39;: &#39;common/*,bus/*&#39;,  # optional, comma-separated list of
+                           # drivers to build, wildcards are accepted
+   &#39;disable_drivers&#39;: &#39;crypto/*&#39;,       # optional, comma-separated list of
+                           # drivers to disable, wildcards are accepted
+   &#39;flags&#39;: [
+      [&#39;RTE_MAX_LCORE&#39;, &#39;16&#39;],
+      [&#39;RTE_MAX_NUMA_NODES&#39;, &#39;1&#39;]
+   ]               # optional, list of DPDK options that will be added
+                   # or overwritten
+}
+</pre></div>
+</div>
+<p>Where &lt;implementer_id&gt; is a key defined in the implementers dictionary
+in config/arm/meson.build (e.g. 0x41) and part_number is a key defined
+in implementers[&lt;implementer_id&gt;][‘part_number_config’] dictionary
+(i.e. the part number must be defined for the implementer,
+e.g. for 0x41, a valid value is 0xd49, which is the neoverse-n2 SoC).</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Linux</a><ul>
+      <li>Previous: <a href="build_dpdk.html" title="previous chapter"><span class="section-number">3. </span>Compiling the DPDK Target from Source</a></li>
+      <li>Next: <a href="cross_build_dpdk_for_loongarch.html" title="next chapter"><span class="section-number">5. </span>Cross compiling DPDK for LoongArch</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/linux_gsg/cross_build_dpdk_for_arm64.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

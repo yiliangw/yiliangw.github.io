@@ -1,0 +1,204 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>39. Reorder Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="40. IP Fragmentation and Reassembly Library" href="ip_fragment_reassembly_lib.html" />
+    <link rel="prev" title="38. Packet Distributor Library" href="packet_distrib_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="reorder-library">
+<span id="id1"></span><h1><span class="section-number">39. </span>Reorder Library</h1>
+<p>The Reorder Library provides a mechanism for reordering mbufs based on their
+sequence number.</p>
+<section id="operation">
+<h2><span class="section-number">39.1. </span>Operation</h2>
+<p>The reorder library is essentially a buffer that reorders mbufs.
+The user inserts out of order mbufs into the reorder buffer and pulls in-order
+mbufs from it.</p>
+<p>At a given time, the reorder buffer contains mbufs whose sequence number are
+inside the sequence window. The sequence window is determined by the minimum
+sequence number and the number of entries that the buffer was configured to hold.
+For example, given a reorder buffer with 200 entries and a minimum sequence
+number of 350, the sequence window has low and high limits of 350 and 550
+respectively.</p>
+<p>When inserting mbufs, the reorder library differentiates between valid, early
+and late mbufs depending on the sequence number of the inserted mbuf:</p>
+<ul class="simple">
+<li><p>valid: the sequence number is inside the window.</p></li>
+<li><p>late: the sequence number is outside the window and less than the low limit.</p></li>
+<li><p>early: the sequence number is outside the window and greater than the high
+limit.</p></li>
+</ul>
+<p>The reorder buffer directly returns late mbufs and tries to accommodate early
+mbufs.</p>
+</section>
+<section id="implementation-details">
+<h2><span class="section-number">39.2. </span>Implementation Details</h2>
+<p>The reorder library is implemented as a pair of buffers, which referred to as
+the <em>Order</em> buffer and the <em>Ready</em> buffer.</p>
+<p>On an insert call, valid mbufs are inserted directly into the Order buffer and
+late mbufs are returned to the user with an error.</p>
+<p>In the case of early mbufs, the reorder buffer will try to move the window
+(incrementing the minimum sequence number) so that the mbuf becomes a valid one.
+To that end, mbufs in the Order buffer are moved into the Ready buffer.
+Any mbufs that have not arrived yet are ignored and therefore will become
+late mbufs.
+This means that as long as there is room in the Ready buffer, the window will
+be moved to accommodate early mbufs that would otherwise be outside the
+reordering window.</p>
+<p>For example, assuming that we have a buffer of 200 entries with a 350 minimum
+sequence number, and we need to insert an early mbuf with 565 sequence number.
+That means that we would need to move the windows at least 15 positions to
+accommodate the mbuf.
+The reorder buffer would try to move mbufs from at least the next 15 slots in
+the Order buffer to the Ready buffer, as long as there is room in the Ready buffer.
+Any gaps in the Order buffer at that point are skipped, and those packet will
+be reported as late packets when they arrive. The process of moving packets
+to the Ready buffer continues beyond the minimum required until a gap,
+i.e. missing mbuf, in the Order buffer is encountered.</p>
+<p>When draining mbufs, the reorder buffer would return  mbufs in the Ready
+buffer first and then from the Order buffer until a gap is found (mbufs that
+have not arrived yet).</p>
+</section>
+<section id="use-case-packet-distributor">
+<h2><span class="section-number">39.3. </span>Use Case: Packet Distributor</h2>
+<p>An application using the DPDK packet distributor could make use of the reorder
+library to transmit packets in the same order they were received.</p>
+<p>A basic packet distributor use case would consist of a distributor with
+multiple workers cores.
+The processing of packets by the workers is not guaranteed to be in order,
+hence a reorder buffer can be used to order as many packets as possible.</p>
+<p>In such a scenario, the distributor assigns a sequence number to mbufs before
+delivering them to the workers.
+As the workers finish processing the packets, the distributor inserts those
+mbufs into the reorder buffer and finally transmit drained mbufs.</p>
+<p>NOTE: Currently the reorder buffer is not thread safe so the same thread is
+responsible for inserting and draining mbufs.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="packet_distrib_lib.html" title="previous chapter"><span class="section-number">38. </span>Packet Distributor Library</a></li>
+      <li>Next: <a href="ip_fragment_reassembly_lib.html" title="next chapter"><span class="section-number">40. </span>IP Fragmentation and Reassembly Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/reorder_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

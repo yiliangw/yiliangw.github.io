@@ -1,0 +1,177 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Ring Mempool Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. Stack Mempool Driver" href="stack.html" />
+    <link rel="prev" title="2. OCTEON TX FPAVF Mempool Driver" href="octeontx.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ring-mempool-driver">
+<h1><span class="section-number">3. </span>Ring Mempool Driver</h1>
+<p><strong>rte_mempool_ring</strong> is a pure software mempool driver based on the
+<code class="docutils literal notranslate"><span class="pre">rte_ring</span></code> DPDK library. This is a default mempool driver.
+The following modes of operation are available for the ring mempool driver
+and can be selected via mempool ops API:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_mp_mc</span></code></p>
+<p>The underlying <strong>rte_ring</strong> operates in multi-thread producer,
+multi-thread consumer sync mode. For more information please refer to:
+<a class="reference internal" href="../prog_guide/ring_lib.html#ring-library-mpmc-mode"><span class="std std-ref">MP/MC (default one)</span></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_sp_sc</span></code></p>
+<p>The underlying <strong>rte_ring</strong> operates in single-thread producer,
+single-thread consumer sync mode. For more information please refer to:
+<a class="reference internal" href="../prog_guide/ring_lib.html#ring-library-spsc-mode"><span class="std std-ref">SP/SC</span></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_sp_mc</span></code></p>
+<p>The underlying <strong>rte_ring</strong> operates in single-thread producer,
+multi-thread consumer sync mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_mp_sc</span></code></p>
+<p>The underlying <strong>rte_ring</strong> operates in multi-thread producer,
+single-thread consumer sync mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_mt_rts</span></code></p>
+<p>For underlying <strong>rte_ring</strong> both producer and consumer operate in
+multi-thread Relaxed Tail Sync (RTS) mode. For more information please
+refer to: <a class="reference internal" href="../prog_guide/ring_lib.html#ring-library-mt-rts-mode"><span class="std std-ref">MP_RTS/MC_RTS</span></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_mt_hts</span></code></p>
+<p>For underlying <strong>rte_ring</strong> both producer and consumer operate in
+multi-thread Head-Tail Sync (HTS) mode. For more information please
+refer to: <a class="reference internal" href="../prog_guide/ring_lib.html#ring-library-mt-hts-mode"><span class="std std-ref">MP_HTS/MC_HTS</span></a>.</p>
+</li>
+</ul>
+<p>For ‘classic’ DPDK deployments (with one thread per core) the <code class="docutils literal notranslate"><span class="pre">ring_mp_mc</span></code>
+mode is usually the most suitable and the fastest one. For overcommitted
+scenarios (multiple threads share same set of cores) the <code class="docutils literal notranslate"><span class="pre">ring_mt_rts</span></code> or
+<code class="docutils literal notranslate"><span class="pre">ring_mt_hts</span></code> modes usually provide a better alternative.
+For more information about <code class="docutils literal notranslate"><span class="pre">rte_ring</span></code> structure, behaviour and available
+synchronisation modes please refer to: <a class="reference internal" href="../prog_guide/ring_lib.html"><span class="doc">Ring Library</span></a>.</p>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Mempool Device Driver</a><ul>
+      <li>Previous: <a href="octeontx.html" title="previous chapter"><span class="section-number">2. </span>OCTEON TX FPAVF Mempool Driver</a></li>
+      <li>Next: <a href="stack.html" title="next chapter"><span class="section-number">4. </span>Stack Mempool Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/mempool/ring.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

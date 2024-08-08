@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>16. MVSAM Crypto Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="17. Marvell NITROX Crypto Poll Mode Driver" href="nitrox.html" />
+    <link rel="prev" title="15. NVIDIA MLX5 Crypto Driver" href="mlx5.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="mvsam-crypto-poll-mode-driver">
+<h1><span class="section-number">16. </span>MVSAM Crypto Poll Mode Driver</h1>
+<p>The MVSAM CRYPTO PMD (<strong>librte_crypto_mvsam</strong>) provides poll mode crypto driver
+support by utilizing MUSDK library, which provides cryptographic operations
+acceleration by using Security Acceleration Engine (EIP197) directly from
+user-space with minimum overhead and high performance.</p>
+<p>Detailed information about SoCs that use MVSAM crypto driver can be obtained here:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-70xx/">https://www.marvell.com/embedded-processors/armada-70xx/</a></p></li>
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-80xx/">https://www.marvell.com/embedded-processors/armada-80xx/</a></p></li>
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-3700/">https://www.marvell.com/embedded-processors/armada-3700/</a></p></li>
+</ul>
+<section id="features">
+<h2><span class="section-number">16.1. </span>Features</h2>
+<p>MVSAM CRYPTO PMD has support for:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_NULL</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_ECB</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_ECB</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_NULL</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_GMAC</span></code></p></li>
+</ul>
+<p>AEAD algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_AES_GCM</span></code></p></li>
+</ul>
+<p>For supported feature flags please consult <a class="reference internal" href="overview.html"><span class="doc">Crypto Device Supported Functionality Matrices</span></a>.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">16.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Hardware only supports scenarios where ICV (digest buffer) is placed just
+after the authenticated data. Other placement will result in error.</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">16.3. </span>Installation</h2>
+<p>MVSAM CRYPTO PMD requires MUSDK built with EIP197 support thus following
+extra option must be passed to the library configuration script:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--enable-sam [--enable-sam-statistics] [--enable-sam-debug]</span>
+</pre></div>
+</div>
+<p>For instructions how to build required kernel modules please refer
+to <cite>doc/musdk_get_started.txt</cite>.</p>
+</section>
+<section id="initialization">
+<h2><span class="section-number">16.4. </span>Initialization</h2>
+<p>After successfully building MVSAM CRYPTO PMD, the following modules need to be
+loaded:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">insmod musdk_cma.ko</span>
+<span class="go">insmod crypto_safexcel.ko rings=0,0</span>
+<span class="go">insmod mv_sam_uio.ko</span>
+</pre></div>
+</div>
+<p>The following parameters (all optional) are exported by the driver:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">max_nb_queue_pairs</span></code>: maximum number of queue pairs in the device (default: 8 - A8K, 4 - A7K/A3K).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_nb_sessions</span></code>: maximum number of sessions that can be created (default: 2048).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id</span></code>: socket on which to allocate the device resources on.</p></li>
+</ul>
+<p>l2fwd-crypto example application can be used to verify MVSAM CRYPTO PMD
+operation:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-l2fwd-crypto --vdev=eth_mvpp2,iface=eth0 --vdev=crypto_mvsam -- \</span>
+<span class="go">  --cipher_op ENCRYPT --cipher_algo aes-cbc \</span>
+<span class="go">  --cipher_key 00:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:0f  \</span>
+<span class="go">  --auth_op GENERATE --auth_algo sha1-hmac \</span>
+<span class="go">  --auth_key 10:11:12:13:14:15:16:17:18:19:1a:1b:1c:1d:1e:1f</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="mlx5.html" title="previous chapter"><span class="section-number">15. </span>NVIDIA MLX5 Crypto Driver</a></li>
+      <li>Next: <a href="nitrox.html" title="next chapter"><span class="section-number">17. </span>Marvell NITROX Crypto Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/mvsam.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

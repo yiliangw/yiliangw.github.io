@@ -1,0 +1,234 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. Broadcom FlexSparc Crypto Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. NXP CAAM JOB RING (caam_jr)" href="caam_jr.html" />
+    <link rel="prev" title="4. ARMv8 Crypto Poll Mode Driver" href="armv8.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="broadcom-flexsparc-crypto-poll-mode-driver">
+<h1><span class="section-number">5. </span>Broadcom FlexSparc Crypto Poll Mode Driver</h1>
+<p>The FlexSparc crypto poll mode driver (BCMFS PMD) provides support for offloading
+cryptographic operations to the Broadcom SoCs having FlexSparc4 unit.
+Detailed information about SoCs can be found at <a class="reference external" href="https://www.broadcom.com/products/ethernet-connectivity/network-adapters/smartnic">Broadcom Official Website</a>.</p>
+<section id="supported-broadcom-socs">
+<h2><span class="section-number">5.1. </span>Supported Broadcom SoCs</h2>
+<ul class="simple">
+<li><p>Stingray</p></li>
+</ul>
+</section>
+<section id="features">
+<h2><span class="section-number">5.2. </span>Features</h2>
+<p>The BCMFS PMD has support for below symmetric algorithms:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_XTS</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_DES_CBC</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_XCBC_MAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_GMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_CMAC</span></code></p></li>
+</ul>
+<p>Supported AEAD algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_AES_GCM</span></code></p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">5.3. </span>Installation</h2>
+<p>Information about kernel, rootfs and toolchain can be found at
+<a class="reference external" href="https://www.broadcom.com/products/ethernet-connectivity/network-adapters/smartnic/stingray-software">Broadcom Official Website</a>.</p>
+<blockquote>
+<div><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To execute BCMFS PMD, it must be compiled with VFIO_PRESENT flag on the
+compiling platform and same gets enabled in rte_vfio.h.</p>
+</div>
+</div></blockquote>
+<p>The BCMFS PMD may be compiled natively on a Stingray platform or
+cross-compiled on an x86 platform. For example, below commands can be executed
+for cross compiling on x86 platform.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;DPDK-source-directory&gt;</span>
+<span class="go">meson setup &lt;dest-dir&gt; --cross-file config/arm/arm64_stingray_linux_gcc</span>
+<span class="go">cd &lt;dest-dir&gt;</span>
+<span class="go">ninja</span>
+</pre></div>
+</div>
+</section>
+<section id="initialization">
+<h2><span class="section-number">5.4. </span>Initialization</h2>
+<p>The supported platform devices should be present in the
+<em>/sys/bus/platform/devices/fs&lt;version&gt;/&lt;dev_name&gt;</em> path on the booted kernel.
+To get BCMFS PMD executing, device node must be owned by VFIO platform module only.
+For example, below commands can be run to get hold of a device node by VFIO.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">SETUP_SYSFS_DEV_NAME=67000000.crypto_mbox</span>
+<span class="go">io_device_name=&quot;vfio-platform&quot;</span>
+<span class="go">echo $io_device_name &gt; /sys/bus/platform/devices/${SETUP_SYSFS_DEV_NAME}/driver_override</span>
+<span class="go">echo ${SETUP_SYSFS_DEV_NAME} &gt; /sys/bus/platform/drivers_probe</span>
+</pre></div>
+</div>
+</section>
+<section id="limitations">
+<h2><span class="section-number">5.5. </span>Limitations</h2>
+<ul class="simple">
+<li><p>The session-oriented APIs are supported but the session-less APIs are not.</p></li>
+<li><p>CCM is not supported.</p></li>
+</ul>
+</section>
+<section id="testing">
+<h2><span class="section-number">5.6. </span>Testing</h2>
+<p>The symmetric crypto operations on BCMFS PMD may be verified by running the test
+application:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-test</span>
+<span class="go">RTE&gt;&gt;cryptodev_bcmfs_autotest</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="armv8.html" title="previous chapter"><span class="section-number">4. </span>ARMv8 Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="caam_jr.html" title="next chapter"><span class="section-number">6. </span>NXP CAAM JOB RING (caam_jr)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/bcmfs.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,238 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. NXP CAAM JOB RING (caam_jr) &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. AMD CCP Poll Mode Driver" href="ccp.html" />
+    <link rel="prev" title="5. Broadcom FlexSparc Crypto Poll Mode Driver" href="bcmfs.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nxp-caam-job-ring-caam-jr">
+<h1><span class="section-number">6. </span>NXP CAAM JOB RING (caam_jr)</h1>
+<p>The caam_jr PMD provides poll mode crypto driver support for NXP SEC 4.x+ (CAAM)
+hardware accelerator. More information is available at:</p>
+<p><a class="reference external" href="https://www.nxp.com/applications/solutions/internet-of-things/secure-things/network-security-technology/cryptographic-acceleration-technology:NETWORK_SECURITY_CRYPTOG">NXP Cryptographic Acceleration Technology</a>.</p>
+<section id="architecture">
+<h2><span class="section-number">6.1. </span>Architecture</h2>
+<p>SEC is the SOC’s security engine, which serves as NXP’s latest cryptographic
+acceleration and offloading hardware. It combines functions previously
+implemented in separate modules to create a modular and scalable acceleration
+and assurance engine. It also implements block encryption algorithms, stream
+cipher algorithms, hashing algorithms, public key algorithms, run-time
+integrity checking, and a hardware random number generator. SEC performs
+higher-level cryptographic operations than previous NXP cryptographic
+accelerators. This provides significant improvement to system level performance.</p>
+<p>SEC HW accelerator above 4.x+ version are also known as CAAM.</p>
+<p>caam_jr PMD is one of DPAA drivers which uses UIO interface to interact with
+Linux kernel for configure and destroy the device instance (ring).</p>
+</section>
+<section id="implementation">
+<h2><span class="section-number">6.2. </span>Implementation</h2>
+<p>SEC provides platform assurance by working with SecMon, which is a companion
+logic block that tracks the security state of the SOC. SEC is programmed by
+means of descriptors (not to be confused with frame descriptors (FDs)) that
+indicate the operations to be performed and link to the message and
+associated data. SEC incorporates two DMA engines to fetch the descriptors,
+read the message data, and write the results of the operations. The DMA
+engine provides a scatter/gather capability so that SEC can read and write
+data scattered in memory. SEC may be configured by means of software for
+dynamic changes in byte ordering. The default configuration for this version
+of SEC is little-endian mode.</p>
+<p>Note that one physical Job Ring represent one caam_jr device.</p>
+</section>
+<section id="features">
+<h2><span class="section-number">6.3. </span>Features</h2>
+<p>The CAAM_JR PMD has support for:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CTR</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5_HMAC</span></code></p></li>
+</ul>
+<p>AEAD algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_AES_GCM</span></code></p></li>
+</ul>
+</section>
+<section id="supported-dpaa-socs">
+<h2><span class="section-number">6.4. </span>Supported DPAA SoCs</h2>
+<ul class="simple">
+<li><p>LS1046A/LS1026A</p></li>
+<li><p>LS1043A/LS1023A</p></li>
+<li><p>LS1028A</p></li>
+<li><p>LS1012A</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">6.5. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Hash followed by Cipher mode is not supported</p></li>
+<li><p>Only supports the session-oriented API implementation (session-less APIs are not supported).</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">6.6. </span>Prerequisites</h2>
+<p>caam_jr driver has following dependencies are not part of DPDK and must be installed separately:</p>
+<ul>
+<li><p><strong>NXP Linux SDK</strong></p>
+<p>NXP Linux software development kit (SDK) includes support for the family
+of QorIQ® ARM-Architecture-based system on chip (SoC) processors
+and corresponding boards.</p>
+<p>It includes the Linux board support packages (BSPs) for NXP SoCs,
+a fully operational tool chain, kernel and board specific modules.</p>
+<p>SDK and related information can be obtained from:  <a class="reference external" href="http://www.nxp.com/products/software-and-tools/run-time-software/linux-sdk/linux-sdk-for-qoriq-processors:SDKLINUX">NXP QorIQ SDK</a>.</p>
+</li>
+</ul>
+<p>Currently supported by DPDK:</p>
+<ul class="simple">
+<li><p>NXP SDK <strong>18.09+</strong>.</p></li>
+<li><p>Supported architectures:  <strong>arm64 LE</strong>.</p></li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+</section>
+<section id="enabling-logs">
+<h2><span class="section-number">6.7. </span>Enabling logs</h2>
+<p>For enabling logs, use the following EAL parameter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_crypto_application &lt;EAL args&gt; --log-level=pmd.crypto.caam,&lt;level&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="bcmfs.html" title="previous chapter"><span class="section-number">5. </span>Broadcom FlexSparc Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="ccp.html" title="next chapter"><span class="section-number">7. </span>AMD CCP Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/caam_jr.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

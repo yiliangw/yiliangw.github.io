@@ -1,0 +1,621 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>64. Graph Library and Inbuilt Nodes &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="65. Installing DPDK Using the meson build system" href="build-sdk-meson.html" />
+    <link rel="prev" title="63. Berkeley Packet Filter Library" href="bpf_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="graph-library-and-inbuilt-nodes">
+<h1><span class="section-number">64. </span>Graph Library and Inbuilt Nodes</h1>
+<p>Graph architecture abstracts the data processing functions as a <code class="docutils literal notranslate"><span class="pre">node</span></code> and
+<code class="docutils literal notranslate"><span class="pre">links</span></code> them together to create a complex <code class="docutils literal notranslate"><span class="pre">graph</span></code> to enable reusable/modular
+data processing functions.</p>
+<p>The graph library provides API to enable graph framework operations such as
+create, lookup, dump and destroy on graph and node operations such as clone,
+edge update, and edge shrink, etc. The API also allows to create the stats
+cluster to monitor per graph and per node stats.</p>
+<section id="features">
+<h2><span class="section-number">64.1. </span>Features</h2>
+<p>Features of the Graph library are:</p>
+<ul class="simple">
+<li><p>Nodes as plugins.</p></li>
+<li><p>Support for out of tree nodes.</p></li>
+<li><p>Inbuilt nodes for packet processing.</p></li>
+<li><p>Multi-process support.</p></li>
+<li><p>Low overhead graph walk and node enqueue.</p></li>
+<li><p>Low overhead statistics collection infrastructure.</p></li>
+<li><p>Support to export the graph as a Graphviz dot file. See <code class="docutils literal notranslate"><span class="pre">rte_graph_export()</span></code>.</p></li>
+<li><p>Allow having another graph walk implementation in the future by segregating
+the fast path(<code class="docutils literal notranslate"><span class="pre">rte_graph_worker.h</span></code>) and slow path code.</p></li>
+</ul>
+</section>
+<section id="advantages-of-graph-architecture">
+<h2><span class="section-number">64.2. </span>Advantages of Graph architecture</h2>
+<ul class="simple">
+<li><p>Memory latency is the enemy for high-speed packet processing, moving the
+similar packet processing code to a node will reduce the I cache and D
+caches misses.</p></li>
+<li><p>Exploits the probability that most packets will follow the same nodes in the
+graph.</p></li>
+<li><p>Allow SIMD instructions for packet processing of the node.-</p></li>
+<li><p>The modular scheme allows having reusable nodes for the consumers.</p></li>
+<li><p>The modular scheme allows us to abstract the vendor HW specific
+optimizations as a node.</p></li>
+</ul>
+</section>
+<section id="performance-tuning-parameters">
+<h2><span class="section-number">64.3. </span>Performance tuning parameters</h2>
+<ul class="simple">
+<li><p>Test with various burst size values (256, 128, 64, 32) using
+RTE_GRAPH_BURST_SIZE config option.
+The testing shows, on x86 and arm64 servers, The sweet spot is 256 burst
+size. While on arm64 embedded SoCs, it is either 64 or 128.</p></li>
+<li><p>Disable node statistics (using <code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_GRAPH_STATS</span></code> config option)
+if not needed.</p></li>
+</ul>
+</section>
+<section id="programming-model">
+<h2><span class="section-number">64.4. </span>Programming model</h2>
+<section id="anatomy-of-node">
+<h3><span class="section-number">64.4.1. </span>Anatomy of Node:</h3>
+<figure class="align-default" id="id1">
+<span id="figure-anatomy-of-a-node"></span><img alt="../_images/anatomy_of_a_node.svg" src="../_images/anatomy_of_a_node.svg" /><figcaption>
+<p><span class="caption-number">Fig. 64.1 </span><span class="caption-text">Anatomy of a node</span></p>
+</figcaption>
+</figure>
+<p>The node is the basic building block of the graph framework.</p>
+<p>A node consists of:</p>
+<section id="process">
+<h4><span class="section-number">64.4.1.1. </span>process():</h4>
+<p>The callback function will be invoked by worker thread using
+<code class="docutils literal notranslate"><span class="pre">rte_graph_walk()</span></code> function when there is data to be processed by the node.
+A graph node process the function using <code class="docutils literal notranslate"><span class="pre">process()</span></code> and enqueue to next
+downstream node using <code class="docutils literal notranslate"><span class="pre">rte_node_enqueue*()</span></code> function.</p>
+</section>
+<section id="context-memory">
+<h4><span class="section-number">64.4.1.2. </span>Context memory:</h4>
+<p>It is memory allocated by the library to store the node-specific context
+information. This memory will be used by process(), init(), fini() callbacks.</p>
+</section>
+<section id="init">
+<h4><span class="section-number">64.4.1.3. </span>init():</h4>
+<p>The callback function will be invoked by <code class="docutils literal notranslate"><span class="pre">rte_graph_create()</span></code> on when
+a node gets attached to a graph.</p>
+</section>
+<section id="fini">
+<h4><span class="section-number">64.4.1.4. </span>fini():</h4>
+<p>The callback function will be invoked by <code class="docutils literal notranslate"><span class="pre">rte_graph_destroy()</span></code> on when a
+node gets detached to a graph.</p>
+</section>
+<section id="node-name">
+<h4><span class="section-number">64.4.1.5. </span>Node name:</h4>
+<p>It is the name of the node. When a node registers to graph library, the library
+gives the ID as <code class="docutils literal notranslate"><span class="pre">rte_node_t</span></code> type. Both ID or Name shall be used lookup the
+node. <code class="docutils literal notranslate"><span class="pre">rte_node_from_name()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_node_id_to_name()</span></code> are the node
+lookup functions.</p>
+</section>
+<section id="nb-edges">
+<h4><span class="section-number">64.4.1.6. </span>nb_edges:</h4>
+<p>The number of downstream nodes connected to this node. The <code class="docutils literal notranslate"><span class="pre">next_nodes[]</span></code>
+stores the downstream nodes objects. <code class="docutils literal notranslate"><span class="pre">rte_node_edge_update()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_node_edge_shrink()</span></code> functions shall be used to update the <code class="docutils literal notranslate"><span class="pre">next_node[]</span></code>
+objects. Consumers of the node APIs are free to update the <code class="docutils literal notranslate"><span class="pre">next_node[]</span></code>
+objects till <code class="docutils literal notranslate"><span class="pre">rte_graph_create()</span></code> invoked.</p>
+</section>
+<section id="next-node">
+<h4><span class="section-number">64.4.1.7. </span>next_node[]:</h4>
+<p>The dynamic array to store the downstream nodes connected to this node. Downstream
+node should not be current node itself or a source node.</p>
+</section>
+<section id="source-node">
+<h4><span class="section-number">64.4.1.8. </span>Source node:</h4>
+<p>Source nodes are static nodes created using <code class="docutils literal notranslate"><span class="pre">RTE_NODE_REGISTER</span></code> by passing
+<code class="docutils literal notranslate"><span class="pre">flags</span></code> as <code class="docutils literal notranslate"><span class="pre">RTE_NODE_SOURCE_F</span></code>.
+While performing the graph walk, the <code class="docutils literal notranslate"><span class="pre">process()</span></code> function of all the source
+nodes will be called first. So that these nodes can be used as input nodes for a graph.</p>
+</section>
+</section>
+<section id="node-creation-and-registration">
+<h3><span class="section-number">64.4.2. </span>Node creation and registration</h3>
+<ul class="simple">
+<li><p>Node implementer creates the node by implementing ops and attributes of
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_node_register</span></code>.</p></li>
+<li><p>The library registers the node by invoking RTE_NODE_REGISTER on library load
+using the constructor scheme. The constructor scheme used here to support multi-process.</p></li>
+</ul>
+</section>
+<section id="link-the-nodes-to-create-the-graph-topology">
+<h3><span class="section-number">64.4.3. </span>Link the Nodes to create the graph topology</h3>
+<figure class="align-default" id="id2">
+<span id="figure-link-the-nodes"></span><img alt="../_images/link_the_nodes.svg" src="../_images/link_the_nodes.svg" /><figcaption>
+<p><span class="caption-number">Fig. 64.2 </span><span class="caption-text">Topology after linking the nodes</span></p>
+</figcaption>
+</figure>
+<p>Once nodes are available to the program, Application or node public API
+functions can links them together to create a complex packet processing graph.</p>
+<p>There are multiple different types of strategies to link the nodes.</p>
+<section id="method-a">
+<h4><span class="section-number">64.4.3.1. </span>Method (a):</h4>
+<p>Provide the <code class="docutils literal notranslate"><span class="pre">next_nodes[]</span></code> at the node registration time. See  <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_node_register::nb_edges</span></code>.
+This is a use case to address the static node scheme where one knows upfront the
+<code class="docutils literal notranslate"><span class="pre">next_nodes[]</span></code> of the node.</p>
+</section>
+<section id="method-b">
+<h4><span class="section-number">64.4.3.2. </span>Method (b):</h4>
+<p>Use <code class="docutils literal notranslate"><span class="pre">rte_node_edge_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_node_edge_update()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_node_edge_shrink()</span></code>
+to update the <code class="docutils literal notranslate"><span class="pre">next_nodes[]</span></code> links for the node runtime but before graph create.</p>
+</section>
+<section id="method-c">
+<h4><span class="section-number">64.4.3.3. </span>Method (c):</h4>
+<p>Use <code class="docutils literal notranslate"><span class="pre">rte_node_clone()</span></code> to clone a already existing node, created using RTE_NODE_REGISTER.
+When <code class="docutils literal notranslate"><span class="pre">rte_node_clone()</span></code> invoked, The library, would clone all the attributes
+of the node and creates a new one. The name for cloned node shall be
+<code class="docutils literal notranslate"><span class="pre">&quot;parent_node_name-user_provided_name&quot;</span></code>.</p>
+<p>This method enables the use case of Rx and Tx nodes where multiple of those nodes
+need to be cloned based on the number of CPU available in the system.
+The cloned nodes will be identical, except the <code class="docutils literal notranslate"><span class="pre">&quot;context</span> <span class="pre">memory&quot;</span></code>.
+Context memory will have information of port, queue pair in case of Rx and Tx
+ethdev nodes.</p>
+</section>
+</section>
+<section id="create-the-graph-object">
+<h3><span class="section-number">64.4.4. </span>Create the graph object</h3>
+<p>Now that the nodes are linked, Its time to create a graph by including
+the required nodes. The application can provide a set of node patterns to
+form a graph object. The <code class="docutils literal notranslate"><span class="pre">fnmatch()</span></code> API used underneath for the pattern
+matching to include the required nodes. After the graph create any changes to
+nodes or graph is not allowed.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_graph_create()</span></code> API shall be used to create the graph.</p>
+<p>Example of a graph object creation:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">{&quot;ethdev_rx-0-0&quot;, ip4*, ethdev_tx-*&quot;}</span>
+</pre></div>
+</div>
+<p>In the above example, A graph object will be created with ethdev Rx
+node of port 0 and queue 0, all ipv4* nodes in the system,
+and ethdev tx node of all ports.</p>
+</section>
+<section id="graph-models">
+<h3><span class="section-number">64.4.5. </span>Graph models</h3>
+<p>There are two different kinds of graph walking models. User can select the model using
+<code class="docutils literal notranslate"><span class="pre">rte_graph_worker_model_set()</span></code> API. If the application decides to use only one model,
+the fast path check can be avoided by defining the model with RTE_GRAPH_MODEL_SELECT.
+For example:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define RTE_GRAPH_MODEL_SELECT RTE_GRAPH_MODEL_RTC</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;rte_graph_worker.h&quot;</span><span class="cp"></span>
+</pre></div>
+</div>
+<section id="rtc-run-to-completion">
+<h4><span class="section-number">64.4.5.1. </span>RTC (Run-To-Completion)</h4>
+<p>This is the default graph walking model. Specifically, <code class="docutils literal notranslate"><span class="pre">rte_graph_walk_rtc()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_node_enqueue*</span></code> fast path API functions are designed to work on single-core to
+have better performance. The fast path API works on graph object, So the multi-core
+graph processing strategy would be to create graph object PER WORKER.</p>
+<p>Example:</p>
+<p>Graph: node-0 -&gt; node-1 -&gt; node-2 &#64;Core0.</p>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gi">+ - - - - - - - - - - - - - - - - - - - - - +</span><span class="w"></span>
+<span class="w">&#39;                  Core #0                  &#39;</span>
+<span class="w">&#39;                                           &#39;</span>
+<span class="w">&#39; +--------+     +---------+     +--------+ &#39;</span>
+<span class="w">&#39; | Node-0 | --&gt; | Node-1  | --&gt; | Node-2 | &#39;</span>
+<span class="w">&#39; +--------+     +---------+     +--------+ &#39;</span>
+<span class="w">&#39;                                           &#39;</span>
+<span class="gi">+ - - - - - - - - - - - - - - - - - - - - - +</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="dispatch-model">
+<h4><span class="section-number">64.4.5.2. </span>Dispatch model</h4>
+<p>The dispatch model enables a cross-core dispatching mechanism which employs
+a scheduling work-queue to dispatch streams to other worker cores which
+being associated with the destination node.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">rte_graph_model_mcore_dispatch_lcore_affinity_set()</span></code> to set lcore affinity
+with the node.
+Each worker core will have a graph repetition. Use <code class="docutils literal notranslate"><span class="pre">rte_graph_clone()</span></code> to clone
+graph for each worker and use``rte_graph_model_mcore_dispatch_core_bind()`` to
+bind graph with the worker core.</p>
+<p>Example:</p>
+<p>Graph topo: node-0 -&gt; Core1; node-1 -&gt; node-2; node-2 -&gt; node-3.
+Config graph: node-0 &#64;Core0; node-1/3 &#64;Core1; node-2 &#64;Core2.</p>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gi">+ - - - - - -+     +- - - - - - - - - - - - - +     + - - - - - -+</span><span class="w"></span>
+<span class="w">&#39;  Core #0   &#39;     &#39;          Core #1         &#39;     &#39;  Core #2   &#39;</span>
+<span class="w">&#39;            &#39;     &#39;                          &#39;     &#39;            &#39;</span>
+<span class="w">&#39; +--------+ &#39;     &#39; +--------+    +--------+ &#39;     &#39; +--------+ &#39;</span>
+<span class="w">&#39; | Node-0 | - - - -&gt;| Node-1 |    | Node-3 |&lt;- - - - | Node-2 | &#39;</span>
+<span class="w">&#39; +--------+ &#39;     &#39; +--------+    +--------+ &#39;     &#39; +--------+ &#39;</span>
+<span class="w">&#39;            &#39;     &#39;     |                    &#39;     &#39;      ^     &#39;</span>
+<span class="gi">+ - - - - - -+     +- - -|- - - - - - - - - - +     + - - -|- - -+</span><span class="w"></span>
+<span class="w"> </span>                        |                                 |<span class="w"></span>
+<span class="w"> </span>                        + - - - - - - - - - - - - - - - - +<span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="in-fast-path">
+<h3><span class="section-number">64.4.6. </span>In fast path</h3>
+<p>Typical fast-path code looks like below, where the application
+gets the fast-path graph object using <code class="docutils literal notranslate"><span class="pre">rte_graph_lookup()</span></code>
+on the worker thread and run the <code class="docutils literal notranslate"><span class="pre">rte_graph_walk()</span></code> in a tight loop.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_graph</span><span class="w"> </span><span class="o">*</span><span class="n">graph</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_graph_lookup</span><span class="p">(</span><span class="s">&quot;worker0&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">done</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_graph_walk</span><span class="p">(</span><span class="n">graph</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="context-update-when-graph-walk-in-action">
+<h3><span class="section-number">64.4.7. </span>Context update when graph walk in action</h3>
+<p>The fast-path object for the node is <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_node</span></code>.</p>
+<p>It may be possible that in slow-path or after the graph walk-in action,
+the user needs to update the context of the node hence access to
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_node</span> <span class="pre">*</span></code> memory.</p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_graph_foreach_node()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_graph_node_get()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_graph_node_get_by_name()</span></code> APIs can be used to get the
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_node*</span></code>. <code class="docutils literal notranslate"><span class="pre">rte_graph_foreach_node()</span></code> iterator function works on
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_graph</span> <span class="pre">*</span></code> fast-path graph object while others works on graph ID or name.</p>
+</section>
+<section id="get-the-node-statistics-using-graph-cluster">
+<h3><span class="section-number">64.4.8. </span>Get the node statistics using graph cluster</h3>
+<p>The user may need to know the aggregate stats of the node across
+multiple graph objects. Especially the situation where each graph object bound
+to a worker thread.</p>
+<p>Introduced a graph cluster object for statistics.
+<code class="docutils literal notranslate"><span class="pre">rte_graph_cluster_stats_create()</span></code> API shall be used for creating a
+graph cluster with multiple graph objects and <code class="docutils literal notranslate"><span class="pre">rte_graph_cluster_stats_get()</span></code>
+to get the aggregate node statistics.</p>
+<p>An example statistics output from <code class="docutils literal notranslate"><span class="pre">rte_graph_cluster_stats_get()</span></code></p>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="gi">+---------+-----------+-------------+---------------+-----------+---------------+-----------+</span><span class="w"></span>
+<span class="w">|Node     |calls      |objs         |realloc_count  |objs/call  |objs/sec(10E6) |cycles/call|</span>
+<span class="gi">+---------------------+-------------+---------------+-----------+---------------+-----------+</span><span class="w"></span>
+<span class="w">|node0    |12977424   |3322220544   |5              |256.000    |3047.151872    |20.0000    |</span>
+<span class="w">|node1    |12977653   |3322279168   |0              |256.000    |3047.210496    |17.0000    |</span>
+<span class="w">|node2    |12977696   |3322290176   |0              |256.000    |3047.221504    |17.0000    |</span>
+<span class="w">|node3    |12977734   |3322299904   |0              |256.000    |3047.231232    |17.0000    |</span>
+<span class="w">|node4    |12977784   |3322312704   |1              |256.000    |3047.243776    |17.0000    |</span>
+<span class="w">|node5    |12977825   |3322323200   |0              |256.000    |3047.254528    |17.0000    |</span>
+<span class="gi">+---------+-----------+-------------+---------------+-----------+---------------+-----------+</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="node-writing-guidelines">
+<h3><span class="section-number">64.4.9. </span>Node writing guidelines</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">process()</span></code> function of a node is the fast-path function and that needs
+to be written carefully to achieve max performance.</p>
+<p>Broadly speaking, there are two different types of nodes.</p>
+</section>
+<section id="static-nodes">
+<h3><span class="section-number">64.4.10. </span>Static nodes</h3>
+<p>The first kind of nodes are those that have a fixed <code class="docutils literal notranslate"><span class="pre">next_nodes[]</span></code> for the
+complete burst (like ethdev_rx, ethdev_tx) and it is simple to write.
+<code class="docutils literal notranslate"><span class="pre">process()</span></code> function can move the obj burst to the next node either using
+<code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_move()</span></code> or using <code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_get()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_put()</span></code>.</p>
+</section>
+<section id="intermediate-nodes">
+<h3><span class="section-number">64.4.11. </span>Intermediate nodes</h3>
+<p>The second kind of such node is <code class="docutils literal notranslate"><span class="pre">intermediate</span> <span class="pre">nodes</span></code> that decide what is the
+<code class="docutils literal notranslate"><span class="pre">next_node[]</span></code> to send to on a per-packet basis. In these nodes,</p>
+<ul class="simple">
+<li><p>Firstly, there has to be the best possible packet processing logic.</p></li>
+<li><p>Secondly, each packet needs to be queued to its next node.</p></li>
+</ul>
+<p>This can be done using <code class="docutils literal notranslate"><span class="pre">rte_node_enqueue_[x1|x2|x4]()</span></code> APIs if
+they are to single next or <code class="docutils literal notranslate"><span class="pre">rte_node_enqueue_next()</span></code> that takes array of nexts.</p>
+<p>In scenario where multiple intermediate nodes are present but most of the time
+each node using the same next node for all its packets, the cost of moving every
+pointer from current node’s stream to next node’s stream could be avoided.
+This is called home run and <code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_move()</span></code> could be used to
+just move stream from the current node to the next node with least number of cycles.
+Since this can be avoided only in the case where all the packets are destined
+to the same next node, node implementation should be also having worst-case
+handling where every packet could be going to different next node.</p>
+<section id="example-of-intermediate-node-implementation-with-home-run">
+<h4><span class="section-number">64.4.11.1. </span>Example of intermediate node implementation with home run:</h4>
+<ol class="arabic simple">
+<li><p>Start with speculation that next_node = node-&gt;ctx.
+This could be the next_node application used in the previous function call of this node.</p></li>
+<li><p>Get the next_node stream array with required space using
+<code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_get(next_node,</span> <span class="pre">space)</span></code>.</p></li>
+<li><p>while n_left_from &gt; 0 (i.e packets left to be sent) prefetch next pkt_set
+and process current pkt_set to find their next node</p></li>
+<li><p>if all the next nodes of the current pkt_set match speculated next node,
+just count them as successfully speculated(<code class="docutils literal notranslate"><span class="pre">last_spec</span></code>) till now and
+continue the loop without actually moving them to the next node. else if there is
+a mismatch, copy all the pkt_set pointers that were <code class="docutils literal notranslate"><span class="pre">last_spec</span></code> and move the
+current pkt_set to their respective next’s nodes using <code class="docutils literal notranslate"><span class="pre">rte_enqueue_next_x1()</span></code>.
+Also, one of the next_node can be updated as speculated next_node if it is more
+probable. Finally, reset <code class="docutils literal notranslate"><span class="pre">last_spec</span></code> to zero.</p></li>
+<li><p>if n_left_from != 0 then goto 3) to process remaining packets.</p></li>
+<li><p>if last_spec == nb_objs, All the objects passed were successfully speculated
+to single next node. So, the current stream can be moved to next node using
+<code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_move(node,</span> <span class="pre">next_node)</span></code>.
+This is the <code class="docutils literal notranslate"><span class="pre">home</span> <span class="pre">run</span></code> where memcpy of buffer pointers to next node is avoided.</p></li>
+<li><p>Update the <code class="docutils literal notranslate"><span class="pre">node-&gt;ctx</span></code> with more probable next node.</p></li>
+</ol>
+</section>
+</section>
+</section>
+<section id="graph-object-memory-layout">
+<h2><span class="section-number">64.5. </span>Graph object memory layout</h2>
+<figure class="align-default" id="id3">
+<span id="figure-graph-mem-layout"></span><img alt="../_images/graph_mem_layout.svg" src="../_images/graph_mem_layout.svg" /><figcaption>
+<p><span class="caption-number">Fig. 64.3 </span><span class="caption-text">Memory layout</span></p>
+</figcaption>
+</figure>
+<p>Understanding the memory layout helps to debug the graph library and
+improve the performance if needed.</p>
+<p>Graph object consists of a header, circular buffer to store the pending
+stream when walking over the graph, and variable-length memory to store
+the <code class="docutils literal notranslate"><span class="pre">rte_node</span></code> objects.</p>
+<p>The graph_nodes_mem_create() creates and populate this memory. The functions
+such as <code class="docutils literal notranslate"><span class="pre">rte_graph_walk()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_node_enqueue_*</span></code> use this memory
+to enable fastpath services.</p>
+</section>
+<section id="inbuilt-nodes">
+<h2><span class="section-number">64.6. </span>Inbuilt Nodes</h2>
+<p>DPDK provides a set of nodes for data processing.
+The following diagram depicts inbuilt nodes data flow.</p>
+<figure class="align-default" id="id4">
+<span id="figure-graph-inbuit-node-flow"></span><img alt="../_images/graph_inbuilt_node_flow.svg" src="../_images/graph_inbuilt_node_flow.svg" /><figcaption>
+<p><span class="caption-number">Fig. 64.4 </span><span class="caption-text">Inbuilt nodes data flow</span></p>
+</figcaption>
+</figure>
+<p>Following section details the documentation for individual inbuilt node.</p>
+<section id="ethdev-rx">
+<h3><span class="section-number">64.6.1. </span>ethdev_rx</h3>
+<p>This node does <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_burst()</span></code> into stream buffer passed to it
+(src node stream) and does <code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_move()</span></code> only when
+there are packets received. Each <code class="docutils literal notranslate"><span class="pre">rte_node</span></code> works only on one Rx port and
+queue that it gets from node-&gt;ctx. For each (port X, rx_queue Y),
+a rte_node is cloned from  ethdev_rx_base_node as <code class="docutils literal notranslate"><span class="pre">ethdev_rx-X-Y</span></code> in
+<code class="docutils literal notranslate"><span class="pre">rte_node_eth_config()</span></code> along with updating <code class="docutils literal notranslate"><span class="pre">node-&gt;ctx</span></code>.
+Each graph needs to be associated  with a unique rte_node for a (port, rx_queue).</p>
+</section>
+<section id="ethdev-tx">
+<h3><span class="section-number">64.6.2. </span>ethdev_tx</h3>
+<p>This node does <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst()</span></code> for a burst of objs received by it.
+It sends the burst to a fixed Tx Port and Queue information from
+node-&gt;ctx. For each (port X), this <code class="docutils literal notranslate"><span class="pre">rte_node</span></code> is cloned from
+ethdev_tx_node_base as “ethdev_tx-X” in <code class="docutils literal notranslate"><span class="pre">rte_node_eth_config()</span></code>
+along with updating node-&gt;context.</p>
+<p>Since each graph doesn’t need more than one Txq, per port, a Txq is assigned
+based on graph id to each rte_node instance. Each graph needs to be associated
+with a rte_node for each (port).</p>
+</section>
+<section id="pkt-drop">
+<h3><span class="section-number">64.6.3. </span>pkt_drop</h3>
+<p>This node frees all the objects passed to it considering them as
+<code class="docutils literal notranslate"><span class="pre">rte_mbufs</span></code> that need to be freed.</p>
+</section>
+<section id="ip4-lookup">
+<h3><span class="section-number">64.6.4. </span>ip4_lookup</h3>
+<p>This node is an intermediate node that does LPM lookup for the received
+ipv4 packets and the result determines each packets next node.</p>
+<p>On successful LPM lookup, the result contains the <code class="docutils literal notranslate"><span class="pre">next_node</span></code> id and
+<code class="docutils literal notranslate"><span class="pre">next-hop</span></code> id with which the packet needs to be further processed.</p>
+<p>On LPM lookup failure, objects are redirected to pkt_drop node.
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip4_route_add()</span></code> is control path API to add ipv4 routes.
+To achieve home run, node use <code class="docutils literal notranslate"><span class="pre">rte_node_stream_move()</span></code> as mentioned in above
+sections.</p>
+</section>
+<section id="ip4-rewrite">
+<h3><span class="section-number">64.6.5. </span>ip4_rewrite</h3>
+<p>This node gets packets from <code class="docutils literal notranslate"><span class="pre">ip4_lookup</span></code> node with next-hop id for each
+packet is embedded in <code class="docutils literal notranslate"><span class="pre">node_mbuf_priv1(mbuf)-&gt;nh</span></code>. This id is used
+to determine the L2 header to be written to the packet before sending
+the packet out to a particular ethdev_tx node.
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip4_rewrite_add()</span></code> is control path API to add next-hop info.</p>
+</section>
+<section id="ip4-reassembly">
+<h3><span class="section-number">64.6.6. </span>ip4_reassembly</h3>
+<p>This node is an intermediate node that reassembles ipv4 fragmented packets,
+non-fragmented packets pass through the node un-effected.
+The node rewrites its stream and moves it to the next node.
+The fragment table and death row table should be setup via the
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip4_reassembly_configure</span></code> API.</p>
+</section>
+<section id="ip6-lookup">
+<h3><span class="section-number">64.6.7. </span>ip6_lookup</h3>
+<p>This node is an intermediate node that does LPM lookup for the received
+IPv6 packets and the result determines each packets next node.</p>
+<p>On successful LPM lookup, the result contains the <code class="docutils literal notranslate"><span class="pre">next_node</span></code> ID
+and <cite>next-hop`</cite> ID with which the packet needs to be further processed.</p>
+<p>On LPM lookup failure, objects are redirected to <code class="docutils literal notranslate"><span class="pre">pkt_drop</span></code> node.
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip6_route_add()</span></code> is control path API to add IPv6 routes.
+To achieve home run, node use <code class="docutils literal notranslate"><span class="pre">rte_node_stream_move()</span></code>
+as mentioned in above sections.</p>
+</section>
+<section id="ip6-rewrite">
+<h3><span class="section-number">64.6.8. </span>ip6_rewrite</h3>
+<p>This node gets packets from <code class="docutils literal notranslate"><span class="pre">ip6_lookup</span></code> node with next-hop ID
+for each packet is embedded in <code class="docutils literal notranslate"><span class="pre">node_mbuf_priv1(mbuf)-&gt;nh</span></code>.
+This ID is used to determine the L2 header to be written to the packet
+before sending the packet out to a particular <code class="docutils literal notranslate"><span class="pre">ethdev_tx</span></code> node.
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip6_rewrite_add()</span></code> is control path API to add next-hop info.</p>
+</section>
+<section id="null">
+<h3><span class="section-number">64.6.9. </span>null</h3>
+<p>This node ignores the set of objects passed to it and reports that all are
+processed.</p>
+</section>
+<section id="kernel-tx">
+<h3><span class="section-number">64.6.10. </span>kernel_tx</h3>
+<p>This node is an exit node that forwards the packets to kernel.
+It will be used to forward any control plane traffic to kernel stack from DPDK.
+It uses a raw socket interface to transmit the packets,
+it uses the packet’s destination IP address in sockaddr_in address structure
+and <code class="docutils literal notranslate"><span class="pre">sendto</span></code> function to send data on the raw socket.
+After sending the burst of packets to kernel,
+this node frees up the packet buffers.</p>
+</section>
+<section id="kernel-rx">
+<h3><span class="section-number">64.6.11. </span>kernel_rx</h3>
+<p>This node is a source node which receives packets from kernel
+and forwards to any of the intermediate nodes.
+It uses the raw socket interface to receive packets from kernel.
+Uses <code class="docutils literal notranslate"><span class="pre">poll</span></code> function to poll on the socket fd
+for <code class="docutils literal notranslate"><span class="pre">POLLIN</span></code> events to read the packets from raw socket
+to stream buffer and does <code class="docutils literal notranslate"><span class="pre">rte_node_next_stream_move()</span></code>
+when there are received packets.</p>
+</section>
+<section id="ip4-local">
+<h3><span class="section-number">64.6.12. </span>ip4_local</h3>
+<p>This node is an intermediate node that does <code class="docutils literal notranslate"><span class="pre">packet_type</span></code> lookup for
+the received ipv4 packets and the result determines each packets next node.</p>
+<p>On successful <code class="docutils literal notranslate"><span class="pre">packet_type</span></code> lookup, for any IPv4 protocol the result
+contains the <code class="docutils literal notranslate"><span class="pre">next_node</span></code> id and <code class="docutils literal notranslate"><span class="pre">next-hop</span></code> id with which the packet
+needs to be further processed.</p>
+<p>On packet_type lookup failure, objects are redirected to <code class="docutils literal notranslate"><span class="pre">pkt_drop</span></code> node.
+<code class="docutils literal notranslate"><span class="pre">rte_node_ip4_route_add()</span></code> is control path API to add ipv4 address with 32 bit
+depth to receive to packets.
+To achieve home run, node use <code class="docutils literal notranslate"><span class="pre">rte_node_stream_move()</span></code> as mentioned in above
+sections.</p>
+</section>
+<section id="udp4-input">
+<h3><span class="section-number">64.6.13. </span>udp4_input</h3>
+<p>This node is an intermediate node that does udp destination port lookup for
+the received ipv4 packets and the result determines each packets next node.</p>
+<p>User registers a new node <code class="docutils literal notranslate"><span class="pre">udp4_input</span></code> into graph library during initialization
+and attach user specified node as edege to this node using
+<code class="docutils literal notranslate"><span class="pre">rte_node_udp4_usr_node_add()</span></code>, and create empty hash table with destination
+port and node id as its feilds.</p>
+<p>After successful addition of user node as edege, edge id is returned to the user.</p>
+<p>User would register <code class="docutils literal notranslate"><span class="pre">ip4_lookup</span></code> table with specified ip address and 32 bit as mask
+for ip filtration using api <code class="docutils literal notranslate"><span class="pre">rte_node_ip4_route_add()</span></code>.</p>
+<p>After graph is created user would update hash table with custom port with
+and previously obtained edge id using API <code class="docutils literal notranslate"><span class="pre">rte_node_udp4_dst_port_add()</span></code>.</p>
+<p>When packet is received lpm look up is performed if ip is matched the packet
+is handed over to ip4_local node, then packet is verified for udp proto and
+on success packet is enqueued to <code class="docutils literal notranslate"><span class="pre">udp4_input</span></code> node.</p>
+<p>Hash lookup is performed in <code class="docutils literal notranslate"><span class="pre">udp4_input</span></code> node with registered destination port
+and destination port in UDP packet , on success packet is handed to <code class="docutils literal notranslate"><span class="pre">udp_user_node</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="bpf_lib.html" title="previous chapter"><span class="section-number">63. </span>Berkeley Packet Filter Library</a></li>
+      <li>Next: <a href="build-sdk-meson.html" title="next chapter"><span class="section-number">65. </span>Installing DPDK Using the meson build system</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/graph_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

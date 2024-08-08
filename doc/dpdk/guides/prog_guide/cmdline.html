@@ -1,0 +1,583 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. Command-line Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Service Cores" href="service_cores.html" />
+    <link rel="prev" title="5. Log Library" href="log_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="command-line-library">
+<h1><span class="section-number">6. </span>Command-line Library</h1>
+<p>Since its earliest versions, DPDK has included a command-line library -
+primarily for internal use by, for example, <code class="docutils literal notranslate"><span class="pre">dpdk-testpmd</span></code> and the <code class="docutils literal notranslate"><span class="pre">dpdk-test</span></code> binaries,
+but the library is also exported on install and can be used by any end application.
+This chapter covers the basics of the command-line library and how to use it in an application.</p>
+<section id="library-features">
+<h2><span class="section-number">6.1. </span>Library Features</h2>
+<p>The DPDK command-line library supports the following features:</p>
+<ul>
+<li><p>Tab-completion available for interactive terminal sessions</p></li>
+<li><p>Ability to read and process commands taken from an input file, e.g. startup script</p></li>
+<li><p>Parameterized commands able to take multiple parameters with different datatypes:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Strings</p></li>
+<li><p>Signed/unsigned 16/32/64-bit integers</p></li>
+<li><p>IP Addresses</p></li>
+<li><p>Ethernet Addresses</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Ability to multiplex multiple commands to a single callback function</p></li>
+</ul>
+</section>
+<section id="adding-command-line-to-an-application">
+<h2><span class="section-number">6.2. </span>Adding Command-line to an Application</h2>
+<p>Adding a command-line instance to an application involves a number of coding steps.</p>
+<ol class="arabic simple">
+<li><p>Define the result structure for the command, specifying the command parameters</p></li>
+<li><p>Provide an initializer for each field in the result</p></li>
+<li><p>Define the callback function for the command</p></li>
+<li><p>Provide a parse result structure instance for the command, linking the callback to the command</p></li>
+<li><p>Add the parse result structure to a command-line context</p></li>
+<li><p>Within your main application code, create a new command-line instance passing in the context.</p></li>
+</ol>
+<p>Many of these steps can be automated using the script <code class="docutils literal notranslate"><span class="pre">dpdk-cmdline-gen.py</span></code> installed by DPDK,
+and found in the <code class="docutils literal notranslate"><span class="pre">buildtools</span></code> folder in the source tree.
+This section covers adding a command-line using this script to generate the boiler plate,
+while the following section,
+<a class="reference internal" href="#worked-example-of-adding-command-line-to-an-application">Worked Example of Adding Command-line to an Application</a> covers the steps to do so manually.</p>
+<section id="creating-a-command-list-file">
+<h3><span class="section-number">6.2.1. </span>Creating a Command List File</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-cmdline-gen.py</span></code> script takes as input a list of commands to be used by the application.
+While these can be piped to it via standard input, using a list file is probably best.</p>
+<p>The format of the list file must be:</p>
+<ul class="simple">
+<li><p>Comment lines start with ‘#’ as first non-whitespace character</p></li>
+<li><p>One command per line</p></li>
+<li><p>Variable fields are prefixed by the type-name in angle-brackets, for example:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;STRING&gt;message</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;UINT16&gt;port_id</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;IP&gt;src_ip</span></code></p></li>
+</ul>
+</li>
+<li><p>Variable fields, which take their values from a list of options,
+have the comma-separated option list placed in braces, rather than a the type name.
+For example,</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;(rx,tx,rxtx)&gt;mode</span></code></p></li>
+</ul>
+</li>
+<li><p>The help text for a command is given in the form of a comment on the same line as the command</p></li>
+</ul>
+<p>An example list file, with a variety of (unrelated) commands, is shown below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># example list file
+list                     # show all entries
+add &lt;UINT16&gt;x &lt;UINT16&gt;y  # add x and y
+echo &lt;STRING&gt;message     # print message to screen
+add socket &lt;STRING&gt;path  # add unix socket with the given path
+set mode &lt;(rx,tx)&gt;rxtx   # set Rx-only or Tx-only mode
+quit                     # close the application
+</pre></div>
+</div>
+</section>
+<section id="running-the-generator-script">
+<h3><span class="section-number">6.2.2. </span>Running the Generator Script</h3>
+<p>To generate the necessary definitions for a command-line, run <code class="docutils literal notranslate"><span class="pre">dpdk-cmdline-gen.py</span></code> passing the list file as parameter.
+The script will output the generated C code to standard output,
+the contents of which are in the form of a C header file.
+Optionally, an output filename may be specified via the <code class="docutils literal notranslate"><span class="pre">-o/--output-file</span></code> argument.</p>
+<p>The generated content includes:</p>
+<ul class="simple">
+<li><p>The result structure definitions for each command</p></li>
+<li><p>The token initializers for each structure field</p></li>
+<li><p>An “extern” function prototype for the callback for each command</p></li>
+<li><p>A parse context for each command, including the per-command comments as help string</p></li>
+<li><p>A command-line context array definition, suitable for passing to <code class="docutils literal notranslate"><span class="pre">cmdline_new</span></code></p></li>
+</ul>
+<p>If so desired, the script can also output function stubs for the callback functions for each command.
+This behaviour is triggered by passing the <code class="docutils literal notranslate"><span class="pre">--stubs</span></code> flag to the script.
+In this case, an output file must be provided with a filename ending in “.h”,
+and the callback stubs will be written to an equivalent “.c” file.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The stubs are written to a separate file,
+to allow continuous use of the script to regenerate the command-line header,
+without overwriting any code the user has added to the callback functions.
+This makes it easy to incrementally add new commands to an existing application.</p>
+</div>
+</section>
+<section id="providing-the-function-callbacks">
+<h3><span class="section-number">6.2.3. </span>Providing the Function Callbacks</h3>
+<p>As discussed above, the script output is a header file, containing structure definitions,
+but the callback functions themselves obviously have to be provided by the user.
+These callback functions must be provided as non-static functions in a C file,
+and named <code class="docutils literal notranslate"><span class="pre">cmd_&lt;cmdname&gt;_parsed</span></code>.
+The function prototypes can be seen in the generated output header.</p>
+<p>The “cmdname” part of the function name is built up by combining the non-variable initial tokens in the command.
+So, given the commands in our worked example below: <code class="docutils literal notranslate"><span class="pre">quit</span></code> and <code class="docutils literal notranslate"><span class="pre">show</span> <span class="pre">port</span> <span class="pre">stats</span> <span class="pre">&lt;n&gt;</span></code>,
+the callback functions would be:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"></span>
+<span class="nf">cmd_quit_parsed</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parsed_result</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"></span>
+<span class="nf">cmd_show_port_stats_parsed</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parsed_result</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>These functions must be provided by the developer, but, as stated above,
+stub functions may be generated by the script automatically using the <code class="docutils literal notranslate"><span class="pre">--stubs</span></code> parameter.</p>
+<p>The same “cmdname” stem is used in the naming of the generated structures too.
+To get at the results structure for each command above,
+the <code class="docutils literal notranslate"><span class="pre">parsed_result</span></code> parameter should be cast to <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">cmd_quit_result</span></code>
+or <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">cmd_show_port_stats_result</span></code> respectively.</p>
+</section>
+<section id="integrating-with-the-application">
+<h3><span class="section-number">6.2.4. </span>Integrating with the Application</h3>
+<p>To integrate the script output with the application,
+we must <code class="docutils literal notranslate"><span class="pre">#include</span></code> the generated header into our applications C file,
+and then have the command-line created via either <code class="docutils literal notranslate"><span class="pre">cmdline_new</span></code> or <code class="docutils literal notranslate"><span class="pre">cmdline_stdin_new</span></code>.
+The first parameter to the function call should be the context array in the generated header file,
+<code class="docutils literal notranslate"><span class="pre">ctx</span></code> by default. (Modifiable via script parameter).</p>
+<p>The callback functions may be in this same file, or in a separate one -
+they just need to be available to the linker at build-time.</p>
+</section>
+<section id="limitations-of-the-script-approach">
+<h3><span class="section-number">6.2.5. </span>Limitations of the Script Approach</h3>
+<p>The script approach works for most commands that a user may wish to add to an application.
+However, it does not support the full range of functions possible with the DPDK command-line library.
+For example,
+it is not possible using the script to multiplex multiple commands into a single callback function.
+To use this functionality, the user should follow the instructions in the next section
+<a class="reference internal" href="#worked-example-of-adding-command-line-to-an-application">Worked Example of Adding Command-line to an Application</a> to manually configure a command-line instance.</p>
+</section>
+</section>
+<section id="worked-example-of-adding-command-line-to-an-application">
+<h2><span class="section-number">6.3. </span>Worked Example of Adding Command-line to an Application</h2>
+<p>The next few subsections will cover each of the steps listed in <a class="reference internal" href="#adding-command-line-to-an-application">Adding Command-line to an Application</a> in more detail,
+working through an example to add two commands to a command-line instance.
+Those two commands will be:</p>
+<ol class="arabic simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">quit</span></code> - as the name suggests, to close the application</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">show</span> <span class="pre">port</span> <span class="pre">stats</span> <span class="pre">&lt;n&gt;</span></code> - to display on-screen the statistics for a given ethernet port</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For further examples of use of the command-line, see
+<a class="reference internal" href="../sample_app_ug/cmd_line.html"><span class="doc">cmdline example application</span></a></p>
+</div>
+<section id="defining-command-result-structure">
+<h3><span class="section-number">6.3.1. </span>Defining Command Result Structure</h3>
+<p>The first structure to be defined is the structure which will be created on successful parse of a command.
+This structure contains one member field for each token, or word, in the command.
+The simplest case is for a one-word command, like <code class="docutils literal notranslate"><span class="pre">quit</span></code>.
+For this, we only need to define a structure with a single string parameter to contain that word.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_quit_result</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="n">cmdline_fixed_string_t</span><span class="w"> </span><span class="n">quit</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>For readability, the name of the struct member should match that of the token in the command.</p>
+<p>For our second command, we need a structure with four member fields in it,
+as there are four words/tokens in our command.
+The first three are strings, and the final one is a 16-bit numeric value.
+The resulting struct looks like:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="n">cmdline_fixed_string_t</span><span class="w"> </span><span class="n">show</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="n">cmdline_fixed_string_t</span><span class="w"> </span><span class="n">port</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="n">cmdline_fixed_string_t</span><span class="w"> </span><span class="n">stats</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>As before, we choose names to match the tokens in the command.
+Since our numeric parameter is a 16-bit value, we use <code class="docutils literal notranslate"><span class="pre">uint16_t</span></code> type for it.
+Any of the standard sized integer types can be used as parameters, depending on the desired result.</p>
+<p>Beyond the standard integer types,
+the library also allows variable parameters to be of a number of other types,
+as called out in the feature list above.</p>
+<ul class="simple">
+<li><p>For variable string parameters,
+the type should be <code class="docutils literal notranslate"><span class="pre">cmdline_fixed_string_t</span></code> - the same as for fixed tokens,
+but these will be initialized differently (as described below).</p></li>
+<li><p>For ethernet addresses use type <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_ether_addr</span></code></p></li>
+<li><p>For IP addresses use type <code class="docutils literal notranslate"><span class="pre">cmdline_ipaddr_t</span></code></p></li>
+</ul>
+</section>
+<section id="providing-field-initializers">
+<h3><span class="section-number">6.3.2. </span>Providing Field Initializers</h3>
+<p>Each field of our result structure needs an initializer.
+For fixed string tokens, like “quit”, “show” and “port”, the initializer will be the string itself.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_token_string_t</span><span class="w"> </span><span class="n">cmd_quit_quit_tok</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">   </span><span class="n">TOKEN_STRING_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_quit_result</span><span class="p">,</span><span class="w"> </span><span class="n">quit</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;quit&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The convention for naming used here is to include the base name of the overall result structure -
+<code class="docutils literal notranslate"><span class="pre">cmd_quit</span></code> in this case,
+as well as the name of the field within that structure - <code class="docutils literal notranslate"><span class="pre">quit</span></code> in this case, followed by <code class="docutils literal notranslate"><span class="pre">_tok</span></code>.
+(This is why there is a double <code class="docutils literal notranslate"><span class="pre">quit</span></code> in the name above).</p>
+<p>This naming convention is seen in our second example,
+which also demonstrates how to define a numeric initializer.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_token_string_t</span><span class="w"> </span><span class="n">cmd_show_port_stats_show_tok</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">   </span><span class="n">TOKEN_STRING_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="p">,</span><span class="w"> </span><span class="n">show</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;show&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_token_string_t</span><span class="w"> </span><span class="n">cmd_show_port_stats_port_tok</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">   </span><span class="n">TOKEN_STRING_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="p">,</span><span class="w"> </span><span class="n">port</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;port&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_token_string_t</span><span class="w"> </span><span class="n">cmd_show_port_stats_stats_tok</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">   </span><span class="n">TOKEN_STRING_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="p">,</span><span class="w"> </span><span class="n">stats</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;stats&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_token_num_t</span><span class="w"> </span><span class="n">cmd_show_port_stats_n_tok</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">   </span><span class="n">TOKEN_NUM_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="p">,</span><span class="w"> </span><span class="n">n</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_UINT16</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>For variable string tokens, the same <code class="docutils literal notranslate"><span class="pre">TOKEN_STRING_INITIALIZER</span></code> macro should be used.
+However, the final parameter should be <code class="docutils literal notranslate"><span class="pre">NULL</span></code> rather than a hard-coded token string.</p>
+<p>For numeric parameters, the final parameter to the <code class="docutils literal notranslate"><span class="pre">TOKEN_NUM_INITIALIZER</span></code> macro should be the
+cmdline type matching the variable type defined in the result structure,
+e.g. RTE_UINT8, RTE_UINT32, etc.</p>
+<p>For IP addresses, the macro <code class="docutils literal notranslate"><span class="pre">TOKEN_IPADDR_INITIALIZER</span></code> should be used.</p>
+<p>For ethernet addresses, the macro <code class="docutils literal notranslate"><span class="pre">TOKEN_ETHERADDR_INITIALIZER</span></code> should be used.</p>
+</section>
+<section id="defining-callback-function">
+<h3><span class="section-number">6.3.3. </span>Defining Callback Function</h3>
+<p>For each command, we need to define a function to be called once the command has been recognised.
+The callback function should have type:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">f</span><span class="p">)(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>where the first parameter is a pointer to the result structure defined above,
+the second parameter is the command-line instance,
+and the final parameter is a user-defined pointer provided when we associate the callback with the command.
+Most callback functions only use the first parameter, or none at all,
+but the additional two parameters provide some extra flexibility,
+to allow the callback to work with non-global state in your application.</p>
+<p>For our two example commands, the relevant callback functions would look very similar in definition.
+However, within the function body,
+we assume that the user would need to reference the result structure to extract the port number in
+the second case.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"></span>
+<span class="nf">cmd_quit_parsed</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parsed_result</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="n">quit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="kt">void</span><span class="w"></span>
+<span class="nf">cmd_show_port_stats_parsed</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parsed_result</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_show_port_stats_result</span><span class="w"> </span><span class="o">*</span><span class="n">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parsed_result</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">port_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">res</span><span class="o">-&gt;</span><span class="n">n</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="associating-callback-and-command">
+<h3><span class="section-number">6.3.4. </span>Associating Callback and Command</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">cmdline_parse_inst_t</span></code> type defines a “parse instance”,
+i.e. a sequence of tokens to be matched and then an associated function to be called.
+Also included in the instance type are a field for help text for the command,
+and any additional user-defined parameter to be passed to the callback functions referenced above.
+For example, for our simple “quit” command:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_inst_t</span><span class="w"> </span><span class="n">cmd_quit</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cmd_quit_parsed</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">help_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;Close the application&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">tokens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_quit_quit_tok</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nb">NULL</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In this case, we firstly identify the callback function to be called,
+then set the user-defined parameter to NULL,
+provide a help message to be given, on request, to the user explaining the command,
+before finally listing out the single token to be matched for this command instance.</p>
+<p>For our second, port stats, example,
+as well as making things a little more complicated by having multiple tokens to be matched,
+we can also demonstrate passing in a parameter to the function.
+Let us suppose that our application does not always use all the ports available to it,
+but instead only uses a subset of the ports, stored in an array called <code class="docutils literal notranslate"><span class="pre">active_ports</span></code>.
+Our stats command, therefore, should only display stats for the currently in-use ports,
+so we pass this <code class="docutils literal notranslate"><span class="pre">active_ports</span></code> array.
+(For simplicity of illustration, we shall assume that the array uses a terminating marker,
+e.g. -1 for the end of the port list, so we don’t need to pass in a length parameter too.)</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">extern</span><span class="w"> </span><span class="kt">int16_t</span><span class="w"> </span><span class="n">active_ports</span><span class="p">[];</span><span class="w"></span>
+<span class="p">...</span><span class="w"></span>
+<span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_inst_t</span><span class="w"> </span><span class="n">cmd_show_port_stats</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cmd_show_port_stats_parsed</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">active_ports</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">help_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;Show statistics for active network ports&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">tokens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_show_port_stats_show_tok</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_show_port_stats_port_tok</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_show_port_stats_stats_tok</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_show_port_stats_n_tok</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="nb">NULL</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="adding-command-to-command-line-context">
+<h3><span class="section-number">6.3.5. </span>Adding Command to Command-line Context</h3>
+<p>Now that we have configured each individual command and callback,
+we need to merge these into a single array of command-line “contexts”.
+This context array will be used to create the actual command-line instance in the application.
+Thankfully, each context entry is the same as each parse instance,
+so our array is defined by simply listing out the previously defined command parse instances.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="n">cmdline_parse_ctx_t</span><span class="w"> </span><span class="n">ctx</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">cmd_quit</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="o">&amp;</span><span class="n">cmd_show_port_stats</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nb">NULL</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The context list must be terminated by a NULL entry.</p>
+</section>
+<section id="creating-a-command-line-instance">
+<h3><span class="section-number">6.3.6. </span>Creating a Command-line Instance</h3>
+<p>Once we have our <code class="docutils literal notranslate"><span class="pre">ctx</span></code> variable defined,
+we now just need to call the API to create the new command-line instance in our application.
+The basic API is <code class="docutils literal notranslate"><span class="pre">cmdline_new</span></code> which will create an interactive command-line with all commands available.
+However, if additional features for interactive use - such as tab-completion -
+are desired, it is recommended that <code class="docutils literal notranslate"><span class="pre">cmdline_new_stdin</span></code> be used instead.</p>
+<p>A pattern that can be used in applications is to use <code class="docutils literal notranslate"><span class="pre">cmdline_new</span></code> for processing any startup commands,
+either from file or from the environment (as is done in the “dpdk-test” application),
+and then using <code class="docutils literal notranslate"><span class="pre">cmdline_stdin_new</span></code> thereafter to handle the interactive part.
+For example, to handle a startup file and then provide an interactive prompt:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">fd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">open</span><span class="p">(</span><span class="n">startup_file</span><span class="p">,</span><span class="w"> </span><span class="n">O_RDONLY</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">fd</span><span class="w"> </span><span class="o">&gt;=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">cl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cmdline_new</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">fd</span><span class="p">,</span><span class="w"> </span><span class="n">STDOUT_FILENO</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cl</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* error handling */</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">cmdline_interact</span><span class="p">(</span><span class="n">cl</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">cmdline_quit</span><span class="p">(</span><span class="n">cl</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">close</span><span class="p">(</span><span class="n">fd</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">cl</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cmdline_stdin_new</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Proxy&gt;&gt; &quot;</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cl</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* error handling */</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">cmdline_interact</span><span class="p">(</span><span class="n">cl</span><span class="p">);</span><span class="w"></span>
+<span class="n">cmdline_stdin_exit</span><span class="p">(</span><span class="n">cl</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="multiplexing-multiple-commands-to-a-single-function">
+<h3><span class="section-number">6.3.7. </span>Multiplexing Multiple Commands to a Single Function</h3>
+<p>To reduce the amount of boiler-plate code needed when creating a command-line for an application,
+it is possible to merge a number of commands together to have them call a separate function.
+This can be done in a number of different ways:</p>
+<ul class="simple">
+<li><p>A callback function can be used as the target for a number of different commands.
+Which command was used for entry to the function can be determined by examining the first parameter,
+<code class="docutils literal notranslate"><span class="pre">parsed_result</span></code> in our examples above.</p></li>
+<li><p>For simple string commands, multiple options can be concatenated using the “#” character.
+For example: <code class="docutils literal notranslate"><span class="pre">exit#quit</span></code>, specified as a token initializer,
+will match either on the string “exit” or the string “quit”.</p></li>
+</ul>
+<p>As a concrete example,
+these two techniques are used in the DPDK unit test application <code class="docutils literal notranslate"><span class="pre">dpdk-test</span></code>,
+where a single command <code class="docutils literal notranslate"><span class="pre">cmdline_parse_t</span></code> instance is used for all the “dump_&lt;item&gt;” test cases.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">cmd_dump_parsed</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">parsed_result</span><span class="p">,</span><span class="w"></span>
+<span class="w">			    </span><span class="n">__rte_unused</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">cmdline</span><span class="w"> </span><span class="o">*</span><span class="n">cl</span><span class="p">,</span><span class="w"></span>
+<span class="w">			    </span><span class="n">__rte_unused</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_dump_result</span><span class="w"> </span><span class="o">*</span><span class="n">res</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">parsed_result</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_physmem&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_dump_physmem_layout</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_memzone&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_memzone_dump</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_struct_sizes&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">dump_struct_sizes</span><span class="p">();</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_ring&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_ring_list_dump</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_mempool&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_mempool_list_dump</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_devargs&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_devargs_dump</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_log_types&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_log_dump</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_malloc_stats&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_malloc_dump_stats</span><span class="p">(</span><span class="n">stdout</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">strcmp</span><span class="p">(</span><span class="n">res</span><span class="o">-&gt;</span><span class="n">dump</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;dump_malloc_heaps&quot;</span><span class="p">))</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_malloc_dump_heaps</span><span class="p">(</span><span class="n">stdout</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">cmdline_parse_token_string_t</span><span class="w"> </span><span class="n">cmd_dump_dump</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">	</span><span class="n">TOKEN_STRING_INITIALIZER</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">cmd_dump_result</span><span class="p">,</span><span class="w"> </span><span class="n">dump</span><span class="p">,</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_physmem#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_memzone#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_struct_sizes#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_ring#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_mempool#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_malloc_stats#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_malloc_heaps#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_devargs#&quot;</span><span class="w"></span>
+<span class="w">				 </span><span class="s">&quot;dump_log_types&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">cmdline_parse_inst_t</span><span class="w"> </span><span class="n">cmd_dump</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">f</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cmd_dump_parsed</span><span class="p">,</span><span class="w">  </span><span class="cm">/* function to call */</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w">      </span><span class="cm">/* 2nd arg of func */</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">help_str</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;dump status&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">tokens</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w">        </span><span class="cm">/* token list, NULL terminated */</span><span class="w"></span>
+<span class="w">		</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="o">&amp;</span><span class="n">cmd_dump_dump</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="p">},</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="examples-of-command-line-use-in-dpdk">
+<h2><span class="section-number">6.4. </span>Examples of Command-line Use in DPDK</h2>
+<p>To help the user follow the steps provided above,
+the following DPDK files can be consulted for examples of command-line use.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is not an exhaustive list of examples of command-line use in DPDK.
+It is simply a list of a few files that may be of use to the application developer.
+Some of these referenced files contain more complex examples of use that others.</p>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">commands.c/.h</span></code> in <code class="docutils literal notranslate"><span class="pre">examples/cmdline</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mp_commands.c/.h</span></code> in <code class="docutils literal notranslate"><span class="pre">examples/multi_process/simple_mp</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">commands.c</span></code> in <code class="docutils literal notranslate"><span class="pre">app/test</span></code></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="log_lib.html" title="previous chapter"><span class="section-number">5. </span>Log Library</a></li>
+      <li>Next: <a href="service_cores.html" title="next chapter"><span class="section-number">7. </span>Service Cores</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/cmdline.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

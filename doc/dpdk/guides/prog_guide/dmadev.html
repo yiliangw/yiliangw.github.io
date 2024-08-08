@@ -1,0 +1,259 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>24. DMA Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="25. General-Purpose Graphics Processing Unit Library" href="gpudev.html" />
+    <link rel="prev" title="23. Machine Learning Device Library" href="mldev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dma-device-library">
+<h1><span class="section-number">24. </span>DMA Device Library</h1>
+<p>The DMA library provides a DMA device framework for management and provisioning
+of hardware and software DMA poll mode drivers, defining generic API which
+support a number of different DMA operations.</p>
+<section id="design-principles">
+<h2><span class="section-number">24.1. </span>Design Principles</h2>
+<p>The DMA framework provides a generic DMA device framework which supports both
+physical (hardware) and virtual (software) DMA devices, as well as a generic DMA
+API which allows DMA devices to be managed and configured, and supports DMA
+operations to be provisioned on DMA poll mode driver.</p>
+<figure class="align-default" id="figure-dmadev">
+<img alt="../_images/dmadev.svg" src="../_images/dmadev.svg" /></figure>
+<p>The above figure shows the model on which the DMA framework is built on:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The DMA controller could have multiple hardware DMA channels (aka. hardware
+DMA queues), each hardware DMA channel should be represented by a dmadev.</p></li>
+<li><p>The dmadev could create multiple virtual DMA channels, each virtual DMA
+channel represents a different transfer context.</p></li>
+<li><p>The DMA operation request must be submitted to the virtual DMA channel.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="device-management">
+<h2><span class="section-number">24.2. </span>Device Management</h2>
+<section id="device-creation">
+<h3><span class="section-number">24.2.1. </span>Device Creation</h3>
+<p>Physical DMA controllers are discovered during the PCI probe/enumeration of the
+EAL function which is executed at DPDK initialization, this is based on their
+PCI BDF (bus/bridge, device, function). Specific physical DMA controllers, like
+other physical devices in DPDK can be listed using the EAL command line options.</p>
+<p>The dmadevs are dynamically allocated by using the function
+<code class="docutils literal notranslate"><span class="pre">rte_dma_pmd_allocate</span></code> based on the number of hardware DMA channels.</p>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">24.2.2. </span>Device Identification</h3>
+<p>Each DMA device, whether physical or virtual is uniquely designated by two
+identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the DMA device in all functions
+exported by the DMA API.</p></li>
+<li><p>A device name used to designate the DMA device in console messages, for
+administration or debugging purposes.</p></li>
+</ul>
+</section>
+</section>
+<section id="device-features-and-capabilities">
+<h2><span class="section-number">24.3. </span>Device Features and Capabilities</h2>
+<p>DMA devices may support different feature sets. The <code class="docutils literal notranslate"><span class="pre">rte_dma_info_get</span></code> API
+can be used to get the device info and supported features.</p>
+<p>Silent mode is a special device capability which does not require the
+application to invoke dequeue APIs.</p>
+<section id="enqueue-dequeue-apis">
+<span id="dmadev-enqueue-dequeue"></span><h3><span class="section-number">24.3.1. </span>Enqueue / Dequeue APIs</h3>
+<p>Enqueue APIs such as <code class="docutils literal notranslate"><span class="pre">rte_dma_copy</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_dma_fill</span></code> can be used to
+enqueue operations to hardware. If an enqueue is successful, a <code class="docutils literal notranslate"><span class="pre">ring_idx</span></code> is
+returned. This <code class="docutils literal notranslate"><span class="pre">ring_idx</span></code> can be used by applications to track per operation
+metadata in an application-defined circular ring.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_dma_submit</span></code> API is used to issue doorbell to hardware.
+Alternatively the <code class="docutils literal notranslate"><span class="pre">RTE_DMA_OP_FLAG_SUBMIT</span></code> flag can be passed to the enqueue
+APIs to also issue the doorbell to hardware.</p>
+<p>The following code demonstrates how to enqueue a burst of copies to the
+device and start the hardware processing of them:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">srcs</span><span class="p">[</span><span class="n">DMA_BURST_SZ</span><span class="p">],</span><span class="w"> </span><span class="o">*</span><span class="n">dsts</span><span class="p">[</span><span class="n">DMA_BURST_SZ</span><span class="p">];</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">srcs</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_dma_copy</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="n">rte_pktmbuf_iova</span><span class="p">(</span><span class="n">srcs</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span><span class="w"></span>
+<span class="w">         </span><span class="n">rte_pktmbuf_iova</span><span class="p">(</span><span class="n">dsts</span><span class="p">[</span><span class="n">i</span><span class="p">]),</span><span class="w"> </span><span class="n">COPY_LEN</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">      </span><span class="n">PRINT_ERR</span><span class="p">(</span><span class="s">&quot;Error with rte_dma_copy for buffer %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="p">);</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="mi">-1</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">rte_dma_submit</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>There are two dequeue APIs <code class="docutils literal notranslate"><span class="pre">rte_dma_completed</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_dma_completed_status</span></code>, these are used to obtain the results of the
+enqueue requests. <code class="docutils literal notranslate"><span class="pre">rte_dma_completed</span></code> will return the number of successfully
+completed operations. <code class="docutils literal notranslate"><span class="pre">rte_dma_completed_status</span></code> will return the number of
+completed operations along with the status of each operation (filled into the
+<code class="docutils literal notranslate"><span class="pre">status</span></code> array passed by user). These two APIs can also return the last
+completed operation’s <code class="docutils literal notranslate"><span class="pre">ring_idx</span></code> which could help user track operations within
+their own application-defined rings.</p>
+</section>
+<section id="querying-device-statistics">
+<h3><span class="section-number">24.3.2. </span>Querying Device Statistics</h3>
+<p>The statistics from a dmadev device can be got via the statistics functions,
+i.e. <code class="docutils literal notranslate"><span class="pre">rte_dma_stats_get()</span></code>. The statistics returned for each device instance are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">submitted</span></code>: The number of operations submitted to the device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">completed</span></code>: The number of operations which have completed (successful and failed).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">errors</span></code>: The number of operations that completed with error.</p></li>
+</ul>
+<p>The dmadev library has support for displaying DMA device information
+through the Telemetry interface. Telemetry commands that can be used
+are shown below.</p>
+<ol class="arabic">
+<li><p>Get the list of available DMA devices by ID:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /dmadev/list
+{&quot;/dmadev/list&quot;: [0, 1]}
+</pre></div>
+</div>
+</li>
+<li><p>Get general information from a DMA device by passing the device id as a parameter:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /dmadev/info,0
+{&quot;/dmadev/info&quot;: {&quot;name&quot;: &quot;0000:00:01.0&quot;, &quot;nb_vchans&quot;: 1, &quot;numa_node&quot;: 0, &quot;max_vchans&quot;: 1, &quot;max_desc&quot;: 4096,
+&quot;min_desc&quot;: 32, &quot;max_sges&quot;: 0, &quot;capabilities&quot;: {&quot;mem2mem&quot;: 1, &quot;mem2dev&quot;: 0, &quot;dev2mem&quot;: 0, ...}}}
+</pre></div>
+</div>
+</li>
+<li><p>Get the statistics for a particular DMA device and virtual DMA channel by passing the device id and vchan id as parameters
+(if a DMA device only has one virtual DMA channel you only need to pass the device id):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /dmadev/stats,0,0
+{&quot;/dmadev/stats&quot;: {&quot;submitted&quot;: 0, &quot;completed&quot;: 0, &quot;errors&quot;: 0}}
+</pre></div>
+</div>
+</li>
+</ol>
+<p>For more information on how to use the Telemetry interface, see
+the <a class="reference internal" href="../howto/telemetry.html"><span class="doc">DPDK Telemetry User Guide</span></a>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="mldev.html" title="previous chapter"><span class="section-number">23. </span>Machine Learning Device Library</a></li>
+      <li>Next: <a href="gpudev.html" title="next chapter"><span class="section-number">25. </span>General-Purpose Graphics Processing Unit Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/dmadev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

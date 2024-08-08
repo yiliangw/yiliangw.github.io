@@ -1,0 +1,426 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>52. Event Timer Adapter Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="53. Event Crypto Adapter Library" href="event_crypto_adapter.html" />
+    <link rel="prev" title="51. Event Ethernet Tx Adapter Library" href="event_ethernet_tx_adapter.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="event-timer-adapter-library">
+<h1><span class="section-number">52. </span>Event Timer Adapter Library</h1>
+<p>The DPDK <a class="reference internal" href="eventdev.html"><span class="doc">Event Device library</span></a>
+introduces an event driven programming model which presents applications with
+an alternative to the polling model traditionally used in DPDK
+applications. Event devices can be coupled with arbitrary components to provide
+new event sources by using <strong>event adapters</strong>. The Event Timer Adapter is one
+such adapter; it bridges event devices and timer mechanisms.</p>
+<p>The Event Timer Adapter library extends the event driven model
+by introducing a <a class="reference internal" href="#timer-expiry-event"><span class="std std-ref">new type of event</span></a> that represents
+a timer expiration, and providing an API with which adapters can be created or
+destroyed, and <a class="reference internal" href="#event-timer"><span class="std std-ref">event timers</span></a> can be armed and canceled.</p>
+<p>The Event Timer Adapter library is designed to interface with hardware or
+software implementations of the timer mechanism; it will query an eventdev PMD
+to determine which implementation should be used.  The default software
+implementation manages timers using the DPDK
+<a class="reference internal" href="timer_lib.html"><span class="doc">Timer library</span></a>.</p>
+<p>Examples of using the API are presented in the <a class="reference internal" href="#api-overview">API Overview</a> and
+<a class="reference internal" href="#processing-timer-expiry-events">Processing Timer Expiry Events</a> sections.  Code samples are abstracted and
+are based on the example of handling a TCP retransmission.</p>
+<section id="event-timer-struct">
+<span id="event-timer"></span><h2><span class="section-number">52.1. </span>Event Timer struct</h2>
+<p>Event timers are timers that enqueue a timer expiration event to an event
+device upon timer expiration.</p>
+<p>The Event Timer Adapter API represents each event timer with a generic struct,
+which contains an event and user metadata.  The <code class="docutils literal notranslate"><span class="pre">rte_event_timer</span></code> struct is
+defined in <code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter.h</span></code>.</p>
+<section id="timer-expiry-event">
+<span id="id1"></span><h3><span class="section-number">52.1.1. </span>Timer Expiry Event</h3>
+<p>The event contained by an event timer is enqueued in the event device when the
+timer expires, and the event device uses the attributes below when scheduling
+it:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">event_queue_id</span></code> - Application should set this to specify an event queue to
+which the timer expiry event should be enqueued</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">event_priority</span></code> - Application can set this to indicate the priority of the
+timer expiry event in the event queue relative to other events</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sched_type</span></code> - Application can set this to specify the scheduling type of
+the timer expiry event</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">flow_id</span></code> - Application can set this to indicate which flow this timer
+expiry event corresponds to</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">op</span></code> - Will be set to <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_OP_NEW</span></code> by the event timer adapter</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">event_type</span></code> - Will be set to <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TYPE_TIMER</span></code> by the event timer
+adapter</p></li>
+</ul>
+</section>
+<section id="timeout-ticks">
+<h3><span class="section-number">52.1.2. </span>Timeout Ticks</h3>
+<p>The number of ticks from now in which the timer will expire. The ticks value
+has a resolution (<code class="docutils literal notranslate"><span class="pre">timer_tick_ns</span></code>) that is specified in the event timer
+adapter configuration.</p>
+</section>
+<section id="state">
+<h3><span class="section-number">52.1.3. </span>State</h3>
+<p>Before arming an event timer, the application should initialize its state to
+RTE_EVENT_TIMER_NOT_ARMED. The event timer’s state will be updated when a
+request to arm or cancel it takes effect.</p>
+<p>If the application wishes to rearm the timer after it has expired, it should
+reset the state back to RTE_EVENT_TIMER_NOT_ARMED before doing so.</p>
+</section>
+<section id="user-metadata">
+<h3><span class="section-number">52.1.4. </span>User Metadata</h3>
+<p>Memory to store user specific metadata.  The event timer adapter implementation
+will not modify this area.</p>
+</section>
+</section>
+<section id="api-overview">
+<h2><span class="section-number">52.2. </span>API Overview</h2>
+<p>This section will introduce the reader to the event timer adapter API, showing
+how to create and configure an event timer adapter and use it to manage event
+timers.</p>
+<p>From a high level, the setup steps are:</p>
+<ul class="simple">
+<li><p>rte_event_timer_adapter_create()</p></li>
+<li><p>rte_event_timer_adapter_start()</p></li>
+</ul>
+<p>And to start and stop timers:</p>
+<ul class="simple">
+<li><p>rte_event_timer_arm_burst()</p></li>
+<li><p>rte_event_timer_cancel_burst()</p></li>
+</ul>
+<section id="create-and-configure-an-adapter-instance">
+<h3><span class="section-number">52.2.1. </span>Create and Configure an Adapter Instance</h3>
+<p>To create an event timer adapter instance, initialize an
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_conf</span></code> struct with the desired values, and pass it
+to <code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_create()</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#define NSECPERSEC 1E9</span>
+<span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_timer_adapter_conf</span><span class="w"> </span><span class="n">adapter_config</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">event_dev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event_dev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">timer_adapter_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">socket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_socket_id</span><span class="p">(),</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">clk_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_TIMER_ADAPTER_CPU_CLK</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">timer_tick_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">NSECPERSEC</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">max_tmo_ns</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">180</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">NSECPERSEC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">nb_timers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">40000</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">flags</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_timer_adapter</span><span class="w"> </span><span class="o">*</span><span class="n">adapter</span><span class="p">;</span><span class="w"></span>
+<span class="n">adapter</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_timer_adapter_create</span><span class="p">(</span><span class="o">&amp;</span><span class="n">adapter_config</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">adapter</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Before creating an instance of a timer adapter, the application should create
+and configure an event device along with its event ports. Based on the event
+device capability, it might require creating an additional event port to be
+used by the timer adapter.  If required, the
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_create()</span></code> function will use a default method to
+configure an event port;  it will examine the current event device
+configuration, determine the next available port identifier number, and create
+a new event port with a default port configuration.</p>
+<p>If the application desires to have finer control of event port allocation
+and setup, it can use the <code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_create_ext()</span></code> function.
+This function is passed a callback function that will be invoked if the
+adapter needs to create an event port, giving the application the opportunity
+to control how it is done.</p>
+<section id="event-device-configuration-for-service-based-adapter">
+<h4><span class="section-number">52.2.1.1. </span>Event device configuration for service based adapter</h4>
+<p>When <code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_create()</span></code> is used for creating
+adapter instance, <code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> is
+automatically incremented, and the event device is reconfigured
+with additional event port during service initialization.
+This event device reconfigure logic also increments the
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code>
+parameter if the adapter event port config is of type
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_PORT_CFG_SINGLE_LINK</span></code>.</p>
+<p>Application no longer needs to account for the
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code>
+parameters required for timer adapter in event device configuration,
+when the adapter is created using the above-mentioned API.</p>
+</section>
+<section id="adapter-modes">
+<h4><span class="section-number">52.2.1.2. </span>Adapter modes</h4>
+<p>An event timer adapter can be configured in either periodic or non-periodic mode
+to support timers of the respective type. A periodic timer expires at a fixed
+time interval repeatedly till it is cancelled. A non-periodic timer expires only
+once. The periodic capability flag, <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TIMER_ADAPTER_CAP_PERIODIC</span></code>,
+can be set for implementations that support periodic mode if desired. To
+configure an adapter in periodic mode, <code class="docutils literal notranslate"><span class="pre">flags</span></code> of
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_conf</span></code> is set to include the periodic flag
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TIMER_ADAPTER_F_PERIODIC</span></code>. Maximum timeout (<code class="docutils literal notranslate"><span class="pre">max_tmo_ns</span></code>) does
+not apply to periodic mode.</p>
+</section>
+</section>
+<section id="retrieve-event-timer-adapter-contextual-information">
+<h3><span class="section-number">52.2.2. </span>Retrieve Event Timer Adapter Contextual Information</h3>
+<p>The event timer adapter implementation may have constraints on tick resolution
+or maximum timer expiry timeout based on the given event timer adapter or
+system.  In this case, the implementation may adjust the tick resolution or
+maximum timeout to the best possible configuration.</p>
+<p>Upon successful event timer adapter creation, the application can get the
+configured resolution and max timeout with
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_get_info()</span></code>. This function will return an
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_info</span></code> struct, which contains the following members:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">min_resolution_ns</span></code> - Minimum timer adapter tick resolution in ns.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_tmo_ns</span></code> - Maximum timer timeout(expiry) in ns.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">adapter_conf</span></code> - Configured event timer adapter attributes</p></li>
+</ul>
+</section>
+<section id="configuring-the-service-component">
+<h3><span class="section-number">52.2.3. </span>Configuring the Service Component</h3>
+<p>If the adapter uses a service component, the application is required to map
+the service to a service core before starting the adapter:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">service_id</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_event_timer_adapter_service_id_get</span><span class="p">(</span><span class="n">adapter</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">service_id</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_service_map_lcore_set</span><span class="p">(</span><span class="n">service_id</span><span class="p">,</span><span class="w"> </span><span class="n">EVTIM_CORE_ID</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>An event timer adapter uses a service component if the event device PMD
+indicates that the adapter should use a software implementation.</p>
+</section>
+<section id="starting-the-adapter-instance">
+<h3><span class="section-number">52.2.4. </span>Starting the Adapter Instance</h3>
+<p>The application should call <code class="docutils literal notranslate"><span class="pre">rte_event_timer_adapter_start()</span></code> to start
+running the event timer adapter. This function calls the start entry points
+defined by eventdev PMDs for hardware implementations or puts a service
+component into the running state in the software implementation.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The eventdev to which the event_timer_adapter is connected needs to
+be started before calling rte_event_timer_adapter_start().</p>
+</div>
+</section>
+<section id="arming-event-timers">
+<h3><span class="section-number">52.2.5. </span>Arming Event Timers</h3>
+<p>Once an event timer adapter has been started, an application can begin to
+manage event timers with it.</p>
+<p>The application should allocate <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_timer</span></code> objects from a
+mempool or huge-page backed application buffers of required size. Upon
+successful allocation, the application should initialize the event timer, and
+then set any of the necessary event attributes described in the
+<a class="reference internal" href="#id1">Timer Expiry Event</a> section. In the following example, assume <code class="docutils literal notranslate"><span class="pre">conn</span></code>
+represents a TCP connection and that <code class="docutils literal notranslate"><span class="pre">event_timer_pool</span></code> is a mempool that
+was created previously:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_mempool_get</span><span class="p">(</span><span class="n">event_timer_pool</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="p">)</span><span class="o">&amp;</span><span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Set up the event timer. */</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_OP_NEW</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">queue_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">event_queue_id</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">sched_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_SCHED_TYPE_ATOMIC</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">priority</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_DEV_PRIORITY_NORMAL</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">event_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_TYPE_TIMER</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">ev</span><span class="p">.</span><span class="n">event_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">conn</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">state</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_TIMER_NOT_ARMED</span><span class="p">;</span><span class="w"></span>
+<span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="o">-&gt;</span><span class="n">timeout_ticks</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">30</span><span class="p">;</span><span class="w"> </span><span class="c1">//3 sec Per RFC1122(TCP returns)</span>
+</pre></div>
+</div>
+<p>Note that it is necessary to initialize the event timer state to
+RTE_EVENT_TIMER_NOT_ARMED.  Also note that we have saved a pointer to the
+<code class="docutils literal notranslate"><span class="pre">conn</span></code> object in the timer’s event payload. This will allow us to locate
+the connection object again once we dequeue the timer expiry event from the
+event device later.</p>
+<p>Now we can arm the event timer with <code class="docutils literal notranslate"><span class="pre">rte_event_timer_arm_burst()</span></code>:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_timer_arm_burst</span><span class="p">(</span><span class="n">adapter</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="o">-&gt;</span><span class="n">evtim</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Once an event timer expires, the application may free it or rearm it as
+necessary.  If the application will rearm the timer, the state should be reset
+to RTE_EVENT_TIMER_NOT_ARMED by the application before rearming it. Timer expiry
+events will be generated once or periodically until the timer is cancelled based
+on adapter mode.</p>
+<section id="multiple-event-timers-with-same-expiry-value">
+<h4><span class="section-number">52.2.5.1. </span>Multiple Event Timers with Same Expiry Value</h4>
+<p>In the special case that there is a set of event timers that should all expire
+at the same time, the application may call
+<code class="docutils literal notranslate"><span class="pre">rte_event_timer_arm_tmo_tick_burst()</span></code>, which allows the implementation to
+optimize the operation if possible.</p>
+</section>
+</section>
+<section id="canceling-event-timers">
+<h3><span class="section-number">52.2.6. </span>Canceling Event Timers</h3>
+<p>An event timer that has been armed as described in <a class="reference internal" href="#arming-event-timers">Arming Event Timers</a> can
+be canceled by calling <code class="docutils literal notranslate"><span class="pre">rte_event_timer_cancel_burst()</span></code>:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* Ack for the previous tcp data packet has been received;</span>
+<span class="cm"> * cancel the retransmission timer</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="n">rte_event_timer_cancel_burst</span><span class="p">(</span><span class="n">adapter</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="o">-&gt;</span><span class="n">timer</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="processing-timer-expiry-events">
+<h2><span class="section-number">52.3. </span>Processing Timer Expiry Events</h2>
+<p>Once an event timer has successfully enqueued a timer expiry event in the event
+device, the application will subsequently dequeue it from the event device.
+The application can use the event payload to retrieve a pointer to the object
+associated with the event timer. It can then re-arm the event timer or free the
+event timer object as desired:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"></span>
+<span class="nf">event_processing_loop</span><span class="p">(...)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">while</span><span class="w"> </span><span class="p">(...)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="cm">/* Receive events from the configured event port. */</span><span class="w"></span>
+<span class="w">                </span><span class="n">rte_event_dequeue_burst</span><span class="p">(</span><span class="n">event_dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">event_port</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+<span class="w">                </span><span class="p">...</span><span class="w"></span>
+<span class="w">                </span><span class="k">switch</span><span class="p">(</span><span class="n">ev</span><span class="p">.</span><span class="n">event_type</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                        </span><span class="p">...</span><span class="w"></span>
+<span class="w">                        </span><span class="k">case</span><span class="w"> </span><span class="nl">RTE_EVENT_TYPE_TIMER</span><span class="p">:</span><span class="w"></span>
+<span class="w">                                </span><span class="n">process_timer_event</span><span class="p">(</span><span class="n">ev</span><span class="p">);</span><span class="w"></span>
+<span class="w">                                </span><span class="p">...</span><span class="w"></span>
+<span class="w">                                </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">                </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"></span>
+<span class="nf">process_timer_event</span><span class="p">(...)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* A retransmission timeout for the connection has been received. */</span><span class="w"></span>
+<span class="w">        </span><span class="n">conn</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ev</span><span class="p">.</span><span class="n">event_ptr</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Retransmit last packet (e.g. TCP segment). */</span><span class="w"></span>
+<span class="w">        </span><span class="p">...</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Re-arm timer using original values. */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_event_timer_arm_burst</span><span class="p">(</span><span class="n">adapter_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conn</span><span class="o">-&gt;</span><span class="n">timer</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="summary">
+<h2><span class="section-number">52.4. </span>Summary</h2>
+<p>The Event Timer Adapter library extends the DPDK event-based programming model
+by representing timer expirations as events in the system and allowing
+applications to use existing event processing loops to arm and cancel event
+timers or handle timer expiry events.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="event_ethernet_tx_adapter.html" title="previous chapter"><span class="section-number">51. </span>Event Ethernet Tx Adapter Library</a></li>
+      <li>Next: <a href="event_crypto_adapter.html" title="next chapter"><span class="section-number">53. </span>Event Crypto Adapter Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/event_timer_adapter.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

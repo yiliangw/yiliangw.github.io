@@ -1,0 +1,186 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Platform Specific Guides &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. NVIDIA BlueField Board Support Package" href="bluefield.html" />
+    <link rel="prev" title="4. Stack Mempool Driver" href="../mempool/stack.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="platform-specific-guides">
+<h1>Platform Specific Guides</h1>
+<p>The following are platform specific guides and setup information.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="bluefield.html">1. NVIDIA BlueField Board Support Package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="bluefield.html#supported-bluefield-platforms">1.1. Supported BlueField Platforms</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bluefield.html#common-offload-hw-drivers">1.2. Common Offload HW Drivers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bluefield.html#steps-to-setup-platform">1.3. Steps To Setup Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bluefield.html#compile-dpdk">1.4. Compile DPDK</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cnxk.html">2. Marvell cnxk platform guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#supported-octeon-cnxk-socs">2.1. Supported OCTEON cnxk SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#resource-virtualization-unit-architecture">2.2. Resource Virtualization Unit architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#lbk-hw-access">2.3. LBK HW Access</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#sdp-interface">2.4. SDP interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#cnxk-packet-flow">2.5. cnxk packet flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#hw-offload-drivers">2.6. HW Offload Drivers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#procedure-to-setup-platform">2.7. Procedure to Setup Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#debugging-options">2.8. Debugging Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#compile-dpdk">2.9. Compile DPDK</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dpaa.html">3. NXP QorIQ DPAA Board Support Package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#supported-dpaa-socs">3.1. Supported DPAA SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#common-offload-hw-block-drivers">3.2. Common Offload HW Block Drivers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#steps-to-setup-platform">3.3. Steps To Setup Platform</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dpaa2.html">4. NXP QorIQ DPAA2 Board Support Package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#supported-dpaa2-socs">4.1. Supported DPAA2 SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#common-offload-hw-block-drivers">4.2. Common Offload HW Block Drivers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#steps-to-setup-platform">4.3. Steps To Setup Platform</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mlx5.html">5. NVIDIA MLX5 Common Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#design">5.1. Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#classes">5.2. Classes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#compilation-prerequisites">5.3. Compilation Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#compilation-options">5.4. Compilation Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#environment-configuration">5.5. Environment Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#device-arguments">5.6. Device Arguments</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="octeontx.html">6. OCTEON TX Board Support Package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#common-offload-hw-block-drivers">6.1. Common Offload HW Block Drivers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#steps-to-setup-platform">6.2. Steps To Setup Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#setup-platform-using-octeon-tx-sdk">6.3. Setup Platform Using OCTEON TX SDK</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../mempool/stack.html" title="previous chapter"><span class="section-number">4. </span>Stack Mempool Driver</a></li>
+      <li>Next: <a href="bluefield.html" title="next chapter"><span class="section-number">1. </span>NVIDIA BlueField Board Support Package</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/platform/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

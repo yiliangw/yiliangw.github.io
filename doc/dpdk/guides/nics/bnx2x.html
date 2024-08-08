@@ -1,0 +1,339 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>10. BNX2X Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="11. BNXT Poll Mode Driver" href="bnxt.html" />
+    <link rel="prev" title="9. AXGBE Poll Mode Driver" href="axgbe.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="bnx2x-poll-mode-driver">
+<h1><span class="section-number">10. </span>BNX2X Poll Mode Driver</h1>
+<p>The BNX2X poll mode driver library (<strong>librte_net_bnx2x</strong>) implements support
+for <strong>QLogic 578xx</strong> 10/20 Gbps family of adapters as well as their virtual
+functions (VF) in SR-IOV context. It is supported on several standard Linux
+distros like RHEL and SLES. It is compile-tested under FreeBSD OS.</p>
+<p>More information can be found at <a class="reference external" href="http://www.qlogic.com">QLogic Corporation’s Official Website</a>.</p>
+<section id="supported-features">
+<h2><span class="section-number">10.1. </span>Supported Features</h2>
+<p>BNX2X PMD has support for:</p>
+<ul class="simple">
+<li><p>Base L2 features</p></li>
+<li><p>Unicast/multicast filtering</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>SR-IOV VF</p></li>
+<li><p>Experimental 2.5Gbps support</p></li>
+</ul>
+</section>
+<section id="non-supported-features">
+<h2><span class="section-number">10.2. </span>Non-supported Features</h2>
+<p>The features not yet supported include:</p>
+<ul class="simple">
+<li><p>TSS (Transmit Side Scaling)</p></li>
+<li><p>RSS (Receive Side Scaling)</p></li>
+<li><p>LRO/TSO offload</p></li>
+<li><p>Checksum offload</p></li>
+<li><p>SR-IOV PF</p></li>
+<li><p>Rx TX scatter gather</p></li>
+</ul>
+</section>
+<section id="co-existence-considerations">
+<h2><span class="section-number">10.3. </span>Co-existence considerations</h2>
+<ul class="simple">
+<li><p>QLogic 578xx CNAs support Ethernet, iSCSI and FCoE functionalities.
+These functionalities are supported using QLogic Linux kernel
+drivers bnx2x, cnic, bnx2i and bnx2fc. DPDK is supported on these
+adapters using bnx2x PMD.</p></li>
+<li><p>When SR-IOV is not enabled on the adapter,
+QLogic Linux kernel drivers (bnx2x, cnic, bnx2i and bnx2fc) and bnx2x
+PMD can’t be attached to different PFs on a given QLogic 578xx
+adapter.
+A given adapter needs to be completely used by DPDK or Linux drivers.
+Before binding DPDK driver to one or more PFs on the adapter,
+please make sure to unbind Linux drivers from all PFs of the adapter.
+If there are multiple adapters on the system, one or more adapters
+can be used by DPDK driver completely and other adapters can be used
+by Linux drivers completely.</p></li>
+<li><p>When SR-IOV is enabled on the adapter,
+Linux kernel drivers (bnx2x, cnic, bnx2i and bnx2fc) can be bound
+to the PFs of a given adapter and either bnx2x PMD or Linux drivers
+bnx2x can be bound to the VFs of the adapter.</p></li>
+</ul>
+</section>
+<section id="supported-qlogic-nics">
+<h2><span class="section-number">10.4. </span>Supported QLogic NICs</h2>
+<ul class="simple">
+<li><p>578xx</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">10.5. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Requires firmware version <strong>7.13.11.0</strong>. It is included in most of the
+standard Linux distros. If it is not available visit
+<a class="reference external" href="https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git/plain/bnx2x/bnx2x-e2-7.13.11.0.fw">linux-firmware git repository</a>
+to get the required firmware.</p></li>
+<li><p>2.5Gbps speed currently requires that the firmware’s NVM configuration
+number 7 / 35 (first port) and 36 (second port) are set to 0x70
+for 1G/2.5G/10G support.
+This can be done for EFI or DOS using EDIAG tool from Broadcom.</p></li>
+</ul>
+</section>
+<section id="pre-installation-configuration">
+<h2><span class="section-number">10.6. </span>Pre-Installation Configuration</h2>
+<section id="config-options">
+<h3><span class="section-number">10.6.1. </span>Config Options</h3>
+<p>The following options can be enabled with Meson flags. Please note that
+enabling debugging options may affect system performance.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_BNX2X_DEBUG_TX</span></code> (default <strong>disabled</strong>)</p>
+<p>Toggle display of transmit fast path run-time messages.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_BNX2X_DEBUG_RX</span></code> (default <strong>disabled</strong>)</p>
+<p>Toggle display of receive fast path run-time messages.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_BNX2X_DEBUG_PERIODIC</span></code> (default <strong>disabled</strong>)</p>
+<p>Toggle display of register reads and writes.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<span id="bnx2x-driver-compilation"></span><h2><span class="section-number">10.7. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="jumbo-limitation">
+<h2><span class="section-number">10.8. </span>Jumbo: Limitation</h2>
+<p>Rx descriptor limit for number of segments per MTU is set to 1.
+PMD doesn’t support Jumbo Rx scatter gather. Some applications can
+adjust mbuf_size based on this param and max_pkt_len.</p>
+<p>For others, PMD detects the condition where Rx packet length cannot
+be held by configured mbuf size and logs the message.</p>
+<p>Example output:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">[bnx2x_recv_pkts:397(04:00.0:dpdk-port-0)] mbuf size 2048 is not enough to hold Rx packet length more than 2046</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="sr-iov-prerequisites-and-sample-application-notes">
+<h2><span class="section-number">10.9. </span>SR-IOV: Prerequisites and sample Application Notes</h2>
+<p>This section provides instructions to configure SR-IOV with Linux OS.</p>
+<ol class="arabic">
+<li><p>Verify SR-IOV and ARI capabilities are enabled on the adapter using <code class="docutils literal notranslate"><span class="pre">lspci</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">lspci -s &lt;slot&gt; -vvv</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">Capabilities: [1b8 v1] Alternative Routing-ID Interpretation (ARI)</span>
+<span class="go">[...]</span>
+<span class="go">Capabilities: [1c0 v1] Single Root I/O Virtualization (SR-IOV)</span>
+<span class="go">[...]</span>
+<span class="go">Kernel driver in use: igb_uio</span>
+</pre></div>
+</div>
+</li>
+<li><p>Load the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe bnx2x</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">systemd-udevd[4848]: renamed network interface eth0 to ens5f0</span>
+<span class="go">systemd-udevd[4848]: renamed network interface eth1 to ens5f1</span>
+</pre></div>
+</div>
+</li>
+<li><p>Bring up the PF ports:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ifconfig ens5f0 up</span>
+<span class="go">ifconfig ens5f1 up</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create VF device(s):</p>
+<p>Echo the number of VFs to be created into “sriov_numvfs” sysfs entry
+of the parent PF.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 2 &gt; /sys/devices/pci0000:00/0000:00:03.0/0000:81:00.0/sriov_numvfs</span>
+</pre></div>
+</div>
+</li>
+<li><p>Assign VF MAC address:</p>
+<p>Assign MAC address to the VF using iproute2 utility. The syntax is:
+ip link set &lt;PF iface&gt; vf &lt;VF id&gt; mac &lt;macaddr&gt;</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ip link set ens5f0 vf 0 mac 52:54:00:2f:9d:e8</span>
+</pre></div>
+</div>
+</li>
+<li><p>PCI Passthrough:</p>
+<p>The VF devices may be passed through to the guest VM using virt-manager or
+virsh etc. bnx2x PMD should be used to bind the VF devices in the guest VM
+using the instructions outlined in the Application notes below.</p>
+</li>
+<li><p>Running testpmd:
+(Supply <code class="docutils literal notranslate"><span class="pre">--log-level=&quot;pmd.net.bnx2x.driver&quot;,7</span></code> to view informational messages):</p>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to run testpmd.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:84:00.0 on NUMA socket 1</span>
+<span class="go">EAL:   probe driver: 14e4:168e rte_bnx2x_pmd</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f14f6fe5000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f14f67e5000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f15fbd9b000</span>
+<span class="go">EAL: PCI device 0000:84:00.1 on NUMA socket 1</span>
+<span class="go">EAL:   probe driver: 14e4:168e rte_bnx2x_pmd</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f14f5fe5000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f14f57e5000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f15fbd4f000</span>
+<span class="go">Interactive-mode selected</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">PMD: bnx2x_dev_tx_queue_setup(): fp[00] req_bd=512, thresh=512,</span>
+<span class="go">             usable_bd=1020, total_bd=1024,</span>
+<span class="go">                          tx_pages=4</span>
+<span class="go">PMD: bnx2x_dev_rx_queue_setup(): fp[00] req_bd=128, thresh=0,</span>
+<span class="go">             usable_bd=510, total_bd=512,</span>
+<span class="go">                          rx_pages=1, cq_pages=8</span>
+<span class="go">PMD: bnx2x_print_adapter_info():</span>
+<span class="go">[...]</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="axgbe.html" title="previous chapter"><span class="section-number">9. </span>AXGBE Poll Mode Driver</a></li>
+      <li>Next: <a href="bnxt.html" title="next chapter"><span class="section-number">11. </span>BNXT Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/bnx2x.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

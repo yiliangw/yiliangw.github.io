@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>34. Vhost_blk Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="35. Vhost_Crypto Sample Application" href="vhost_crypto.html" />
+    <link rel="prev" title="33. Vhost Sample Application" href="vhost.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vhost-blk-sample-application">
+<h1><span class="section-number">34. </span>Vhost_blk Sample Application</h1>
+<p>The vhost_blk sample application implemented a simple block device,
+which used as the  backend of Qemu vhost-user-blk device. Users can extend
+the exist example to use other type of block device(e.g. AIO) besides
+memory based block device. Similar with vhost-user-net device, the sample
+application used domain socket to communicate with Qemu, and the virtio
+ring (split or packed format) was processed by vhost_blk sample application.</p>
+<p>The sample application reuse lots codes from SPDK(Storage Performance
+Development Kit, <a class="reference external" href="https://github.com/spdk/spdk">https://github.com/spdk/spdk</a>) vhost-user-blk target,
+for DPDK vhost library used in storage area, user can take SPDK as
+reference as well.</p>
+<section id="testing-steps">
+<h2><span class="section-number">34.1. </span>Testing steps</h2>
+<p>This section shows the steps how to start a VM with the block device as
+fast data path for critical application.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">34.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">examples</span></code> sub-directory.</p>
+<p>You will also need to build DPDK both on the host and inside the guest</p>
+<section id="start-the-vhost-blk-example">
+<h3><span class="section-number">34.2.1. </span>Start the vhost_blk example</h3>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-vhost_blk -m 1024</span>
+</pre></div>
+</div>
+</section>
+<section id="start-the-vm">
+<span id="vhost-blk-app-run-vm"></span><h3><span class="section-number">34.2.2. </span>Start the VM</h3>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">qemu-system-x86_64 -machine accel=kvm \</span>
+<span class="go">    -m $mem -object memory-backend-file,id=mem,size=$mem,\</span>
+<span class="go">    mem-path=/dev/hugepages,share=on -numa node,memdev=mem \</span>
+<span class="go">    -drive file=os.img,if=none,id=disk \</span>
+<span class="go">    -device ide-hd,drive=disk,bootindex=0 \</span>
+<span class="go">    -chardev socket,id=char0,reconnect=1,path=/tmp/vhost.socket \</span>
+<span class="go">    -device vhost-user-blk-pci,packed=on,chardev=char0,num-queues=1 \</span>
+<span class="go">    ...</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You must check whether your Qemu can support “vhost-user-blk” or not,
+Qemu v4.0 or newer version is required.
+reconnect=1 means live recovery support that qemu can reconnect vhost_blk
+after we restart vhost_blk example.
+packed=on means the device support packed ring but need the guest kernel
+version &gt;= 5.0.
+Now Qemu commit 9bb73502321d46f4d320fa17aa38201445783fc4 both support the
+vhost-blk reconnect and packed ring.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="vhost.html" title="previous chapter"><span class="section-number">33. </span>Vhost Sample Application</a></li>
+      <li>Next: <a href="vhost_crypto.html" title="next chapter"><span class="section-number">35. </span>Vhost_Crypto Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/vhost_blk.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

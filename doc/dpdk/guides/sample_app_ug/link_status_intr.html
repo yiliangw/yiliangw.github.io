@@ -1,0 +1,285 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>23. Link Status Interrupt Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="24. Server-Node EFD Sample Application" href="server_node_efd.html" />
+    <link rel="prev" title="22. L3 Forwarding with Power Management Sample Application" href="l3_forward_power_man.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="link-status-interrupt-sample-application">
+<h1><span class="section-number">23. </span>Link Status Interrupt Sample Application</h1>
+<p>The Link Status Interrupt sample application is a simple example of packet processing using
+the Data Plane Development Kit (DPDK) that
+demonstrates how network link status changes for a network port can be captured and
+used by a DPDK application.</p>
+<section id="overview">
+<h2><span class="section-number">23.1. </span>Overview</h2>
+<p>The Link Status Interrupt sample application registers a user space callback for the link status interrupt of each port
+and performs L2 forwarding for each packet that is received on an RX_PORT.
+The following operations are performed:</p>
+<ul class="simple">
+<li><p>RX_PORT and TX_PORT are paired with available ports one-by-one according to the core mask</p></li>
+<li><p>The source MAC address is replaced by the TX_PORT MAC address</p></li>
+<li><p>The destination MAC address is replaced by 02:00:00:00:00:TX_PORT_ID</p></li>
+</ul>
+<p>This application can be used to demonstrate the usage of link status interrupt and its user space callbacks
+and the behavior of L2 forwarding each time the link status changes.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">23.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">link_status_interrupt</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">23.3. </span>Running the Application</h2>
+<p>The application requires a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-link_status_interrupt [EAL options] -- -p PORTMASK [-q NQ][-T PERIOD]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul class="simple">
+<li><p>-p PORTMASK: A hexadecimal bitmask of the ports to configure</p></li>
+<li><p>-q NQ: A number of queues (=ports) per lcore (default is 1)</p></li>
+<li><p>-T PERIOD: statistics will be refreshed each PERIOD seconds (0 to disable, 10 default)</p></li>
+</ul>
+<p>To run the application in a linux environment with 4 lcores, 4 memory channels, 16 ports and 8 RX queues per lcore,
+issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-link_status_interrupt -l <span class="m">0</span>-3 -n <span class="m">4</span>-- -q <span class="m">8</span> -p ffff
+</pre></div>
+</div>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running applications
+and the Environment Abstraction Layer (EAL) options.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">23.4. </span>Explanation</h2>
+<p>The following sections provide some explanation of the code.</p>
+<section id="command-line-arguments">
+<h3><span class="section-number">23.4.1. </span>Command Line Arguments</h3>
+<p>The Link Status Interrupt sample application takes specific parameters,
+in addition to Environment Abstraction Layer (EAL) arguments (see Section <a class="reference internal" href="#running-the-application">Running the Application</a>).</p>
+<p>Command line parsing is done in the same way as it is done in the L2 Forwarding Sample Application.
+See <a class="reference internal" href="l2_forward_real_virtual.html#l2-fwd-app-cmd-arguments"><span class="std std-ref">Command Line Arguments</span></a> for more information.</p>
+</section>
+<section id="mbuf-pool-initialization">
+<h3><span class="section-number">23.4.2. </span>Mbuf Pool Initialization</h3>
+<p>Mbuf pool initialization is done in the same way as it is done in the L2 Forwarding Sample Application.
+See <a class="reference internal" href="l2_forward_real_virtual.html#l2-fwd-app-mbuf-init"><span class="std std-ref">Mbuf Pool Initialization</span></a> for more information.</p>
+</section>
+<section id="driver-initialization">
+<h3><span class="section-number">23.4.3. </span>Driver Initialization</h3>
+<p>The main part of the code in the main() function relates to the initialization of the driver.
+To fully understand this code, it is recommended to study the chapters that related to the Poll Mode Driver in the
+<em>DPDK Programmer’s Guide and the DPDK API Reference</em>.</p>
+<p>The next step is to configure the RX and TX queues.
+For each port, there is only one RX queue (only one lcore is able to poll a given port).
+The number of TX queues depends on the number of available lcores.
+The rte_eth_dev_configure() function is used to configure the number of queues for a port:</p>
+<p>The global configuration is stored in a static structure:</p>
+<p>Configuring lsc to 0 (the default) disables the generation of any link status change interrupts in kernel space
+and no user space interrupt event is received.
+The public interface rte_eth_link_get() accesses the NIC registers directly to update the link status.
+Configuring lsc to non-zero enables the generation of link status change interrupts in kernel space
+when a link status change is present and calls the user space callbacks registered by the application.
+The public interface rte_eth_link_get() just reads the link status in a global structure
+that would be updated in the interrupt host thread only.</p>
+</section>
+<section id="interrupt-callback-registration">
+<h3><span class="section-number">23.4.4. </span>Interrupt Callback Registration</h3>
+<p>The application can register one or more callbacks to a specific port and interrupt event.
+An example callback function that has been written as indicated below.</p>
+<p>This function is called when a link status interrupt is present for the right port.
+The port_id indicates which port the interrupt applies to.
+The type parameter identifies the interrupt event type,
+which currently can be RTE_ETH_EVENT_INTR_LSC only, but other types can be added in the future.
+The param parameter is the address of the parameter for the callback.
+This function should be implemented with care since it will be called in the interrupt host thread,
+which is different from the main thread of its caller.</p>
+<p>The application registers the lsi_event_callback and a NULL parameter to the link status interrupt event on each port:</p>
+<p>This registration can be done only after calling the rte_eth_dev_configure() function and before calling any other function.
+If lsc is initialized with 0, the callback is never called since no interrupt event would ever be present.</p>
+</section>
+<section id="rx-queue-initialization">
+<h3><span class="section-number">23.4.5. </span>RX Queue Initialization</h3>
+<p>The application uses one lcore to poll one or several ports, depending on the -q option,
+which specifies the number of queues per lcore.</p>
+<p>For example, if the user specifies -q 4, the application is able to poll four ports with one lcore.
+If there are 16 ports on the target (and if the portmask argument is -p ffff),
+the application will need four lcores to poll all the ports.</p>
+<p>The list of queues that must be polled for a given lcore is stored in a private structure called struct lcore_queue_conf.</p>
+<p>The n_rx_port and rx_port_list[] fields are used in the main packet processing loop
+(see <a class="reference internal" href="#receive-process-and-transmit-packets">Receive, Process and Transmit Packets</a>).</p>
+<p>The global configuration for the RX queues is stored in a static structure:</p>
+</section>
+<section id="tx-queue-initialization">
+<h3><span class="section-number">23.4.6. </span>TX Queue Initialization</h3>
+<p>Each lcore should be able to transmit on any port.
+For every port, a single TX queue is initialized.</p>
+<p>The global configuration for TX queues is stored in a static structure:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_txconf</span><span class="w"> </span><span class="n">tx_conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">tx_thresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">pthresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TX_PTHRESH</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">hthresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TX_HTHRESH</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">wthresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TX_WTHRESH</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">tx_free_thresh</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TX_DESC_DEFAULT</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="cm">/* disable feature */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="receive-process-and-transmit-packets">
+<h3><span class="section-number">23.4.7. </span>Receive, Process and Transmit Packets</h3>
+<p>In the lsi_main_loop() function, the main task is to read ingress packets from the RX queues.
+This is done using the following code:</p>
+<p>Packets are read in a burst of size MAX_PKT_BURST.
+The rte_eth_rx_burst() function writes the mbuf pointers in a local table and returns the number of available mbufs in the table.</p>
+<p>Then, each mbuf in the table is processed by the lsi_simple_forward() function.
+The processing is very simple: processes the TX port from the RX port and then replaces the source and destination MAC addresses.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the following code, the two lines for calculating the output port require some explanation.
+If portId is even, the first line does nothing (as portid &amp; 1 will be 0), and the second line adds 1.
+If portId is odd, the first line subtracts one and the second line does nothing.
+Therefore, 0 goes to 1, and 1 to 0, 2 goes to 3 and 3 to 2, and so on.</p>
+</div>
+<p>Then, the packet is sent using the lsi_send_packet(m, dst_port) function.
+For this test application, the processing is exactly the same for all packets arriving on the same RX port.
+Therefore, it would have been possible to call the lsi_send_burst() function directly from the main loop
+to send all the received packets on the same TX port using
+the burst-oriented send function, which is more efficient.</p>
+<p>However, in real-life applications (such as, L3 routing),
+packet N is not necessarily forwarded on the same port as packet N-1.
+The application is implemented to illustrate that so the same approach can be reused in a more complex application.</p>
+<p>The lsi_send_packet() function stores the packet in a per-lcore and per-txport table.
+If the table is full, the whole packets table is transmitted using the lsi_send_burst() function:</p>
+<p>To ensure that no packets remain in the tables, each lcore does a draining of the TX queue in its main loop.
+This technique introduces some latency when there are not many packets to send.
+However, it improves performance:</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="l3_forward_power_man.html" title="previous chapter"><span class="section-number">22. </span>L3 Forwarding with Power Management Sample Application</a></li>
+      <li>Next: <a href="server_node_efd.html" title="next chapter"><span class="section-number">24. </span>Server-Node EFD Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/link_status_intr.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

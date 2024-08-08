@@ -1,0 +1,803 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>8. Contributing Code to DPDK &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="9. DPDK Vulnerability Management Process" href="vulnerability.html" />
+    <link rel="prev" title="7. Adding a new library" href="new_library.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="contributing-code-to-dpdk">
+<h1><span class="section-number">8. </span>Contributing Code to DPDK</h1>
+<p>This document outlines the guidelines for submitting code to DPDK.</p>
+<p>The DPDK development process is modeled (loosely) on the Linux Kernel development model so it is worth reading the
+Linux kernel guide on submitting patches:
+<a class="reference external" href="https://www.kernel.org/doc/html/latest/process/submitting-patches.html">How to Get Your Change Into the Linux Kernel</a>.
+The rationale for many of the DPDK guidelines is explained in greater detail in the kernel guidelines.</p>
+<section id="the-dpdk-development-process">
+<h2><span class="section-number">8.1. </span>The DPDK Development Process</h2>
+<p>The DPDK development process has the following features:</p>
+<ul class="simple">
+<li><p>The code is hosted in a public git repository.</p></li>
+<li><p>There is a mailing list where developers submit patches.</p></li>
+<li><p>There are maintainers for hierarchical components.</p></li>
+<li><p>Patches are reviewed publicly on the mailing list.</p></li>
+<li><p>Successfully reviewed patches are merged to the repository.</p></li>
+<li><p>Patches should be sent to the target repository or sub-tree, see below.</p></li>
+<li><p>All sub-repositories are merged into main repository for <code class="docutils literal notranslate"><span class="pre">-rc1</span></code> and <code class="docutils literal notranslate"><span class="pre">-rc2</span></code> versions of the release.</p></li>
+<li><p>After the <code class="docutils literal notranslate"><span class="pre">-rc2</span></code> release all patches should target the main repository.</p></li>
+</ul>
+<p>The mailing list for DPDK development is <a class="reference external" href="https://mails.dpdk.org/archives/dev/">dev&#64;dpdk.org</a>.
+Contributors will need to <a class="reference external" href="https://mails.dpdk.org/listinfo/dev">register for the mailing list</a> in order to submit patches.
+It is also worth registering for the DPDK <a class="reference external" href="https://patches.dpdk.org/project/dpdk/list/">Patchwork</a></p>
+<p>If you are using the GitHub service, pushing to a branch will trigger GitHub
+Actions to automatically build your changes and run unit tests and ABI checks.</p>
+<p>The development process requires some familiarity with the <code class="docutils literal notranslate"><span class="pre">git</span></code> version control system.
+Refer to the <a class="reference external" href="http://www.git-scm.com/book/">Pro Git Book</a> for further information.</p>
+</section>
+<section id="source-license">
+<h2><span class="section-number">8.2. </span>Source License</h2>
+<p>The DPDK uses the Open Source BSD-3-Clause license for the core libraries and
+drivers. The kernel components are GPL-2.0 licensed. DPDK uses single line
+reference to Unique License Identifiers in source files as defined by the Linux
+Foundation’s <a class="reference external" href="http://spdx.org/">SPDX project</a>.</p>
+<p>DPDK uses first line of the file to be SPDX tag. In case of <em>#!</em> scripts, SPDX
+tag can be placed in 2nd line of the file.</p>
+<p>For example, to label a file as subject to the BSD-3-Clause license,
+the following text would be used:</p>
+<p><code class="docutils literal notranslate"><span class="pre">SPDX-License-Identifier:</span> <span class="pre">BSD-3-Clause</span></code></p>
+<p>To label a file as dual-licensed with BSD-3-Clause and GPL-2.0 (e.g., for code
+that is shared between the kernel and userspace), the following text would be
+used:</p>
+<p><code class="docutils literal notranslate"><span class="pre">SPDX-License-Identifier:</span> <span class="pre">(BSD-3-Clause</span> <span class="pre">OR</span> <span class="pre">GPL-2.0)</span></code></p>
+<p>Refer to <code class="docutils literal notranslate"><span class="pre">licenses/README</span></code> for more details.</p>
+</section>
+<section id="maintainers-and-sub-trees">
+<h2><span class="section-number">8.3. </span>Maintainers and Sub-trees</h2>
+<p>The DPDK maintenance hierarchy is divided into a main repository <code class="docutils literal notranslate"><span class="pre">dpdk</span></code> and sub-repositories <code class="docutils literal notranslate"><span class="pre">dpdk-next-*</span></code>.</p>
+<p>There are maintainers for the trees and for components within the tree.</p>
+<p>Trees and maintainers are listed in the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Crypto Drivers
+--------------
+M: Some Name &lt;some.name@email.com&gt;
+T: git://dpdk.org/next/dpdk-next-crypto
+
+Intel AES-NI GCM PMD
+M: Some One &lt;some.one@email.com&gt;
+F: drivers/crypto/aesni_gcm/
+F: doc/guides/cryptodevs/aesni_gcm.rst
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">M</span></code> is a tree or component maintainer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">T</span></code> is a repository tree.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">F</span></code> is a maintained file or directory.</p></li>
+</ul>
+<p>Additional details are given in the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file.</p>
+<p>The role of the component maintainers is to:</p>
+<ul class="simple">
+<li><p>Review patches for the component or delegate the review.
+The review should be done, ideally, within 1 week of submission to the mailing list.</p></li>
+<li><p>Add an <code class="docutils literal notranslate"><span class="pre">acked-by</span></code> to patches, or patchsets, that are ready for committing to a tree.</p></li>
+<li><p>Reply to questions asked about the component.</p></li>
+</ul>
+<p>Component maintainers can be added or removed by submitting a patch to the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file.
+Maintainers should have demonstrated a reasonable level of contributions or reviews to the component area.
+The maintainer should be confirmed by an <code class="docutils literal notranslate"><span class="pre">ack</span></code> from an established contributor.
+There can be more than one component maintainer if desired.</p>
+<p>The role of the tree maintainers is to:</p>
+<ul class="simple">
+<li><p>Maintain the overall quality of their tree.
+This can entail additional review, compilation checks or other tests deemed necessary by the maintainer.</p></li>
+<li><p>Commit patches that have been reviewed by component maintainers and/or other contributors.
+The tree maintainer should determine if patches have been reviewed sufficiently.</p></li>
+<li><p>Ensure that patches are reviewed in a timely manner.</p></li>
+<li><p>Prepare the tree for integration.</p></li>
+<li><p>Ensure that there is a designated back-up maintainer and coordinate a handover for periods where the
+tree maintainer can’t perform their role.</p></li>
+</ul>
+<p>Tree maintainers can be added or removed by submitting a patch to the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file.
+The proposer should justify the need for a new sub-tree and should have demonstrated a sufficient level of contributions in the area or to a similar area.
+The maintainer should be confirmed by an <code class="docutils literal notranslate"><span class="pre">ack</span></code> from an existing tree maintainer.
+Disagreements on trees or maintainers can be brought to the Technical Board.</p>
+<p>The backup maintainer for the main tree should be selected
+from the existing sub-tree maintainers of the project.
+The backup maintainer for a sub-tree should be selected from among the component maintainers within that sub-tree.</p>
+</section>
+<section id="getting-the-source-code">
+<h2><span class="section-number">8.4. </span>Getting the Source Code</h2>
+<p>The source code can be cloned using either of the following:</p>
+<p>main repository:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git clone git://dpdk.org/dpdk
+git clone https://dpdk.org/git/dpdk
+</pre></div>
+</div>
+<p>sub-repositories (<a class="reference external" href="https://git.dpdk.org/next">list</a>):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git clone git://dpdk.org/next/dpdk-next-*
+git clone https://dpdk.org/git/next/dpdk-next-*
+</pre></div>
+</div>
+</section>
+<section id="make-your-changes">
+<h2><span class="section-number">8.5. </span>Make your Changes</h2>
+<p>Make your planned changes in the cloned <code class="docutils literal notranslate"><span class="pre">dpdk</span></code> repo. Here are some guidelines and requirements:</p>
+<ul class="simple">
+<li><p>Follow the <a class="reference internal" href="coding_style.html#coding-style"><span class="std std-ref">DPDK Coding Style</span></a> guidelines.</p></li>
+<li><p>If you are a new contributor, or if your mail address changed,
+you may update the <code class="docutils literal notranslate"><span class="pre">.mailmap</span></code> file.
+Otherwise the new name or address will be added by a maintainer.
+Keeping this file up-to-date will help when someone wants to contact you
+about the changes you contributed to.</p></li>
+<li><p>If you add new files or directories you should add your name to the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file.</p></li>
+<li><p>Initial submission of new PMDs should be prepared against a corresponding repo.</p>
+<ul>
+<li><p>Thus, for example, initial submission of a new network PMD should be
+prepared against dpdk-next-net repo.</p></li>
+<li><p>Likewise, initial submission of a new crypto or compression PMD should be
+prepared against dpdk-next-crypto repo.</p></li>
+<li><p>For other PMDs and more info, refer to the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file.</p></li>
+</ul>
+</li>
+<li><p>New external functions should be added to the local <code class="docutils literal notranslate"><span class="pre">version.map</span></code> file. See
+the <a class="reference internal" href="abi_policy.html"><span class="doc">ABI policy</span></a> and <a class="reference internal" href="abi_versioning.html#abi-versioning"><span class="std std-ref">ABI versioning</span></a>
+guides. New external functions should also be added in alphabetical order.</p></li>
+<li><p>Any new API function should be used in <code class="docutils literal notranslate"><span class="pre">/app</span></code> test directory.</p></li>
+<li><p>When introducing a new device API, at least one driver should implement it.</p></li>
+<li><p>Important changes will require an addition to the release notes in <code class="docutils literal notranslate"><span class="pre">doc/guides/rel_notes/</span></code>.
+See the <a class="reference internal" href="documentation.html#doc-guidelines"><span class="std std-ref">Release Notes section of the Documentation Guidelines</span></a> for details.</p></li>
+<li><p>Test the compilation works with different targets, compilers and options, see <a class="reference internal" href="#contrib-check-compilation"><span class="std std-ref">Checking Compilation</span></a>.</p></li>
+<li><p>Don’t break compilation between commits with forward dependencies in a patchset.
+Each commit should compile on its own to allow for <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">bisect</span></code> and continuous integration testing.</p></li>
+<li><p>Add tests to the <code class="docutils literal notranslate"><span class="pre">app/test</span></code> unit test framework where possible.</p></li>
+<li><p>Add documentation, if relevant, in the form of Doxygen comments or a User Guide in RST format.
+See the <a class="reference internal" href="documentation.html#doc-guidelines"><span class="std std-ref">Documentation Guidelines</span></a>.</p></li>
+<li><p>Code and related documentation must be updated atomically in the same patch.</p></li>
+</ul>
+<p>Once the changes have been made you should commit them to your local repo.</p>
+<p>For small changes, that do not require specific explanations, it is better to keep things together in the
+same patch.
+Larger changes that require different explanations should be separated into logical patches in a patchset.
+A good way of thinking about whether a patch should be split is to consider whether the change could be
+applied without dependencies as a backport.</p>
+<p>As a guide to how patches should be structured run <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code> on similar files.</p>
+</section>
+<section id="commit-messages-subject-line">
+<h2><span class="section-number">8.6. </span>Commit Messages: Subject Line</h2>
+<p>The first, summary, line of the git commit message becomes the subject line of the patch email.
+Here are some guidelines for the summary line:</p>
+<ul>
+<li><p>The summary line must capture the area and the impact of the change.</p></li>
+<li><p>The summary line should be around 50 characters.</p></li>
+<li><p>The summary line should be lowercase apart from acronyms.</p></li>
+<li><p>It should be prefixed with the component name (use git log to check existing components).
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ixgbe: fix offload config option name
+
+config: increase max queues per port
+</pre></div>
+</div>
+</li>
+<li><p>Use the imperative of the verb (like instructions to the code base).</p></li>
+<li><p>Don’t add a period/full stop to the subject line or you will end up two in the patch name: <code class="docutils literal notranslate"><span class="pre">dpdk_description..patch</span></code>.</p></li>
+</ul>
+<p>The actual email subject line should be prefixed by <code class="docutils literal notranslate"><span class="pre">[PATCH]</span></code> and the version, if greater than v1,
+for example: <code class="docutils literal notranslate"><span class="pre">PATCH</span> <span class="pre">v2</span></code>.
+The is generally added by <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">send-email</span></code> or <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">format-patch</span></code>, see below.</p>
+<p>If you are submitting an RFC draft of a feature you can use <code class="docutils literal notranslate"><span class="pre">[RFC]</span></code> instead of <code class="docutils literal notranslate"><span class="pre">[PATCH]</span></code>.
+An RFC patch doesn’t have to be complete.
+It is intended as a way of getting early feedback.</p>
+</section>
+<section id="commit-messages-body">
+<h2><span class="section-number">8.7. </span>Commit Messages: Body</h2>
+<p>Here are some guidelines for the body of a commit message:</p>
+<ul>
+<li><p>The body of the message should describe the issue being fixed or the feature being added.
+It is important to provide enough information to allow a reviewer to understand the purpose of the patch.</p></li>
+<li><p>When the change is obvious the body can be blank, apart from the signoff.</p></li>
+<li><p>The commit message must end with a <code class="docutils literal notranslate"><span class="pre">Signed-off-by:</span></code> line which is added using:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git commit --signoff # or -s
+</pre></div>
+</div>
+<p>The purpose of the signoff is explained in the
+<a class="reference external" href="https://www.kernel.org/doc/html/latest/process/submitting-patches.html#developer-s-certificate-of-origin-1-1">Developer’s Certificate of Origin</a>
+section of the Linux kernel guidelines.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All developers must ensure that they have read and understood the
+Developer’s Certificate of Origin section of the documentation prior
+to applying the signoff and submitting a patch.</p>
+</div>
+</li>
+<li><p>The signoff must be a real name and not an alias or nickname.
+More than one signoff is allowed.</p></li>
+<li><p>The text of the commit message should be wrapped at 72 characters.</p></li>
+<li><p>When fixing a regression, it is required to reference the id of the commit
+which introduced the bug, and put the original author of that commit on CC.
+You can generate the required lines using the following git alias, which prints
+the commit SHA and the author of the original code:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git config alias.fixline &quot;log -1 --abbrev=12 --format=&#39;Fixes: %h (\&quot;%s\&quot;)%nCc: %ae&#39;&quot;
+</pre></div>
+</div>
+<p>The output of <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">fixline</span> <span class="pre">&lt;SHA&gt;</span></code> must then be added to the commit message:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doc: fix some parameter description
+
+Update the docs, fixing description of some parameter.
+
+Fixes: abcdefgh1234 (&quot;doc: add some parameter&quot;)
+Cc: author@example.com
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+</pre></div>
+</div>
+</li>
+<li><p>When fixing an error or warning it is useful to add the error message and instructions on how to reproduce it.</p></li>
+<li><p>Use correct capitalization, punctuation and spelling.</p></li>
+</ul>
+<p>In addition to the <code class="docutils literal notranslate"><span class="pre">Signed-off-by:</span></code> name the commit messages can also have
+tags for who reported, suggested, tested and reviewed the patch being
+posted. Please refer to the <a class="reference internal" href="#tested-acked-and-reviewed-by">Tested, Acked and Reviewed by</a> section.</p>
+<section id="patch-fix-related-issues">
+<h3><span class="section-number">8.7.1. </span>Patch Fix Related Issues</h3>
+<p><a class="reference external" href="https://scan.coverity.com/projects/dpdk-data-plane-development-kit">Coverity</a>
+is a tool for static code analysis.
+It is used as a cloud-based service used to scan the DPDK source code,
+and alert developers of any potential defects in the source code.
+When fixing an issue found by Coverity, the patch must contain a Coverity issue ID
+in the body of the commit message. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doc: fix some parameter description
+
+Update the docs, fixing description of some parameter.
+
+Coverity issue: 12345
+Fixes: abcdefgh1234 (&quot;doc: add some parameter&quot;)
+Cc: author@example.com
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+</pre></div>
+</div>
+<p><a class="reference external" href="https://bugs.dpdk.org">Bugzilla</a>
+is a bug- or issue-tracking system.
+Bug-tracking systems allow individual or groups of developers
+effectively to keep track of outstanding problems with their product.
+When fixing an issue raised in Bugzilla, the patch must contain
+a Bugzilla issue ID in the body of the commit message.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doc: fix some parameter description
+
+Update the docs, fixing description of some parameter.
+
+Bugzilla ID: 12345
+Fixes: abcdefgh1234 (&quot;doc: add some parameter&quot;)
+Cc: author@example.com
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+</pre></div>
+</div>
+</section>
+<section id="patch-for-stable-releases">
+<h3><span class="section-number">8.7.2. </span>Patch for Stable Releases</h3>
+<p>All fix patches to the main branch that are candidates for backporting
+should also be CCed to the <a class="reference external" href="https://mails.dpdk.org/listinfo/stable">stable&#64;dpdk.org</a>
+mailing list.
+In the commit message body the Cc: <a class="reference external" href="mailto:stable&#37;&#52;&#48;dpdk&#46;org">stable<span>&#64;</span>dpdk<span>&#46;</span>org</a> should be inserted as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doc: fix some parameter description
+
+Update the docs, fixing description of some parameter.
+
+Fixes: abcdefgh1234 (&quot;doc: add some parameter&quot;)
+Cc: stable@dpdk.org
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+</pre></div>
+</div>
+<p>For further information on stable contribution you can go to
+<a class="reference internal" href="stable.html"><span class="doc">Stable Contribution Guide</span></a>.</p>
+</section>
+<section id="patch-dependencies">
+<h3><span class="section-number">8.7.3. </span>Patch Dependencies</h3>
+<p>Sometimes a patch or patchset can depend on another one.
+To help the maintainers and automation tasks, please document this dependency in commit log or cover letter
+with the following syntax:</p>
+<p><code class="docutils literal notranslate"><span class="pre">Depends-on:</span> <span class="pre">series-NNNNN</span> <span class="pre">(&quot;Title</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">series&quot;)</span></code> or <code class="docutils literal notranslate"><span class="pre">Depends-on:</span> <span class="pre">patch-NNNNN</span> <span class="pre">(&quot;Title</span> <span class="pre">of</span> <span class="pre">the</span> <span class="pre">patch&quot;)</span></code></p>
+<p>Where <code class="docutils literal notranslate"><span class="pre">NNNNN</span></code> is patchwork ID for patch or series:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>doc: fix some parameter description
+
+Update the docs, fixing description of some parameter.
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+---
+Depends-on: series-10000 (&quot;Title of the series&quot;)
+</pre></div>
+</div>
+</section>
+<section id="tag-order">
+<h3><span class="section-number">8.7.4. </span>Tag order</h3>
+<p>There is a pattern indicating how certain tags should relate to each other.</p>
+<p>Example of proper tag sequence:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Coverity issue:
+Bugzilla ID:
+Fixes:
+Cc:
+
+Reported-by:
+Suggested-by:
+Signed-off-by:
+Acked-by:
+Reviewed-by:
+Tested-by:
+</pre></div>
+</div>
+<p>Between first and second tag section there is and empty line.</p>
+<p>While <code class="docutils literal notranslate"><span class="pre">Signed-off-by:</span></code> is an obligatory tag and must exist in each commit,
+all other tags are optional.
+Any tag, as long as it is in proper location to other adjacent tags (if present),
+may occur multiple times.</p>
+<p>Tags after the first occurrence of <code class="docutils literal notranslate"><span class="pre">Signed-off-by:</span></code> shall be laid out
+in a chronological order.</p>
+</section>
+</section>
+<section id="creating-patches">
+<h2><span class="section-number">8.8. </span>Creating Patches</h2>
+<p>It is possible to send patches directly from git but for new contributors it is recommended to generate the
+patches with <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">format-patch</span></code> and then when everything looks okay, and the patches have been checked, to
+send them with <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">send-email</span></code>.</p>
+<p>Here are some examples of using <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">format-patch</span></code> to generate patches:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Generate a patch from the last commit.
+<span class="go">git format-patch -1</span>
+
+<span class="gp"># </span>Generate a patch from the last <span class="m">3</span> commits.
+<span class="go">git format-patch -3</span>
+
+<span class="gp"># </span>Generate the patches <span class="k">in</span> a directory.
+<span class="go">git format-patch -3 -o ~/patch/</span>
+
+<span class="gp"># </span>Add a cover letter to explain a patchset.
+<span class="go">git format-patch -3 -o ~/patch/ --cover-letter</span>
+
+<span class="gp"># </span>Add a prefix with a version number.
+<span class="go">git format-patch -3 -o ~/patch/ -v 2</span>
+</pre></div>
+</div>
+<p>Cover letters are useful for explaining a patchset and help to generate a logical threading to the patches.
+Smaller notes can be put inline in the patch after the <code class="docutils literal notranslate"><span class="pre">---</span></code> separator, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Subject: [PATCH] fm10k/base: add FM10420 device ids
+
+Add the device ID for Boulder Rapids and Atwood Channel to enable
+drivers to support those devices.
+
+Signed-off-by: Alex Smith &lt;alex.smith@example.com&gt;
+---
+
+ADD NOTES HERE.
+
+ drivers/net/fm10k/base/fm10k_api.c  | 6 ++++++
+ drivers/net/fm10k/base/fm10k_type.h | 6 ++++++
+ 2 files changed, 12 insertions(+)
+...
+</pre></div>
+</div>
+<p>Version 2 and later of a patchset should also include a short log of the changes so the reviewer knows what has changed.
+This can be added to the cover letter or the annotations.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>---
+v3:
+* Fixed issued with version.map.
+
+v2:
+* Added i40e support.
+* Renamed ethdev functions from rte_eth_ieee15888_*() to rte_eth_timesync_*()
+  since 802.1AS can be supported through the same interfaces.
+</pre></div>
+</div>
+</section>
+<section id="checking-the-patches">
+<span id="contrib-checkpatch"></span><h2><span class="section-number">8.9. </span>Checking the Patches</h2>
+<p>Patches should be checked for formatting and syntax issues using the <code class="docutils literal notranslate"><span class="pre">checkpatches.sh</span></code> script in the <code class="docutils literal notranslate"><span class="pre">devtools</span></code>
+directory of the DPDK repo.
+This uses the Linux kernel development tool <code class="docutils literal notranslate"><span class="pre">checkpatch.pl</span></code> which  can be obtained by cloning, and periodically,
+updating the Linux kernel sources.</p>
+<p>The path to the original Linux script must be set in the environment variable <code class="docutils literal notranslate"><span class="pre">DPDK_CHECKPATCH_PATH</span></code>.</p>
+<p>Spell checking of commonly misspelled words is enabled
+by default if installed in <code class="docutils literal notranslate"><span class="pre">/usr/share/codespell/dictionary.txt</span></code>.
+A different dictionary path can be specified
+in the environment variable <code class="docutils literal notranslate"><span class="pre">DPDK_CHECKPATCH_CODESPELL</span></code>.</p>
+<p>There is a DPDK script to build an adjusted dictionary
+from the multiple codespell dictionaries:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/codespell-project/codespell.git
+devtools/build-dict.sh codespell/ &gt; codespell-dpdk.txt
+</pre></div>
+</div>
+<p>Environment variables required by the development tools,
+are loaded from the following files, in order of preference:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.develconfig
+~/.config/dpdk/devel.config
+/etc/dpdk/devel.config.
+</pre></div>
+</div>
+<p>Once the environment variable is set, the script can be run as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>devtools/checkpatches.sh ~/patch/
+</pre></div>
+</div>
+<p>The script usage is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>checkpatches.sh [-h] [-q] [-v] [-nX|-r range|patch1 [patch2] ...]
+</pre></div>
+</div>
+<p>Then the git logs should be checked using the <code class="docutils literal notranslate"><span class="pre">check-git-log.sh</span></code> script.</p>
+<p>The script usage is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>check-git-log.sh [-h] [-nX|-r range]
+</pre></div>
+</div>
+<p>For both of the above scripts, the -n option is used to specify a number of commits from HEAD,
+and the -r option allows the user specify a <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">log</span></code> range.</p>
+</section>
+<section id="checking-compilation">
+<span id="contrib-check-compilation"></span><h2><span class="section-number">8.10. </span>Checking Compilation</h2>
+<p>Compilation of patches is to be tested with <code class="docutils literal notranslate"><span class="pre">devtools/test-meson-builds.sh</span></code> script.</p>
+<p>The script internally checks for dependencies, then builds for several
+combinations of compilation configuration.
+By default, each build will be put in a subfolder of the current working directory.
+However, if it is preferred to place the builds in a different location,
+the environment variable <code class="docutils literal notranslate"><span class="pre">DPDK_BUILD_TEST_DIR</span></code> can be set to that desired location.
+For example, setting <code class="docutils literal notranslate"><span class="pre">DPDK_BUILD_TEST_DIR=__builds</span></code> will put all builds
+in a single subfolder called “__builds” created in the current directory.
+Setting <code class="docutils literal notranslate"><span class="pre">DPDK_BUILD_TEST_DIR</span></code> to an absolute directory path e.g. <code class="docutils literal notranslate"><span class="pre">/tmp</span></code> is also supported.</p>
+</section>
+<section id="checking-abi-compatibility">
+<span id="integrated-abi-check"></span><h2><span class="section-number">8.11. </span>Checking ABI compatibility</h2>
+<p>By default, ABI compatibility checks are disabled.</p>
+<p>To enable them, a reference version must be selected via the environment
+variable <code class="docutils literal notranslate"><span class="pre">DPDK_ABI_REF_VERSION</span></code>. Contributors should ordinarily reference the
+git tag of the most recent release of DPDK in <code class="docutils literal notranslate"><span class="pre">DPDK_ABI_REF_VERSION</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">devtools/test-meson-builds.sh</span></code> script then build this reference version
+in a temporary directory and store the results in a subfolder of the current
+working directory.
+The environment variable <code class="docutils literal notranslate"><span class="pre">DPDK_ABI_REF_DIR</span></code> can be set so that the results go
+to a different location.</p>
+<p>Sample:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_ABI_REF_VERSION=v19.11 DPDK_ABI_REF_DIR=/tmp ./devtools/test-meson-builds.sh
+</pre></div>
+</div>
+</section>
+<section id="sending-patches">
+<h2><span class="section-number">8.12. </span>Sending Patches</h2>
+<p>Patches should be sent to the mailing list using <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">send-email</span></code>.
+You can configure an external SMTP with something like the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[sendemail]
+    smtpuser = name@domain.com
+    smtpserver = smtp.domain.com
+    smtpserverport = 465
+    smtpencryption = ssl
+</pre></div>
+</div>
+<p>See the <a class="reference external" href="https://git-scm.com/docs/git-send-email">Git send-email</a> documentation for more details.</p>
+<p>The patches should be sent to <code class="docutils literal notranslate"><span class="pre">dev&#64;dpdk.org</span></code>.
+If the patches are a change to existing files then you should send them TO the maintainer(s) and CC <code class="docutils literal notranslate"><span class="pre">dev&#64;dpdk.org</span></code>.
+The appropriate maintainer can be found in the <code class="docutils literal notranslate"><span class="pre">MAINTAINERS</span></code> file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git send-email --to maintainer@some.org --cc dev@dpdk.org 000*.patch
+</pre></div>
+</div>
+<p>Script <code class="docutils literal notranslate"><span class="pre">get-maintainer.sh</span></code> can be used to select maintainers automatically:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git send-email --to-cmd ./devtools/get-maintainer.sh --cc dev@dpdk.org 000*.patch
+</pre></div>
+</div>
+<p>New additions can be sent without a maintainer:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git send-email --to dev@dpdk.org 000*.patch
+</pre></div>
+</div>
+<p>You can test the emails by sending it to yourself or with the <code class="docutils literal notranslate"><span class="pre">--dry-run</span></code> option.</p>
+<p>If the patch is in relation to a previous email thread you can add it to the same thread using the Message ID:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git send-email --to dev@dpdk.org --in-reply-to &lt;1234-foo@bar.com&gt; 000*.patch
+</pre></div>
+</div>
+<p>The Message ID can be found in the raw text of emails or at the top of each Patchwork patch,
+<a class="reference external" href="https://patches.dpdk.org/patch/7646/">for example</a>.
+Shallow threading (<code class="docutils literal notranslate"><span class="pre">--thread</span> <span class="pre">--no-chain-reply-to</span></code>) is preferred for a patch series.</p>
+<p>Once submitted your patches will appear on the mailing list and in Patchwork.</p>
+<p>Experienced committers may send patches directly with <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">send-email</span></code> without the <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">format-patch</span></code> step.
+The options <code class="docutils literal notranslate"><span class="pre">--annotate</span></code> and <code class="docutils literal notranslate"><span class="pre">confirm</span> <span class="pre">=</span> <span class="pre">always</span></code> are recommended for checking patches before sending.</p>
+<section id="backporting-patches-for-stable-releases">
+<h3><span class="section-number">8.12.1. </span>Backporting patches for Stable Releases</h3>
+<p>Sometimes a maintainer or contributor wishes, or can be asked, to send a patch
+for a stable release rather than mainline.
+In this case the patch(es) should be sent to <code class="docutils literal notranslate"><span class="pre">stable&#64;dpdk.org</span></code>,
+not to <code class="docutils literal notranslate"><span class="pre">dev&#64;dpdk.org</span></code>.</p>
+<p>Given that there are multiple stable releases being maintained at the same time,
+please specify exactly which branch(es) the patch is for
+using <code class="docutils literal notranslate"><span class="pre">git</span> <span class="pre">send-email</span> <span class="pre">--subject-prefix='PATCH</span> <span class="pre">16.11'</span> <span class="pre">...</span></code>
+and also optionally in the cover letter or in the annotation.</p>
+</section>
+</section>
+<section id="the-review-process">
+<h2><span class="section-number">8.13. </span>The Review Process</h2>
+<p>Patches are reviewed by the community, relying on the experience and
+collaboration of the members to double-check each other’s work. There are a
+number of ways to indicate that you have checked a patch on the mailing list.</p>
+<section id="tested-acked-and-reviewed-by">
+<h3><span class="section-number">8.13.1. </span>Tested, Acked and Reviewed by</h3>
+<p>To indicate that you have interacted with a patch on the mailing list you
+should respond to the patch in an email with one of the following tags:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Reviewed-by:</p></li>
+<li><p>Acked-by:</p></li>
+<li><p>Tested-by:</p></li>
+<li><p>Reported-by:</p></li>
+<li><p>Suggested-by:</p></li>
+</ul>
+</div></blockquote>
+<p>The tag should be on a separate line as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tag-here: Name Surname &lt;email@address.com&gt;
+</pre></div>
+</div>
+<p>Each of these tags has a specific meaning. In general, the DPDK community
+follows the kernel usage of the tags. A short summary of the meanings of each
+tag is given here for reference:</p>
+<p><code class="docutils literal notranslate"><span class="pre">Reviewed-by:</span></code> is a strong <a class="reference external" href="https://www.kernel.org/doc/html/latest/process/submitting-patches.html#reviewer-s-statement-of-oversight">statement</a> that the patch is an appropriate state
+for merging without any remaining serious technical issues. Reviews from
+community members who are known to understand the subject area and to perform
+thorough reviews will increase the likelihood of the patch getting merged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Acked-by:</span></code> is a record that the person named was not directly involved in
+the preparation of the patch but wishes to signify and record their acceptance
+and approval of it.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Tested-by:</span></code> indicates that the patch has been successfully tested (in some
+environment) by the person named.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Reported-by:</span></code> is used to acknowledge person who found or reported the bug.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Suggested-by:</span></code> indicates that the patch idea was suggested by the named
+person.</p>
+</section>
+<section id="steps-to-getting-your-patch-merged">
+<h3><span class="section-number">8.13.2. </span>Steps to getting your patch merged</h3>
+<p>The more work you put into the previous steps the easier it will be to get a
+patch accepted. The general cycle for patch review and acceptance is:</p>
+<ol class="arabic">
+<li><p>Submit the patch.</p></li>
+<li><p>Check the automatic test reports in the coming hours.</p></li>
+<li><p>Wait for review comments. While you are waiting review some other patches.</p></li>
+<li><p>Fix the review comments and submit a <code class="docutils literal notranslate"><span class="pre">v</span> <span class="pre">n+1</span></code> patchset:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git format-patch -3 -v 2
+</pre></div>
+</div>
+</li>
+<li><p>Update Patchwork to mark your previous patches as “Superseded”.</p></li>
+<li><p>If the patch is deemed suitable for merging by the relevant maintainer(s) or other developers they will <code class="docutils literal notranslate"><span class="pre">ack</span></code>
+the patch with an email that includes something like:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Acked-by: Alex Smith &lt;alex.smith@example.com&gt;
+</pre></div>
+</div>
+<p><strong>Note</strong>: When acking patches please remove as much of the text of the patch email as possible.
+It is generally best to delete everything after the <code class="docutils literal notranslate"><span class="pre">Signed-off-by:</span></code> line.</p>
+</li>
+<li><p>Having the patch <code class="docutils literal notranslate"><span class="pre">Reviewed-by:</span></code> and/or <code class="docutils literal notranslate"><span class="pre">Tested-by:</span></code> will also help the patch to be accepted.</p></li>
+<li><p>If the patch isn’t deemed suitable based on being out of scope or conflicting with existing functionality
+it may receive a <code class="docutils literal notranslate"><span class="pre">nack</span></code>.
+In this case you will need to make a more convincing technical argument in favor of your patches.</p></li>
+<li><p>In addition a patch will not be accepted if it doesn’t address comments from a previous version with fixes or
+valid arguments.</p></li>
+<li><p>It is the responsibility of a maintainer to ensure that patches are reviewed and to provide an <code class="docutils literal notranslate"><span class="pre">ack</span></code> or
+<code class="docutils literal notranslate"><span class="pre">nack</span></code> of those patches as appropriate.</p></li>
+<li><p>Once a patch has been acked by the relevant maintainer, reviewers may still comment on it for a further
+two weeks. After that time, the patch should be merged into the relevant git tree for the next release.
+Additional notes and restrictions:</p>
+<ul class="simple">
+<li><p>Patches should be acked by a maintainer at least two days before the release merge
+deadline, in order to make that release.</p></li>
+<li><p>For patches acked with less than two weeks to go to the merge deadline, all additional
+comments should be made no later than two days before the merge deadline.</p></li>
+<li><p>After the appropriate time for additional feedback has passed, if the patch has not yet
+been merged to the relevant tree by the committer, it should be treated as though it had,
+in that any additional changes needed to it must be addressed by a follow-on patch, rather
+than rework of the original.</p></li>
+<li><p>Trivial patches may be merged sooner than described above at the tree committer’s
+discretion.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+<section id="milestones-definition">
+<h2><span class="section-number">8.14. </span>Milestones definition</h2>
+<p>Each DPDK release has milestones that help everyone to converge to the release date.
+The following is a list of these milestones together with
+concrete definitions and expectations for a typical release cycle.
+An average cycle lasts 3 months and have 4 release candidates in the last month.
+Test reports are expected to be received after each release candidate.
+The number and expectations of release candidates might vary slightly.
+The schedule is updated in the <a class="reference external" href="https://core.dpdk.org/roadmap/#dates">roadmap</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Sooner is always better. Deadlines are not ideal dates.</p>
+<p>Integration is never guaranteed but everyone can help.</p>
+</div>
+<section id="id1">
+<h3><span class="section-number">8.14.1. </span>Roadmap</h3>
+<ul class="simple">
+<li><p>Announce new features in libraries, drivers, applications, and examples.</p></li>
+<li><p>To be published before the previous release.</p></li>
+</ul>
+</section>
+<section id="proposal-deadline">
+<h3><span class="section-number">8.14.2. </span>Proposal Deadline</h3>
+<ul class="simple">
+<li><p>Must send an RFC (Request For Comments) or a complete patch of new features.</p></li>
+<li><p>Early RFC gives time for design review before complete implementation.</p></li>
+<li><p>Should include at least the API changes in libraries and applications.</p></li>
+<li><p>Library code should be quite complete at the deadline.</p></li>
+<li><p>Nice to have: driver implementation, example code, and documentation.</p></li>
+</ul>
+</section>
+<section id="rc1">
+<h3><span class="section-number">8.14.3. </span>rc1</h3>
+<ul class="simple">
+<li><p>Priority: libraries. No library feature should be accepted after -rc1.</p></li>
+<li><p>API changes or additions must be implemented in libraries.</p></li>
+<li><p>The API must include Doxygen documentation
+and be part of the relevant .rst files (library-specific and release notes).</p></li>
+<li><p>API should be used in a test application (<code class="docutils literal notranslate"><span class="pre">/app</span></code>).</p></li>
+<li><p>At least one PMD should implement the API.
+It may be a draft sent in a separate series.</p></li>
+<li><p>The above should be sent to the mailing list at least 2 weeks before -rc1
+to give time for review and maintainers approval.</p></li>
+<li><p>If no review after 10 days, a reminder should be sent.</p></li>
+<li><p>Nice to have: example code (<code class="docutils literal notranslate"><span class="pre">/examples</span></code>)</p></li>
+</ul>
+</section>
+<section id="rc2">
+<h3><span class="section-number">8.14.4. </span>rc2</h3>
+<ul class="simple">
+<li><p>Priority: drivers. No driver feature should be accepted after -rc2.</p></li>
+<li><p>A driver change must include documentation
+in the relevant .rst files (driver-specific and release notes).</p></li>
+<li><p>Driver changes should be sent to the mailing list before -rc1 is released.</p></li>
+</ul>
+</section>
+<section id="rc3">
+<h3><span class="section-number">8.14.5. </span>rc3</h3>
+<ul class="simple">
+<li><p>Priority: applications. No application feature should be accepted after -rc3.</p></li>
+<li><p>New functionality that does not depend on libraries update
+can be integrated as part of -rc3.</p></li>
+<li><p>The application change must include documentation in the relevant .rst files
+(application-specific and release notes if significant).</p></li>
+<li><p>Libraries and drivers cleanup are allowed.</p></li>
+<li><p>Small driver reworks.</p></li>
+</ul>
+</section>
+<section id="rc4">
+<h3><span class="section-number">8.14.6. </span>rc4</h3>
+<ul class="simple">
+<li><p>Documentation updates.</p></li>
+<li><p>Critical bug fixes only.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Bug fixes are integrated as early as possible at any stage.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="new_library.html" title="previous chapter"><span class="section-number">7. </span>Adding a new library</a></li>
+      <li>Next: <a href="vulnerability.html" title="next chapter"><span class="section-number">9. </span>DPDK Vulnerability Management Process</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/patches.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

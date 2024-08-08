@@ -1,0 +1,265 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>24. Server-Node EFD Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="25. Service Cores Sample Application" href="service_cores.html" />
+    <link rel="prev" title="23. Link Status Interrupt Sample Application" href="link_status_intr.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="server-node-efd-sample-application">
+<h1><span class="section-number">24. </span>Server-Node EFD Sample Application</h1>
+<p>This sample application demonstrates the use of EFD library as a flow-level
+load balancer, for more information about the EFD Library please refer to the
+DPDK programmer’s guide.</p>
+<p>This sample application is a variant of the
+<a class="reference internal" href="multi_process.html#multi-process-app"><span class="std std-ref">client-server sample application</span></a>
+where a specific target node is specified for every and each flow
+(not in a round-robin fashion as the original load balancing sample application).</p>
+<section id="overview">
+<h2><span class="section-number">24.1. </span>Overview</h2>
+<p>The architecture of the EFD flow-based load balancer sample application is
+presented in the following figure.</p>
+<figure class="align-default" id="id1">
+<span id="figure-efd-sample-app-overview"></span><img alt="../_images/server_node_efd.svg" src="../_images/server_node_efd.svg" /><figcaption>
+<p><span class="caption-number">Fig. 24.1 </span><span class="caption-text">Using EFD as a Flow-Level Load Balancer</span></p>
+</figcaption>
+</figure>
+<p>As shown in <a class="reference internal" href="#figure-efd-sample-app-overview"><span class="std std-numref">Fig. 24.1</span></a>,
+the sample application consists of a front-end node (server)
+using the EFD library to create a load-balancing table for flows,
+for each flow a target backend worker node is specified. The EFD table does not
+store the flow key (unlike a regular hash table), and hence, it can
+individually load-balance millions of flows (number of targets * maximum number
+of flows fit in a flow table per target) while still fitting in CPU cache.</p>
+<p>It should be noted that although they are referred to as nodes, the frontend
+server and worker nodes are processes running on the same platform.</p>
+<section id="front-end-server">
+<h3><span class="section-number">24.1.1. </span>Front-end Server</h3>
+<p>Upon initializing, the frontend server node (process) creates a flow
+distributor table (based on the EFD library) which is populated with flow
+information and its intended target node.</p>
+<p>The sample application assigns a specific target node_id (process) for each of
+the IP destination addresses as follows:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">node_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">num_nodes</span><span class="p">;</span><span class="w"> </span><span class="cm">/* Target node id is generated */</span><span class="w"></span>
+<span class="n">ip_dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cpu_to_be_32</span><span class="p">(</span><span class="n">i</span><span class="p">);</span><span class="w"> </span><span class="cm">/* Specific ip destination address is</span>
+<span class="cm">                                 assigned to this target node */</span><span class="w"></span>
+</pre></div>
+</div>
+<p>then the pair of &lt;key,target&gt; is inserted into the flow distribution table.</p>
+<p>The main loop of the server process receives a burst of packets, then for
+each packet, a flow key (IP destination address) is extracted. The flow
+distributor table is looked up and the target node id is returned.  Packets are
+then enqueued to the specified target node id.</p>
+<p>It should be noted that flow distributor table is not a membership test table.
+I.e. if the key has already been inserted the target node id will be correct,
+but for new keys the flow distributor table will return a value (which can be
+valid).</p>
+</section>
+<section id="backend-worker-nodes">
+<h3><span class="section-number">24.1.2. </span>Backend Worker Nodes</h3>
+<p>Upon initializing, the worker node (process) creates a flow table (a regular
+hash table that stores the key default size 1M flows) which is populated with
+only the flow information that is serviced at this node. This flow key is
+essential to point out new keys that have not been inserted before.</p>
+<p>The worker node’s main loop is simply receiving packets then doing a hash table
+lookup. If a match occurs then statistics are updated for flows serviced by
+this node. If no match is found in the local hash table then this indicates
+that this is a new flow, which is dropped.</p>
+</section>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">24.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">server_node_efd</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">24.3. </span>Running the Application</h2>
+<p>The application has two binaries to be run: the front-end server
+and the back-end node.</p>
+<p>The frontend server (server) has the following command line options:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./&lt;build_dir&gt;/examples/dpdk-server [EAL options] -- -p PORTMASK -n NUM_NODES -f NUM_FLOWS
+</pre></div>
+</div>
+<p>Where,</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-p</span> <span class="pre">PORTMASK:</span></code> Hexadecimal bitmask of ports to configure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-n</span> <span class="pre">NUM_NODES:</span></code> Number of back-end nodes that will be used</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">NUM_FLOWS:</span></code> Number of flows to be added in the EFD table (1 million, by default)</p></li>
+</ul>
+<p>The back-end node (node) has the following command line options:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./node [EAL options] -- -n NODE_ID
+</pre></div>
+</div>
+<p>Where,</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-n</span> <span class="pre">NODE_ID:</span></code> Node ID, which cannot be equal or higher than NUM_MODES</p></li>
+</ul>
+<p>First, the server app must be launched, with the number of nodes that will be run.
+Once it has been started, the node instances can be run, with different NODE_ID.
+These instances have to be run as secondary processes, with <code class="docutils literal notranslate"><span class="pre">--proc-type=secondary</span></code>
+in the EAL options, which will attach to the primary process memory, and therefore,
+they can access the queues created by the primary process to distribute packets.</p>
+<p>To successfully run the application, the command line used to start the
+application has to be in sync with the traffic flows configured on the traffic
+generator side.</p>
+<p>For examples of application command lines and traffic generator flows, please
+refer to the DPDK Test Report. For more details on how to set up and run the
+sample applications provided with DPDK package, please refer to the
+<a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">DPDK Getting Started Guide for Linux</span></a> and
+<a class="reference internal" href="../freebsd_gsg/index.html#freebsd-gsg"><span class="std std-ref">DPDK Getting Started Guide for FreeBSD</span></a>.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">24.4. </span>Explanation</h2>
+<p>As described in previous sections, there are two processes in this example.</p>
+<p>The first process, the front-end server, creates and populates the EFD table,
+which is used to distribute packets to nodes, which the number of flows
+specified in the command line (1 million, by default).</p>
+<p>After initialization, packets are received from the enabled ports, and the IPv4
+address from the packets is used as a key to look up in the EFD table,
+which tells the node where the packet has to be distributed.</p>
+<p>The burst of packets received is enqueued in temporary buffers (per node),
+and enqueued in the shared ring between the server and the node.
+After this, a new burst of packets is received and this process is
+repeated infinitely.</p>
+<p>The second process, the back-end node, receives the packets from the shared
+ring with the server and send them out, if they belong to the node.</p>
+<p>At initialization, it attaches to the server process memory, to have
+access to the shared ring, parameters and statistics.</p>
+<p>Then, the hash table that contains the flows that will be handled
+by the node is created and populated.</p>
+<p>After initialization, packets are dequeued from the shared ring
+(from the server) and, like in the server process,
+the IPv4 address from the packets is used as a key to look up in the hash table.
+If there is a hit, packet is stored in a buffer, to be eventually transmitted
+in one of the enabled ports. If key is not there, packet is dropped, since the
+flow is not handled by the node.</p>
+<p>Finally, note that both processes updates statistics, such as transmitted, received
+and dropped packets, which are shown and refreshed by the server app.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="link_status_intr.html" title="previous chapter"><span class="section-number">23. </span>Link Status Interrupt Sample Application</a></li>
+      <li>Next: <a href="service_cores.html" title="next chapter"><span class="section-number">25. </span>Service Cores Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/server_node_efd.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

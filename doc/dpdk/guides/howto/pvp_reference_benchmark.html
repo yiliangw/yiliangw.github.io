@@ -1,0 +1,458 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. PVP reference benchmark setup using testpmd &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. VF daemon (VFd)" href="vfd.html" />
+    <link rel="prev" title="5. Generic flow API - examples" href="rte_flow.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="pvp-reference-benchmark-setup-using-testpmd">
+<h1><span class="section-number">6. </span>PVP reference benchmark setup using testpmd</h1>
+<p>This guide lists the steps required to setup a PVP benchmark using testpmd as
+a simple forwarder between NICs and Vhost interfaces. The goal of this setup
+is to have a reference PVP benchmark without using external vSwitches (OVS,
+VPP, …) to make it easier to obtain reproducible results and to facilitate
+continuous integration testing.</p>
+<p>The guide covers two ways of launching the VM, either by directly calling the
+QEMU command line, or by relying on libvirt. It has been tested with DPDK
+v16.11 using RHEL7 for both host and guest.</p>
+<section id="setup-overview">
+<h2><span class="section-number">6.1. </span>Setup overview</h2>
+<figure class="align-default" id="id3">
+<span id="figure-pvp-2nics"></span><img alt="../_images/pvp_2nics.svg" src="../_images/pvp_2nics.svg" /><figcaption>
+<p><span class="caption-number">Fig. 6.1 </span><span class="caption-text">PVP setup using 2 NICs</span></p>
+</figcaption>
+</figure>
+<p>In this diagram, each red arrow represents one logical core. This use case
+requires 6 dedicated logical cores. A forwarding configuration with a single
+NIC is also possible, requiring 3 logical cores.</p>
+</section>
+<section id="host-setup">
+<h2><span class="section-number">6.2. </span>Host setup</h2>
+<p>In this setup, we isolate 6 cores (from CPU2 to CPU7) on the same NUMA
+node. Two cores are assigned to the VM vCPUs running testpmd and four are
+assigned to testpmd on the host.</p>
+<section id="host-tuning">
+<h3><span class="section-number">6.2.1. </span>Host tuning</h3>
+<ol class="arabic">
+<li><p>On BIOS, disable turbo-boost and hyper-threads.</p></li>
+<li><p>Append these options to Kernel command line:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">intel_pstate=disable mce=ignore_ce default_hugepagesz=1G hugepagesz=1G hugepages=6 isolcpus=2-7 nohz_full=2-7 iommu=pt intel_iommu=on</span>
+</pre></div>
+</div>
+</li>
+<li><p>Disable hyper-threads at runtime if necessary or if BIOS is not accessible:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /sys/devices/system/cpu/cpu*[0-9]/topology/thread_siblings_list \</span>
+<span class="go">    | sort | uniq \</span>
+<span class="go">    | awk -F, &#39;{system(&quot;echo 0 &gt; /sys/devices/system/cpu/cpu&quot;$2&quot;/online&quot;)}&#39;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Disable NMIs:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 0 &gt; /proc/sys/kernel/nmi_watchdog</span>
+</pre></div>
+</div>
+</li>
+<li><p>Exclude isolated CPUs from the writeback cpumask:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo ffffff03 &gt; /sys/bus/workqueue/devices/writeback/cpumask</span>
+</pre></div>
+</div>
+</li>
+<li><p>Isolate CPUs from IRQs:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">clear_mask=0xfc #Isolate CPU2 to CPU7 from IRQs</span>
+<span class="go">for i in /proc/irq/*/smp_affinity</span>
+<span class="go">do</span>
+<span class="go">  echo &quot;obase=16;$(( 0x$(cat $i) &amp; ~$clear_mask ))&quot; | bc &gt; $i</span>
+<span class="go">done</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="qemu-build">
+<h3><span class="section-number">6.2.2. </span>Qemu build</h3>
+<p>Build Qemu:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone git://git.qemu.org/qemu.git</span>
+<span class="go">cd qemu</span>
+<span class="go">mkdir bin</span>
+<span class="go">cd bin</span>
+<span class="go">../configure --target-list=x86_64-softmmu</span>
+<span class="go">make</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="dpdk-build">
+<h3><span class="section-number">6.2.3. </span>DPDK build</h3>
+<p>See <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">Compiling the DPDK Target from Source</span></a> for details.</p>
+</section>
+<section id="testpmd-launch">
+<h3><span class="section-number">6.2.4. </span>Testpmd launch</h3>
+<ol class="arabic">
+<li><p>Assign NICs to DPDK:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe vfio-pci</span>
+<span class="go">usertools/dpdk-devbind -b vfio-pci 0000:11:00.0 0000:11:00.1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Sandy Bridge family seems to have some IOMMU limitations giving poor
+performance results. To achieve good performance on these machines
+consider using UIO instead.</p>
+</div>
+</li>
+<li><p>Launch the testpmd application:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;build_dir&gt;/app/dpdk-testpmd -l 0,2,3,4,5 --socket-mem=1024 -n 4 \</span>
+<span class="go">    --vdev &#39;net_vhost0,iface=/tmp/vhost-user1&#39; \</span>
+<span class="go">    --vdev &#39;net_vhost1,iface=/tmp/vhost-user2&#39; -- \</span>
+<span class="go">    --portmask=f -i --rxq=1 --txq=1 \</span>
+<span class="go">    --nb-cores=4 --forward-mode=io</span>
+</pre></div>
+</div>
+<p>With this command, isolated CPUs 2 to 5 will be used as lcores for PMD threads.</p>
+</li>
+<li><p>In testpmd interactive mode, set the portlist to obtain the correct port
+chaining:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">set portlist 0,2,1,3</span>
+<span class="go">start</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="vm-launch">
+<h3><span class="section-number">6.2.5. </span>VM launch</h3>
+<p>The VM may be launched either by calling QEMU directly, or by using libvirt.</p>
+<section id="qemu-way">
+<h4><span class="section-number">6.2.5.1. </span>Qemu way</h4>
+<p>Launch QEMU with two Virtio-net devices paired to the vhost-user sockets
+created by testpmd. Below example uses default Virtio-net options, but options
+may be specified, for example to disable mergeable buffers or indirect
+descriptors.</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;QEMU path&gt;/bin/x86_64-softmmu/qemu-system-x86_64 \</span>
+<span class="go">    -enable-kvm -cpu host -m 3072 -smp 3 \</span>
+<span class="go">    -chardev socket,id=char0,path=/tmp/vhost-user1 \</span>
+<span class="go">    -netdev type=vhost-user,id=mynet1,chardev=char0,vhostforce \</span>
+<span class="go">    -device virtio-net-pci,netdev=mynet1,mac=52:54:00:02:d9:01,addr=0x10 \</span>
+<span class="go">    -chardev socket,id=char1,path=/tmp/vhost-user2 \</span>
+<span class="go">    -netdev type=vhost-user,id=mynet2,chardev=char1,vhostforce \</span>
+<span class="go">    -device virtio-net-pci,netdev=mynet2,mac=52:54:00:02:d9:02,addr=0x11 \</span>
+<span class="go">    -object memory-backend-file,id=mem,size=3072M,mem-path=/dev/hugepages,share=on \</span>
+<span class="go">    -numa node,memdev=mem -mem-prealloc \</span>
+<span class="go">    -net user,hostfwd=tcp::1002$1-:22 -net nic \</span>
+<span class="go">    -qmp unix:/tmp/qmp.socket,server,nowait \</span>
+<span class="go">    -monitor stdio &lt;vm_image&gt;.qcow2</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>You can use this <a class="reference external" href="https://patchwork.kernel.org/patch/9361617/">qmp-vcpu-pin</a>
+script to pin vCPUs.</p>
+<p>It can be used as follows, for example to pin 3 vCPUs to CPUs 1, 6 and 7,
+where isolated CPUs 6 and 7 will be used as lcores for Virtio PMDs:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export PYTHONPATH=$PYTHONPATH:&lt;QEMU path&gt;/scripts/qmp</span>
+<span class="go">./qmp-vcpu-pin -s /tmp/qmp.socket 1 6 7</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="libvirt-way">
+<h4><span class="section-number">6.2.5.2. </span>Libvirt way</h4>
+<p>Some initial steps are required for libvirt to be able to connect to testpmd’s
+sockets.</p>
+<p>First, SELinux policy needs to be set to permissive, since testpmd is
+generally run as root (note, as reboot is required):</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /etc/selinux/config</span>
+
+<span class="gp"># </span>This file controls the state of SELinux on the system.
+<span class="gp"># </span><span class="nv">SELINUX</span><span class="o">=</span> can take one of these three values:
+<span class="gp">#     </span>enforcing  - SELinux security policy is enforced.
+<span class="gp">#     </span>permissive - SELinux prints warnings instead of enforcing.
+<span class="gp">#     </span>disabled   - No SELinux policy is loaded.
+<span class="go">SELINUX=permissive</span>
+
+<span class="gp"># </span><span class="nv">SELINUXTYPE</span><span class="o">=</span> can take one of three two values:
+<span class="gp">#     </span>targeted - Targeted processes are protected,
+<span class="gp">#     </span>minimum  - Modification of targeted policy.
+<span class="gp">#                </span>Only selected processes are protected.
+<span class="gp">#     </span>mls      - Multi Level Security protection.
+<span class="go">SELINUXTYPE=targeted</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Also, Qemu needs to be run as root, which has to be specified in
+<code class="docutils literal notranslate"><span class="pre">/etc/libvirt/qemu.conf</span></code>:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">user = &quot;root&quot;</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Once the domain created, the following snippet is an extract of he most
+important information (hugepages, vCPU pinning, Virtio PCI devices):</p>
+<blockquote>
+<div><div class="highlight-xml notranslate"><div class="highlight"><pre><span></span><span class="nt">&lt;domain</span> <span class="na">type=</span><span class="s">&#39;kvm&#39;</span><span class="nt">&gt;</span>
+  <span class="nt">&lt;memory</span> <span class="na">unit=</span><span class="s">&#39;KiB&#39;</span><span class="nt">&gt;</span>3145728<span class="nt">&lt;/memory&gt;</span>
+  <span class="nt">&lt;currentMemory</span> <span class="na">unit=</span><span class="s">&#39;KiB&#39;</span><span class="nt">&gt;</span>3145728<span class="nt">&lt;/currentMemory&gt;</span>
+  <span class="nt">&lt;memoryBacking&gt;</span>
+    <span class="nt">&lt;hugepages&gt;</span>
+      <span class="nt">&lt;page</span> <span class="na">size=</span><span class="s">&#39;1048576&#39;</span> <span class="na">unit=</span><span class="s">&#39;KiB&#39;</span> <span class="na">nodeset=</span><span class="s">&#39;0&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/hugepages&gt;</span>
+    <span class="nt">&lt;locked/&gt;</span>
+  <span class="nt">&lt;/memoryBacking&gt;</span>
+  <span class="nt">&lt;vcpu</span> <span class="na">placement=</span><span class="s">&#39;static&#39;</span><span class="nt">&gt;</span>3<span class="nt">&lt;/vcpu&gt;</span>
+  <span class="nt">&lt;cputune&gt;</span>
+    <span class="nt">&lt;vcpupin</span> <span class="na">vcpu=</span><span class="s">&#39;0&#39;</span> <span class="na">cpuset=</span><span class="s">&#39;1&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;vcpupin</span> <span class="na">vcpu=</span><span class="s">&#39;1&#39;</span> <span class="na">cpuset=</span><span class="s">&#39;6&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;vcpupin</span> <span class="na">vcpu=</span><span class="s">&#39;2&#39;</span> <span class="na">cpuset=</span><span class="s">&#39;7&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;emulatorpin</span> <span class="na">cpuset=</span><span class="s">&#39;0&#39;</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/cputune&gt;</span>
+  <span class="nt">&lt;numatune&gt;</span>
+    <span class="nt">&lt;memory</span> <span class="na">mode=</span><span class="s">&#39;strict&#39;</span> <span class="na">nodeset=</span><span class="s">&#39;0&#39;</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/numatune&gt;</span>
+  <span class="nt">&lt;os&gt;</span>
+    <span class="nt">&lt;type</span> <span class="na">arch=</span><span class="s">&#39;x86_64&#39;</span> <span class="na">machine=</span><span class="s">&#39;pc-i440fx-rhel7.0.0&#39;</span><span class="nt">&gt;</span>hvm<span class="nt">&lt;/type&gt;</span>
+    <span class="nt">&lt;boot</span> <span class="na">dev=</span><span class="s">&#39;hd&#39;</span><span class="nt">/&gt;</span>
+  <span class="nt">&lt;/os&gt;</span>
+  <span class="nt">&lt;cpu</span> <span class="na">mode=</span><span class="s">&#39;host-passthrough&#39;</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;topology</span> <span class="na">sockets=</span><span class="s">&#39;1&#39;</span> <span class="na">cores=</span><span class="s">&#39;3&#39;</span> <span class="na">threads=</span><span class="s">&#39;1&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;numa&gt;</span>
+      <span class="nt">&lt;cell</span> <span class="na">id=</span><span class="s">&#39;0&#39;</span> <span class="na">cpus=</span><span class="s">&#39;0-2&#39;</span> <span class="na">memory=</span><span class="s">&#39;3145728&#39;</span> <span class="na">unit=</span><span class="s">&#39;KiB&#39;</span> <span class="na">memAccess=</span><span class="s">&#39;shared&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/numa&gt;</span>
+  <span class="nt">&lt;/cpu&gt;</span>
+  <span class="nt">&lt;devices&gt;</span>
+    <span class="nt">&lt;interface</span> <span class="na">type=</span><span class="s">&#39;vhostuser&#39;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;mac</span> <span class="na">address=</span><span class="s">&#39;56:48:4f:53:54:01&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;source</span> <span class="na">type=</span><span class="s">&#39;unix&#39;</span> <span class="na">path=</span><span class="s">&#39;/tmp/vhost-user1&#39;</span> <span class="na">mode=</span><span class="s">&#39;client&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;model</span> <span class="na">type=</span><span class="s">&#39;virtio&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;driver</span> <span class="na">name=</span><span class="s">&#39;vhost&#39;</span> <span class="na">rx_queue_size=</span><span class="s">&#39;256&#39;</span> <span class="nt">/&gt;</span>
+      <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;pci&#39;</span> <span class="na">domain=</span><span class="s">&#39;0x0000&#39;</span> <span class="na">bus=</span><span class="s">&#39;0x00&#39;</span> <span class="na">slot=</span><span class="s">&#39;0x10&#39;</span> <span class="na">function=</span><span class="s">&#39;0x0&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/interface&gt;</span>
+    <span class="nt">&lt;interface</span> <span class="na">type=</span><span class="s">&#39;vhostuser&#39;</span><span class="nt">&gt;</span>
+      <span class="nt">&lt;mac</span> <span class="na">address=</span><span class="s">&#39;56:48:4f:53:54:02&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;source</span> <span class="na">type=</span><span class="s">&#39;unix&#39;</span> <span class="na">path=</span><span class="s">&#39;/tmp/vhost-user2&#39;</span> <span class="na">mode=</span><span class="s">&#39;client&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;model</span> <span class="na">type=</span><span class="s">&#39;virtio&#39;</span><span class="nt">/&gt;</span>
+      <span class="nt">&lt;driver</span> <span class="na">name=</span><span class="s">&#39;vhost&#39;</span> <span class="na">rx_queue_size=</span><span class="s">&#39;256&#39;</span> <span class="nt">/&gt;</span>
+      <span class="nt">&lt;address</span> <span class="na">type=</span><span class="s">&#39;pci&#39;</span> <span class="na">domain=</span><span class="s">&#39;0x0000&#39;</span> <span class="na">bus=</span><span class="s">&#39;0x00&#39;</span> <span class="na">slot=</span><span class="s">&#39;0x11&#39;</span> <span class="na">function=</span><span class="s">&#39;0x0&#39;</span><span class="nt">/&gt;</span>
+    <span class="nt">&lt;/interface&gt;</span>
+  <span class="nt">&lt;/devices&gt;</span>
+<span class="nt">&lt;/domain&gt;</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+</section>
+</section>
+<section id="guest-setup">
+<h2><span class="section-number">6.3. </span>Guest setup</h2>
+<section id="guest-tuning">
+<h3><span class="section-number">6.3.1. </span>Guest tuning</h3>
+<ol class="arabic">
+<li><p>Append these options to the Kernel command line:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">default_hugepagesz=1G hugepagesz=1G hugepages=1 intel_iommu=on iommu=pt isolcpus=1,2 nohz_full=1,2</span>
+</pre></div>
+</div>
+</li>
+<li><p>Disable NMIs:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 0 &gt; /proc/sys/kernel/nmi_watchdog</span>
+</pre></div>
+</div>
+</li>
+<li><p>Exclude isolated CPU1 and CPU2 from the writeback cpumask:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 1 &gt; /sys/bus/workqueue/devices/writeback/cpumask</span>
+</pre></div>
+</div>
+</li>
+<li><p>Isolate CPUs from IRQs:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">clear_mask=0x6 #Isolate CPU1 and CPU2 from IRQs</span>
+<span class="go">for i in /proc/irq/*/smp_affinity</span>
+<span class="go">do</span>
+<span class="go">  echo &quot;obase=16;$(( 0x$(cat $i) &amp; ~$clear_mask ))&quot; | bc &gt; $i</span>
+<span class="go">done</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="id1">
+<h3><span class="section-number">6.3.2. </span>DPDK build</h3>
+<p>See <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">Compiling the DPDK Target from Source</span></a> for details.</p>
+</section>
+<section id="id2">
+<h3><span class="section-number">6.3.3. </span>Testpmd launch</h3>
+<p>Probe vfio module without iommu:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe -r vfio_iommu_type1</span>
+<span class="go">modprobe -r vfio</span>
+<span class="go">modprobe  vfio enable_unsafe_noiommu_mode=1</span>
+<span class="go">cat /sys/module/vfio/parameters/enable_unsafe_noiommu_mode</span>
+<span class="go">modprobe vfio-pci</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Bind the virtio-net devices to DPDK:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">usertools/dpdk-devbind.py -b vfio-pci 0000:00:10.0 0000:00:11.0</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Start testpmd:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;build_dir&gt;/app/dpdk-testpmd -l 0,1,2 --socket-mem 1024 -n 4 \</span>
+<span class="go">    --proc-type auto --file-prefix pg -- \</span>
+<span class="go">    --portmask=3 --forward-mode=macswap --port-topology=chained \</span>
+<span class="go">    --disable-rss -i --rxq=1 --txq=1 \</span>
+<span class="go">    --rxd=256 --txd=256 --nb-cores=2 --auto-start</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+</section>
+<section id="results-template">
+<h2><span class="section-number">6.4. </span>Results template</h2>
+<p>Below template should be used when sharing results:</p>
+<blockquote>
+<div><div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Traffic Generator: &lt;Test equipment (e.g. IXIA, Moongen, ...)&gt;
+Acceptable Loss: &lt;n&gt;%
+Validation run time: &lt;n&gt;min
+Host DPDK version/commit: &lt;version, SHA-1&gt;
+Guest DPDK version/commit: &lt;version, SHA-1&gt;
+Patches applied: &lt;link to patchwork&gt;
+QEMU version/commit: &lt;version&gt;
+Virtio features: &lt;features (e.g. mrg_rxbuf=&#39;off&#39;, leave empty if default)&gt;
+CPU: &lt;CPU model&gt;, &lt;CPU frequency&gt;
+NIC: &lt;NIC model&gt;
+Result: &lt;n&gt; Mpps
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="rte_flow.html" title="previous chapter"><span class="section-number">5. </span>Generic flow API - examples</a></li>
+      <li>Next: <a href="vfd.html" title="next chapter"><span class="section-number">7. </span>VF daemon (VFd)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/pvp_reference_benchmark.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

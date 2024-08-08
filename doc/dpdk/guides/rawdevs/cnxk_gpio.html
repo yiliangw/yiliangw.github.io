@@ -1,0 +1,285 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Marvell CNXK GPIO Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. NXP DPAA2 CMDIF Driver" href="dpaa2_cmdif.html" />
+    <link rel="prev" title="1. Marvell CNXK BPHY Driver" href="cnxk_bphy.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="marvell-cnxk-gpio-driver">
+<h1><span class="section-number">2. </span>Marvell CNXK GPIO Driver</h1>
+<p>CNXK GPIO PMD configures and manages GPIOs available on the system using
+standard enqueue/dequeue mechanism offered by raw device abstraction. PMD relies
+both on standard sysfs GPIO interface provided by the Linux kernel and GPIO
+kernel driver custom interface allowing one to install userspace interrupt
+handlers.</p>
+<section id="features">
+<h2><span class="section-number">2.1. </span>Features</h2>
+<p>Following features are available:</p>
+<ul class="simple">
+<li><p>export/unexport a GPIO</p></li>
+<li><p>read/write specific value from/to exported GPIO</p></li>
+<li><p>set GPIO direction</p></li>
+<li><p>set GPIO edge that triggers interrupt</p></li>
+<li><p>set GPIO active low</p></li>
+<li><p>register interrupt handler for specific GPIO</p></li>
+<li><p>multiprocess aware</p></li>
+</ul>
+</section>
+<section id="requirements">
+<h2><span class="section-number">2.2. </span>Requirements</h2>
+<p>PMD relies on modified kernel GPIO driver which exposes <code class="docutils literal notranslate"><span class="pre">ioctl()</span></code> interface
+for installing interrupt handlers for low latency signal processing.</p>
+<p>Driver is shipped with Marvell SDK.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">2.3. </span>Limitations</h2>
+<p>In multiprocess mode, user-space application must ensure
+no GPIO sharing across processes takes place.</p>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">2.4. </span>Device Setup</h2>
+<p>CNXK GPIO PMD binds to virtual device which gets created by passing
+<cite>–vdev=cnxk_gpio,gpiochip=&lt;number&gt;</cite> command line to EAL. <cite>gpiochip</cite> parameter
+tells PMD which GPIO controller should be used. Available controllers are
+available under <cite>/sys/class/gpio</cite>. For further details on how Linux represents
+GPIOs in userspace please refer to
+<a class="reference external" href="https://www.kernel.org/doc/Documentation/gpio/sysfs.txt">sysfs.txt</a>.</p>
+<p>If <cite>gpiochip=&lt;number&gt;</cite> was omitted then first gpiochip from the alphabetically
+sort list of available gpiochips is used.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>ls /sys/class/gpio
+<span class="go">export gpiochip448 unexport</span>
+</pre></div>
+</div>
+<p>In above scenario only one GPIO controller is present hence
+<cite>–vdev=cnxk_gpio,gpiochip=448</cite> should be passed to EAL.</p>
+<p>Before performing actual data transfer one needs to call
+<code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_count()</span></code> followed by <code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_conf_get()</span></code>. The
+former returns number GPIOs available in the system irrespective of GPIOs
+being controllable or not. Thus it is user responsibility to pick the proper
+ones. The latter call simply returns queue capacity.</p>
+<p>In order to allow using only subset of available GPIOs <cite>allowlist</cite> PMD param may
+be used. For example passing <cite>–vdev=cnxk_gpio,gpiochip=448,allowlist=[0,1,2,3]</cite>
+to EAL will deny using all GPIOs except those specified explicitly in the
+<cite>allowlist</cite>.</p>
+<p>Respective queue needs to be configured with <code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_setup()</span></code>. This
+call barely exports GPIO to userspace.</p>
+<p>To perform actual data transfer use standard <code class="docutils literal notranslate"><span class="pre">rte_rawdev_enqueue_buffers()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">rte_rawdev_dequeue_buffers()</span></code> APIs. Not all messages produce sensible
+responses hence dequeueing is not always necessary.</p>
+</section>
+<section id="cnxk-gpio-pmd">
+<h2><span class="section-number">2.5. </span>CNXK GPIO PMD</h2>
+<p>PMD accepts <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">cnxk_gpio_msg</span></code> messages which differ by type and payload.
+Message types along with description are listed below. As for the usage examples
+please refer to <code class="docutils literal notranslate"><span class="pre">cnxk_gpio_selftest()</span></code>. There’s a set of convenient wrappers
+available, one for each existing command.</p>
+<section id="set-gpio-value">
+<h3><span class="section-number">2.5.1. </span>Set GPIO value</h3>
+<p>Message is used to set output to low or high. This does not work for GPIOs
+configured as input.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_SET_PIN_VALUE</span></code>.</p>
+<p>Payload must be an integer set to 0 (low) or 1 (high).</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_set_pin_value()</span></code> wrapper.</p>
+</section>
+<section id="set-gpio-edge">
+<h3><span class="section-number">2.5.2. </span>Set GPIO edge</h3>
+<p>Message is used to set edge that triggers interrupt.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_SET_PIN_EDGE</span></code>.</p>
+<p>Payload must be <cite>enum cnxk_gpio_pin_edge</cite>.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_set_pin_edge()</span></code> wrapper.</p>
+</section>
+<section id="set-gpio-direction">
+<h3><span class="section-number">2.5.3. </span>Set GPIO direction</h3>
+<p>Message is used to change GPIO direction to either input or output.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_SET_PIN_DIR</span></code>.</p>
+<p>Payload must be <cite>enum cnxk_gpio_pin_dir</cite>.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_set_pin_dir()</span></code> wrapper.</p>
+</section>
+<section id="set-gpio-active-low">
+<h3><span class="section-number">2.5.4. </span>Set GPIO active low</h3>
+<p>Message is used to set whether pin is active low.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_SET_PIN_ACTIVE_LOW</span></code>.</p>
+<p>Payload must be an integer set to 0 or 1. The latter activates inversion.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_set_pin_active_low()</span></code> wrapper.</p>
+</section>
+<section id="get-gpio-value">
+<h3><span class="section-number">2.5.5. </span>Get GPIO value</h3>
+<p>Message is used to read GPIO value. Value can be 0 (low) or 1 (high).</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_GET_PIN_VALUE</span></code>.</p>
+<p>Payload contains integer set to either 0 or 1.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_get_pin_value()</span></code> wrapper.</p>
+</section>
+<section id="get-gpio-edge">
+<h3><span class="section-number">2.5.6. </span>Get GPIO edge</h3>
+<p>Message is used to read GPIO edge.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_GET_PIN_EDGE</span></code>.</p>
+<p>Payload contains <cite>enum cnxk_gpio_pin_edge</cite>.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_get_pin_edge()</span></code> wrapper.</p>
+</section>
+<section id="get-gpio-direction">
+<h3><span class="section-number">2.5.7. </span>Get GPIO direction</h3>
+<p>Message is used to read GPIO direction.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_GET_PIN_DIR</span></code>.</p>
+<p>Payload contains <cite>enum cnxk_gpio_pin_dir</cite>.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_get_pin_dir()</span></code> wrapper.</p>
+</section>
+<section id="get-gpio-active-low">
+<h3><span class="section-number">2.5.8. </span>Get GPIO active low</h3>
+<p>Message is used check whether inverted logic is active.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_GET_PIN_ACTIVE_LOW</span></code>.</p>
+<p>Payload contains an integer set to 0 or 1. The latter means inverted logic
+is turned on.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_get_pin_active_low()</span></code> wrapper.</p>
+</section>
+<section id="request-interrupt">
+<h3><span class="section-number">2.5.9. </span>Request interrupt</h3>
+<p>Message is used to install custom interrupt handler.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_REGISTER_IRQ</span></code>.</p>
+<p>Payload needs to be set to <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">cnxk_gpio_irq</span></code> which describes interrupt
+being requested.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_register_gpio()</span></code> wrapper.</p>
+</section>
+<section id="free-interrupt">
+<h3><span class="section-number">2.5.10. </span>Free interrupt</h3>
+<p>Message is used to remove installed interrupt handler.</p>
+<p>Message must have type set to <code class="docutils literal notranslate"><span class="pre">CNXK_GPIO_MSG_TYPE_UNREGISTER_IRQ</span></code>.</p>
+<p>Consider using <code class="docutils literal notranslate"><span class="pre">rte_pmd_gpio_unregister_gpio()</span></code> wrapper.</p>
+</section>
+</section>
+<section id="self-test">
+<h2><span class="section-number">2.6. </span>Self test</h2>
+<p>On EAL initialization CNXK GPIO device will be probed and populated into
+the list of raw devices on condition <code class="docutils literal notranslate"><span class="pre">--vdev=cnxk_gpio,gpiochip=&lt;number&gt;</span></code> was
+passed. <code class="docutils literal notranslate"><span class="pre">rte_rawdev_get_dev_id(&quot;CNXK_GPIO&quot;)</span></code> returns unique device id. Use
+this identifier for further rawdev function calls.</p>
+<p>Selftest rawdev API can be used to verify the PMD functionality. Note it blindly
+assumes that all GPIOs are controllable so some errors during test are expected.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Rawdev Drivers</a><ul>
+      <li>Previous: <a href="cnxk_bphy.html" title="previous chapter"><span class="section-number">1. </span>Marvell CNXK BPHY Driver</a></li>
+      <li>Next: <a href="dpaa2_cmdif.html" title="next chapter"><span class="section-number">3. </span>NXP DPAA2 CMDIF Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rawdevs/cnxk_gpio.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

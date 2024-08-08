@@ -1,0 +1,199 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>36. MANA poll mode driver library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="37. Memif Poll Mode Driver" href="memif.html" />
+    <link rel="prev" title="35. IXGBE Driver" href="ixgbe.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="mana-poll-mode-driver-library">
+<h1><span class="section-number">36. </span>MANA poll mode driver library</h1>
+<p>The MANA poll mode driver library (<strong>librte_net_mana</strong>) implements support
+for Microsoft Azure Network Adapter VF in SR-IOV context.</p>
+<section id="prerequisites">
+<h2><span class="section-number">36.1. </span>Prerequisites</h2>
+<p>This driver relies on external libraries and kernel drivers
+for resources allocations and initialization.
+The following dependencies are not part of DPDK
+and must be installed separately:</p>
+<ul>
+<li><p><strong>libibverbs</strong> (provided by rdma-core package)</p>
+<p>User space verbs framework used by librte_net_mana.
+This library provides a generic interface between the kernel
+and low-level user space drivers such as libmana.</p>
+<p>It allows slow and privileged operations
+(context initialization, hardware resources allocations)
+to be managed by the kernel and fast operations to never leave user space.
+The minimum required rdma-core version is v44.</p>
+<p>In most cases, rdma-core is shipped as a package with an OS distribution.
+User can also install the upstream version of the rdma-core from
+<a class="reference external" href="https://github.com/linux-rdma/rdma-core">https://github.com/linux-rdma/rdma-core</a>.</p>
+</li>
+<li><p><strong>libmana</strong> (provided by rdma-core package)</p>
+<p>Low-level user space driver library
+for Microsoft Azure Network Adapter devices,
+it is automatically loaded by libibverbs.
+The minimum required version of rdma-core with libmana is v44.</p>
+</li>
+<li><p><strong>Kernel modules</strong></p>
+<p>They provide the kernel-side verbs API and low level device drivers
+that manage actual hardware initialization
+and resources sharing with user space processes.
+The minimum required Linux kernel version is 6.2.</p>
+<p>Unlike most other PMDs, these modules must remain loaded
+and bound to their devices:</p>
+<ul class="simple">
+<li><p>mana: Ethernet device driver that provides kernel network interfaces.</p></li>
+<li><p>mana_ib: InifiniBand device driver.</p></li>
+<li><p>ib_uverbs: user space driver for verbs (entry point for libibverbs).</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">36.2. </span>Driver compilation and testing</h2>
+<p>Refer to the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a> for details.</p>
+</section>
+<section id="runtime-configuration">
+<h2><span class="section-number">36.3. </span>Runtime Configuration</h2>
+<p>The user can specify below argument in devargs.</p>
+<ol class="arabic">
+<li><p><code class="docutils literal notranslate"><span class="pre">mac</span></code>:</p>
+<p>Specify the MAC address for this device.
+If it is set, the driver probes and loads the NIC
+with a matching MAC address.
+If it is not set, the driver probes on all the NICs on the PCI device.
+The default value is not set,
+meaning all the NICs will be probed and loaded.
+User can specify multiple mac=xx:xx:xx:xx:xx:xx arguments for up to 8 NICs.</p>
+</li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="ixgbe.html" title="previous chapter"><span class="section-number">35. </span>IXGBE Driver</a></li>
+      <li>Next: <a href="memif.html" title="next chapter"><span class="section-number">37. </span>Memif Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/mana.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

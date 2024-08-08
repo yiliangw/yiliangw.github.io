@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>17. Driver for VM Emulated Devices &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="18. ENA Poll Mode Driver" href="ena.html" />
+    <link rel="prev" title="16. DPAA2 Poll Mode Driver" href="dpaa2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="driver-for-vm-emulated-devices">
+<h1><span class="section-number">17. </span>Driver for VM Emulated Devices</h1>
+<p>The DPDK EM poll mode driver supports the following emulated devices:</p>
+<ul class="simple">
+<li><p>qemu-kvm emulated Intel® 82540EM Gigabit Ethernet Controller (qemu e1000 device)</p></li>
+<li><p>VMware emulated Intel® 82545EM Gigabit Ethernet Controller</p></li>
+<li><p>VMware emulated Intel® 82574L Gigabit Ethernet Controller.</p></li>
+</ul>
+<section id="validated-hypervisors">
+<h2><span class="section-number">17.1. </span>Validated Hypervisors</h2>
+<p>The validated hypervisors are:</p>
+<ul class="simple">
+<li><p>KVM (Kernel Virtual Machine) with Qemu, version 0.14.0</p></li>
+<li><p>KVM (Kernel Virtual Machine) with Qemu, version 0.15.1</p></li>
+<li><p>VMware ESXi 5.0, Update 1</p></li>
+</ul>
+</section>
+<section id="recommended-guest-operating-system-in-virtual-machine">
+<h2><span class="section-number">17.2. </span>Recommended Guest Operating System in Virtual Machine</h2>
+<p>The recommended guest operating system in a virtualized environment is:</p>
+<ul class="simple">
+<li><p>Fedora* 18 (64-bit)</p></li>
+</ul>
+<p>For supported kernel versions, refer to the <em>DPDK Release Notes</em>.</p>
+</section>
+<section id="setting-up-a-kvm-virtual-machine">
+<h2><span class="section-number">17.3. </span>Setting Up a KVM Virtual Machine</h2>
+<p>The following describes a target environment:</p>
+<ul class="simple">
+<li><p>Host Operating System: Fedora 14</p></li>
+<li><p>Hypervisor: KVM (Kernel Virtual Machine) with Qemu version, 0.14.0</p></li>
+<li><p>Guest Operating System: Fedora 14</p></li>
+<li><p>Linux Kernel Version: Refer to the DPDK Getting Started Guide</p></li>
+<li><p>Target Applications: testpmd</p></li>
+</ul>
+<p>The setup procedure is as follows:</p>
+<ol class="arabic">
+<li><p>Download qemu-kvm-0.14.0 from
+<a class="reference external" href="http://sourceforge.net/projects/kvm/files/qemu-kvm/">http://sourceforge.net/projects/kvm/files/qemu-kvm/</a>
+and install it in the Host OS using the following steps:</p>
+<p>When using a recent kernel (2.6.25+) with kvm modules included:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tar xzf qemu-kvm-release.tar.gz cd qemu-kvm-release</span>
+<span class="go">./configure --prefix=/usr/local/kvm</span>
+<span class="go">make</span>
+<span class="go">sudo make install</span>
+<span class="go">sudo /sbin/modprobe kvm-intel</span>
+</pre></div>
+</div>
+<p>When using an older kernel or a kernel from a distribution without the kvm modules,
+you must download (from the same link), compile and install the modules yourself:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tar xjf kvm-kmod-release.tar.bz2</span>
+<span class="go">cd kvm-kmod-release</span>
+<span class="go">./configure</span>
+<span class="go">make</span>
+<span class="go">sudo make install</span>
+<span class="go">sudo /sbin/modprobe kvm-intel</span>
+</pre></div>
+</div>
+<p>Note that qemu-kvm installs in the /usr/local/bin directory.</p>
+<p>For more details about KVM configuration and usage, please refer to:
+<a class="reference external" href="http://www.linux-kvm.org/page/HOWTO1">http://www.linux-kvm.org/page/HOWTO1</a>.</p>
+</li>
+<li><p>Create a Virtual Machine and install Fedora 14 on the Virtual Machine.
+This is referred to as the Guest Operating System (Guest OS).</p></li>
+<li><p>Start the Virtual Machine with at least one emulated e1000 device.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Qemu provides several choices for the emulated network device backend.
+Most commonly used is a TAP networking backend that uses a TAP networking device in the host.
+For more information about Qemu supported networking backends and different options for configuring networking at Qemu,
+please refer to:</p>
+<p>— <a class="reference external" href="http://www.linux-kvm.org/page/Networking">http://www.linux-kvm.org/page/Networking</a></p>
+<p>— <a class="reference external" href="http://wiki.qemu.org/Documentation/Networking">http://wiki.qemu.org/Documentation/Networking</a></p>
+<p>— <a class="reference external" href="http://qemu.weilnetz.de/qemu-doc.html">http://qemu.weilnetz.de/qemu-doc.html</a></p>
+<p>For example, to start a VM with two emulated e1000 devices, issue the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/usr/local/kvm/bin/qemu-system-x86_64 -cpu host -smp 4 -hda qemu1.raw -m 1024</span>
+<span class="go">-net nic,model=e1000,vlan=1,macaddr=DE:AD:1E:00:00:01</span>
+<span class="go">-net tap,vlan=1,ifname=tapvm01,script=no,downscript=no</span>
+<span class="go">-net nic,model=e1000,vlan=2,macaddr=DE:AD:1E:00:00:02</span>
+<span class="go">-net tap,vlan=2,ifname=tapvm02,script=no,downscript=no</span>
+</pre></div>
+</div>
+<p>where:</p>
+<p>— -m = memory to assign</p>
+<p>— -smp = number of smp cores</p>
+<p>— -hda = virtual disk image</p>
+<p>This command starts a new virtual machine with two emulated 82540EM devices,
+backed up with two TAP networking host interfaces, tapvm01 and tapvm02.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>ip tuntap show
+<span class="go">tapvm01: tap</span>
+<span class="go">tapvm02: tap</span>
+</pre></div>
+</div>
+</div>
+</li>
+<li><p>Configure your TAP networking interfaces using ip/ifconfig tools.</p></li>
+<li><p>Log in to the guest OS and check that the expected emulated devices exist:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lspci -d <span class="m">8086</span>:100e
+<span class="go">00:04.0 Ethernet controller: Intel Corporation 82540EM Gigabit Ethernet Controller (rev 03)</span>
+<span class="go">00:05.0 Ethernet controller: Intel Corporation 82540EM Gigabit Ethernet Controller (rev 03)</span>
+</pre></div>
+</div>
+</li>
+<li><p>Install the DPDK and run testpmd.</p></li>
+</ol>
+</section>
+<section id="known-limitations-of-emulated-devices">
+<h2><span class="section-number">17.4. </span>Known Limitations of Emulated Devices</h2>
+<p>The following are known limitations:</p>
+<ol class="arabic">
+<li><p>The Qemu e1000 RX path does not support multiple descriptors/buffers per packet.
+Therefore, rte_mbuf should be big enough to hold the whole packet.
+For example, to allow testpmd to receive jumbo frames, use the following:</p>
+<p>dpdk-testpmd [options] – –mbuf-size=&lt;your-max-packet-size&gt;</p>
+</li>
+<li><p>Qemu e1000 does not validate the checksum of incoming packets.</p></li>
+<li><p>Qemu e1000 only supports one interrupt source, so link and Rx interrupt should be exclusive.</p></li>
+<li><p>Qemu e1000 does not support interrupt auto-clear, application should disable interrupt immediately when woken up.</p></li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="dpaa2.html" title="previous chapter"><span class="section-number">16. </span>DPAA2 Poll Mode Driver</a></li>
+      <li>Next: <a href="ena.html" title="next chapter"><span class="section-number">18. </span>ENA Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/e1000em.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

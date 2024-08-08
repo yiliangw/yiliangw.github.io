@@ -1,0 +1,246 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>DPDK Tools User Guides &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. dpdk-hugepages Application" href="hugepages.html" />
+    <link rel="prev" title="14. Using AVX-512 with DPDK" href="../howto/avx512.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-tools-user-guides">
+<h1>DPDK Tools User Guides</h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="hugepages.html">1. dpdk-hugepages Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="hugepages.html#running-the-application">1.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hugepages.html#options">1.2. Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hugepages.html#examples">1.3. Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="devbind.html">2. dpdk-devbind Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="devbind.html#running-the-application">2.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devbind.html#options">2.2. OPTIONS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="devbind.html#examples">2.3. Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="proc_info.html">3. dpdk-proc-info Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="proc_info.html#running-the-application">3.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="proc_info.html#limitations">3.2. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pmdinfo.html">4. dpdk-pmdinfo Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pmdinfo.html#synopsis">4.1. Synopsis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pmdinfo.html#arguments">4.2. Arguments</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pmdinfo.html#environment-variables">4.3. Environment Variables</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pmdinfo.html#examples">4.4. Examples</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dumpcap.html">5. dpdk-dumpcap Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dumpcap.html#running-the-application">5.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dumpcap.html#example">5.2. Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dumpcap.html#limitations">5.3. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pdump.html">6. dpdk-pdump Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pdump.html#running-the-application">6.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pdump.html#example">6.2. Example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dmaperf.html">7. dpdk-test-dma-perf Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dmaperf.html#configuration">7.1. Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dmaperf.html#running-the-application">7.2. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dmaperf.html#limitations">7.3. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="flow-perf.html">8. Flow Performance Tool</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="flow-perf.html#compiling-the-application">8.1. Compiling the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="flow-perf.html#running-the-application">8.2. Running the Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="securityperf.html">9. Security Performance Tool</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="securityperf.html#limitations">9.1. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="securityperf.html#running-the-application">9.2. Running the Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="testbbdev.html">10. dpdk-test-bbdev Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="testbbdev.html#running-the-application">10.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testbbdev.html#running-tests">10.2. Running Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testbbdev.html#test-vector-files">10.3. Test Vector files</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cryptoperf.html">11. dpdk-test-crypto-perf Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cryptoperf.html#limitations">11.1. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cryptoperf.html#linearization-setting">11.2. Linearization setting</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cryptoperf.html#running-the-application">11.3. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cryptoperf.html#examples">11.4. Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cryptoperf.html#graph-crypto-perf-results">11.5. Graph Crypto Perf Results</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="comp_perf.html">12. dpdk-test-compress-perf Tool</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="comp_perf.html#limitations">12.1. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="comp_perf.html#eal-options">12.2. EAL Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="comp_perf.html#application-options">12.3. Application Options</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="testeventdev.html">13. dpdk-test-eventdev Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="testeventdev.html#running-the-application">13.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testeventdev.html#eventdev-tests">13.2. Eventdev Tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="testregex.html">14. dpdk-test-regex Tool</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="testregex.html#limitations">14.1. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testregex.html#application-options">14.2. Application Options</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="testmldev.html">15. dpdk-test-mldev Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="testmldev.html#application-and-options">15.1. Application and Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testmldev.html#ml-device-tests">15.2. ML Device Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testmldev.html#ml-model-tests">15.3. ML Model Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testmldev.html#ml-inference-tests">15.4. ML Inference Tests</a></li>
+<li class="toctree-l2"><a class="reference internal" href="testmldev.html#debug-mode">15.5. Debug mode</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="graph.html">16. dpdk-graph Application</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#running-the-application">16.1. Running the Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#supported-use-cases">16.2. Supported Use cases</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#supported-cli-commands">16.3. Supported CLI commands</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#runtime-configuration">16.4. Runtime configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="graph.html#created-graph-for-use-case">16.5. Created graph for use case</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dts.html">17. DPDK Test Suite</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#dts-terminology">17.1. DTS Terminology</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#dts-environment">17.2. DTS Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#setting-up-system-under-test">17.3. Setting up System Under Test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#setting-up-traffic-generator-node">17.4. Setting up Traffic Generator Node</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#running-dts">17.5. Running DTS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#how-to-write-a-test-suite">17.6. How To Write a Test Suite</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dts.html#dts-developer-tools">17.7. DTS Developer Tools</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../howto/avx512.html" title="previous chapter"><span class="section-number">14. </span>Using AVX-512 with DPDK</a></li>
+      <li>Next: <a href="hugepages.html" title="next chapter"><span class="section-number">1. </span>dpdk-hugepages Application</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

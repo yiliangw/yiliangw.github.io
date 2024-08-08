@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>1. CNXK DMA Device Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2. NXP DPAA DMA Driver" href="dpaa.html" />
+    <link rel="prev" title="DMA Device Drivers" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cnxk-dma-device-driver">
+<h1><span class="section-number">1. </span>CNXK DMA Device Driver</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">cnxk</span></code> dmadev driver provides a poll-mode driver (PMD) for Marvell DPI DMA
+Hardware Accelerator block found in OCTEON 9 and OCTEON 10 family of SoCs.
+Each DMA queue is exposed as a VF function when SRIOV is enabled.</p>
+<p>The block supports following modes of DMA transfers:</p>
+<ol class="arabic simple">
+<li><p>Internal - DMA within SoC DRAM to DRAM</p></li>
+<li><p>Inbound  - Host DRAM to SoC DRAM when SoC is in PCIe Endpoint</p></li>
+<li><p>Outbound - SoC DRAM to Host DRAM when SoC is in PCIe Endpoint</p></li>
+</ol>
+<section id="prerequisites-and-compilation-procedure">
+<h2><span class="section-number">1.1. </span>Prerequisites and Compilation procedure</h2>
+<p>See <a class="reference internal" href="../platform/cnxk.html"><span class="doc">Marvell cnxk platform guide</span></a> for setup information.</p>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">1.2. </span>Device Setup</h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script, included with DPDK,
+can be used to show the presence of supported hardware.
+Running <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span> <span class="pre">--status-dev</span> <span class="pre">dma</span></code> will show all the CNXK DMA devices.</p>
+<section id="devices-using-vfio-drivers">
+<h3><span class="section-number">1.2.1. </span>Devices using VFIO drivers</h3>
+<p>The HW devices to be used will need to be bound to a user-space IO driver for use.
+The <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script can be used to view the state of the devices
+and to bind them to a suitable DPDK-supported driver, such as <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code>.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ dpdk-devbind.py -b vfio-pci 0000:05:00.1
+</pre></div>
+</div>
+</section>
+<section id="device-probing-and-initialization">
+<h3><span class="section-number">1.2.2. </span>Device Probing and Initialization</h3>
+<p>To use the devices from an application, the dmadev API can be used.
+CNXK DMA device configuration requirements:</p>
+<ul class="simple">
+<li><p>Only one <code class="docutils literal notranslate"><span class="pre">vchan</span></code> is supported per device.</p></li>
+<li><p>CNXK DMA devices do not support silent mode.</p></li>
+</ul>
+<p>Once configured, the device can then be made ready for use
+by calling the <code class="docutils literal notranslate"><span class="pre">rte_dma_start()</span></code> API.</p>
+</section>
+<section id="performing-data-copies">
+<h3><span class="section-number">1.2.3. </span>Performing Data Copies</h3>
+<p>Refer to the <a class="reference internal" href="../prog_guide/dmadev.html#dmadev-enqueue-dequeue"><span class="std std-ref">Enqueue / Dequeue APIs</span></a> section
+of the dmadev library documentation
+for details on operation enqueue and submission API usage.</p>
+</section>
+<section id="performance-tuning-parameters">
+<h3><span class="section-number">1.2.4. </span>Performance Tuning Parameters</h3>
+<p>To achieve higher performance, DMA device needs to be tuned
+using PF kernel driver module parameters.
+The PF kernel driver is part of the OCTEON SDK.
+Module parameters shall be configured during module insert as in below example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ sudo insmod octeontx2_dpi.ko mps=128 mrrs=128 eng_fifo_buf=0x101008080808
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">mps</span></code></p>
+<blockquote>
+<div><p>Maximum payload size.
+MPS size shall not exceed the size selected by PCI config.
+Maximum size that shall be configured can be found
+on executing <code class="docutils literal notranslate"><span class="pre">lspci</span></code> command for the device.</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">mrrs</span></code></p>
+<blockquote>
+<div><p>Maximum read request size.
+MRRS size shall not exceed the size selected by PCI config.
+Maximum size that shall be configured can be found
+on executing <code class="docutils literal notranslate"><span class="pre">lspci</span></code> command for the device.</p>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">eng_fifo_buf</span></code></p>
+<blockquote>
+<div><p>CNXK supports 6 DMA engines and each engine has an associated FIFO.
+By default, all engine’s FIFO is configured to 8 KB.
+Engine FIFO size can be tuned using this 64-bit variable,
+where each byte represents an engine.
+In the example above, engine 0-3 FIFO are configure as 8 KB
+and engine 4-5 are configured as 16 KB.</p>
+</div></blockquote>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>MPS and MRRS performance tuning parameters help achieve higher performance
+only for inbound and outbound DMA transfers.
+The parameter has no effect for internal only DMA transfer.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DMA Device Drivers</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">DMA Device Drivers</a></li>
+      <li>Next: <a href="dpaa.html" title="next chapter"><span class="section-number">2. </span>NXP DPAA DMA Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/dmadevs/cnxk.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

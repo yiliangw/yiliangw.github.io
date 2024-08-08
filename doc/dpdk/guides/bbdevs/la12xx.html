@@ -1,0 +1,211 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>9. NXP LA12xx Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Crypto Device Drivers" href="../cryptodevs/index.html" />
+    <link rel="prev" title="8. Intel® vRAN Boost v2 Poll Mode Driver (PMD)" href="vrb2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nxp-la12xx-poll-mode-driver">
+<h1><span class="section-number">9. </span>NXP LA12xx Poll Mode Driver</h1>
+<p>The BBDEV LA12xx poll mode driver (PMD) supports an implementation for
+offloading High Phy processing functions like LDPC Encode / Decode 5GNR wireless
+acceleration function, using PCI based LA12xx Software defined radio.</p>
+<p>More information can be found at <a class="reference external" href="https://www.nxp.com/products/processors-and-microcontrollers/arm-processors/layerscape-processors/layerscape-access-la1200-programmable-baseband-processor:LA1200">NXP Official Website</a>.</p>
+<section id="features">
+<h2><span class="section-number">9.1. </span>Features</h2>
+<p>LA12xx PMD supports the following features:</p>
+<ul class="simple">
+<li><p>Maximum of 8 LDPC decode (UL) queues</p></li>
+<li><p>Maximum of 8 LDPC encode (DL) queues</p></li>
+<li><p>PCIe Gen-3 x8 Interface</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">9.2. </span>Installation</h2>
+<p>Section 3 of the DPDK manual provides instructions on installing and compiling DPDK.</p>
+<p>DPDK requires hugepages to be configured as detailed in section 2 of the DPDK manual.</p>
+</section>
+<section id="initialization">
+<h2><span class="section-number">9.3. </span>Initialization</h2>
+<p>The device can be listed on the host console with:</p>
+<p>Use the following lspci command to get the multiple LA12xx processor ids. The
+device ID of the LA12xx baseband processor is “1c30”.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo lspci -nn</span>
+</pre></div>
+</div>
+<p>…
+0001:01:00.0 Power PC [0b20]: Freescale Semiconductor Inc Device [1957:1c30] (
+rev 10)
+…
+0002:01:00.0 Power PC [0b20]: Freescale Semiconductor Inc Device [1957:1c30] (
+rev 10)</p>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">9.4. </span>Prerequisites</h2>
+<p>Currently supported by DPDK:</p>
+<ul class="simple">
+<li><p>NXP LA1224 BSP <strong>1.0+</strong>.</p></li>
+<li><p>NXP LA1224 PCIe Modem card connected to ARM host.</p></li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+<ul class="simple">
+<li><p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">modem=0</span></code> to identify the modem instance for a given
+device. This is required only if more than 1 modem cards are attached to host.
+this is optional and the default value is 0.
+e.g. <code class="docutils literal notranslate"><span class="pre">--vdev=baseband_la12xx,modem=0</span></code></p></li>
+<li><p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">max_nb_queues=x</span></code> to specify the maximum number of queues
+to be used for communication with offload device i.e. modem. default is 16.
+e.g. <code class="docutils literal notranslate"><span class="pre">--vdev=baseband_la12xx,max_nb_queues=4</span></code></p></li>
+</ul>
+</section>
+<section id="enabling-logs">
+<h2><span class="section-number">9.5. </span>Enabling logs</h2>
+<p>For enabling logs, use the following EAL parameter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_bbdev_application &lt;EAL args&gt; --log-level=la12xx:&lt;level&gt;</span>
+</pre></div>
+</div>
+<p>Using <code class="docutils literal notranslate"><span class="pre">bb.la12xx</span></code> as log matching criteria, all Baseband PMD logs can be
+enabled which are lower than logging <code class="docutils literal notranslate"><span class="pre">level</span></code>.</p>
+</section>
+<section id="test-application">
+<h2><span class="section-number">9.6. </span>Test Application</h2>
+<p>BBDEV provides a test application, <code class="docutils literal notranslate"><span class="pre">test-bbdev.py</span></code> and range of test data for testing
+the functionality of the device, depending on the device’s capabilities.</p>
+<p>For more details on how to use the test application,
+see <a class="reference internal" href="../tools/testbbdev.html#test-bbdev-application"><span class="std std-ref">dpdk-test-bbdev Application</span></a>.</p>
+<section id="test-vectors">
+<h3><span class="section-number">9.6.1. </span>Test Vectors</h3>
+<p>In addition to the simple LDPC decoder and LDPC encoder tests, bbdev also provides
+a range of additional tests under the test_vectors folder, which may be useful. The results
+of these tests will depend on the LA12xx FEC capabilities which may cause some
+testcases to be skipped, but no failure should be reported.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Baseband Device Drivers</a><ul>
+      <li>Previous: <a href="vrb2.html" title="previous chapter"><span class="section-number">8. </span>Intel® vRAN Boost v2 Poll Mode Driver (PMD)</a></li>
+      <li>Next: <a href="../cryptodevs/index.html" title="next chapter">Crypto Device Drivers</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/bbdevs/la12xx.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

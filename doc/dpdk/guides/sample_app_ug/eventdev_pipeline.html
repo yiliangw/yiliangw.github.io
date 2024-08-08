@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>40. Eventdev Pipeline Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="41. Distributor Sample Application" href="dist_app.html" />
+    <link rel="prev" title="39. Pipeline Application" href="pipeline.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="eventdev-pipeline-sample-application">
+<h1><span class="section-number">40. </span>Eventdev Pipeline Sample Application</h1>
+<p>The eventdev pipeline sample application is a sample app that demonstrates
+the usage of the eventdev API using the software PMD. It shows how an
+application can configure a pipeline and assign a set of worker cores to
+perform the processing required.</p>
+<p>The application has a range of command line arguments allowing it to be
+configured for various numbers worker cores, stages,queue depths and cycles per
+stage of work. This is useful for performance testing as well as quickly testing
+a particular pipeline configuration.</p>
+<section id="compiling-the-application">
+<h2><span class="section-number">40.1. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">examples</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">40.2. </span>Running the Application</h2>
+<p>The application has a lot of command line options. This allows specification of
+the eventdev PMD to use, and a number of attributes of the processing pipeline
+options.</p>
+<p>An example eventdev pipeline running with the software eventdev PMD using
+these settings is shown below:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-l</span> <span class="pre">0,2,8-15</span></code>: lcore to use</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-r1</span></code>: core mask 0x1 for RX</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-t1</span></code>: core mask 0x1 for TX</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-e4</span></code>: core mask 0x4 for the software scheduler</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-w</span> <span class="pre">FF00</span></code>: core mask for worker cores, 8 cores from 8th to 16th</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-s4</span></code>: 4 atomic stages</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-n0</span></code>: process infinite packets (run forever)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c32</span></code>: worker dequeue depth of 32</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-W1000</span></code>: do 1000 cycles of work per packet in each stage</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-D</span></code>: dump statistics on exit</p></li>
+</ul>
+</div></blockquote>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-eventdev_pipeline -l 0,2,8-15 --vdev event_sw0 \</span>
+<span class="go">-- -r1 -t1 -e4 -w FF00 -s4 -n0 -c32 -W1000 -D</span>
+</pre></div>
+</div>
+<p>The application has some sanity checking built-in, so if there is a function
+(e.g.; the RX core) which doesn’t have a cpu core mask assigned, the application
+will print an error message:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Core part of pipeline was not assigned any cores. This will stall the</span>
+<span class="go">pipeline, please check core masks (use -h for details on setting core masks):</span>
+<span class="go">        rx: 0</span>
+<span class="go">        tx: 1</span>
+</pre></div>
+</div>
+<p>Configuration of the eventdev is covered in detail in the programmers guide,
+see the Event Device Library section.</p>
+</section>
+<section id="observing-the-application">
+<h2><span class="section-number">40.3. </span>Observing the Application</h2>
+<p>At runtime the eventdev pipeline application prints out a summary of the
+configuration, and some runtime statistics like packets per second. On exit the
+worker statistics are printed, along with a full dump of the PMD statistics if
+required. The following sections show sample output for each of the output
+types.</p>
+<section id="configuration">
+<h3><span class="section-number">40.3.1. </span>Configuration</h3>
+<p>This provides an overview of the pipeline,
+scheduling type at each stage, and parameters to options such as how many
+flows to use and what eventdev PMD is in use. See the following sample output
+for details:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Config:</span>
+<span class="go">      ports: 2</span>
+<span class="go">      workers: 8</span>
+<span class="go">      packets: 0</span>
+<span class="go">      priorities: 1</span>
+<span class="go">      Queue-prio: 0</span>
+<span class="go">      qid0 type: atomic</span>
+<span class="go">      Cores available: 44</span>
+<span class="go">      Cores used: 10</span>
+<span class="go">      Eventdev 0: event_sw</span>
+<span class="go">Stages:</span>
+<span class="go">      Stage 0, Type Atomic    Priority = 128</span>
+<span class="go">      Stage 1, Type Atomic    Priority = 128</span>
+<span class="go">      Stage 2, Type Atomic    Priority = 128</span>
+<span class="go">      Stage 3, Type Atomic    Priority = 128</span>
+</pre></div>
+</div>
+</section>
+<section id="runtime">
+<h3><span class="section-number">40.3.2. </span>Runtime</h3>
+<p>At runtime, the statistics of the consumer are printed, stating the number of
+packets received, runtime in milliseconds, average mpps, and current mpps.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>consumer <span class="nv">RX</span><span class="o">=</span> xxxxxxx, <span class="nb">time</span> yyyy ms, avg z.zzz mpps <span class="o">[</span>current w.www mpps<span class="o">]</span>
+</pre></div>
+</div>
+</section>
+<section id="shutdown">
+<h3><span class="section-number">40.3.3. </span>Shutdown</h3>
+<p>At shutdown, the application prints the number of packets received and
+transmitted, and an overview of the distribution of work across worker cores.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Signal 2 received, preparing to exit...</span>
+<span class="go">  worker 12 thread done. RX=4966581 TX=4966581</span>
+<span class="go">  worker 13 thread done. RX=4963329 TX=4963329</span>
+<span class="go">  worker 14 thread done. RX=4953614 TX=4953614</span>
+<span class="go">  worker 0 thread done. RX=0 TX=0</span>
+<span class="go">  worker 11 thread done. RX=4970549 TX=4970549</span>
+<span class="go">  worker 10 thread done. RX=4986391 TX=4986391</span>
+<span class="go">  worker 9 thread done. RX=4970528 TX=4970528</span>
+<span class="go">  worker 15 thread done. RX=4974087 TX=4974087</span>
+<span class="go">  worker 8 thread done. RX=4979908 TX=4979908</span>
+<span class="go">  worker 2 thread done. RX=0 TX=0</span>
+
+<span class="go">Port Workload distribution:</span>
+<span class="go">worker 0 :      12.5 % (4979876 pkts)</span>
+<span class="go">worker 1 :      12.5 % (4970497 pkts)</span>
+<span class="go">worker 2 :      12.5 % (4986359 pkts)</span>
+<span class="go">worker 3 :      12.5 % (4970517 pkts)</span>
+<span class="go">worker 4 :      12.5 % (4966566 pkts)</span>
+<span class="go">worker 5 :      12.5 % (4963297 pkts)</span>
+<span class="go">worker 6 :      12.5 % (4953598 pkts)</span>
+<span class="go">worker 7 :      12.5 % (4974055 pkts)</span>
+</pre></div>
+</div>
+<p>To get a full dump of the state of the eventdev PMD, pass the <code class="docutils literal notranslate"><span class="pre">-D</span></code> flag to
+this application. When the app is terminated using <code class="docutils literal notranslate"><span class="pre">Ctrl+C</span></code>, the
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_dump()</span></code> function is called, resulting in a dump of the
+statistics that the PMD provides. The statistics provided depend on the PMD
+used, see the Event Device Drivers section for a list of eventdev PMDs.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="pipeline.html" title="previous chapter"><span class="section-number">39. </span>Pipeline Application</a></li>
+      <li>Next: <a href="dist_app.html" title="next chapter"><span class="section-number">41. </span>Distributor Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/eventdev_pipeline.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

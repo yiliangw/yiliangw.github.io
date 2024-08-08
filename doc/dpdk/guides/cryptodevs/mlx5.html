@@ -1,0 +1,351 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>15. NVIDIA MLX5 Crypto Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="16. MVSAM Crypto Poll Mode Driver" href="mvsam.html" />
+    <link rel="prev" title="14. OpenSSL Crypto Poll Mode Driver" href="openssl.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nvidia-mlx5-crypto-driver">
+<h1><span class="section-number">15. </span>NVIDIA MLX5 Crypto Driver</h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>NVIDIA acquired Mellanox Technologies in 2020.
+The DPDK documentation and code might still include instances
+of or references to Mellanox trademarks (like BlueField and ConnectX)
+that are now NVIDIA trademarks.</p>
+</div>
+<p>The MLX5 crypto driver library
+(<strong>librte_crypto_mlx5</strong>) provides support for <strong>NVIDIA ConnectX-6</strong>,
+<strong>NVIDIA ConnectX-6 Dx</strong>, <strong>NVIDIA ConnectX-7</strong>, <strong>NVIDIA BlueField-2</strong>,
+and <strong>NVIDIA BlueField-3</strong> family adapters.</p>
+<section id="overview">
+<h2><span class="section-number">15.1. </span>Overview</h2>
+<p>NVIDIA MLX5 crypto driver supports AES-XTS and AES-GCM cryption.</p>
+<section id="aes-xts">
+<h3><span class="section-number">15.1.1. </span>AES-XTS</h3>
+<p>The device can provide disk encryption services,
+allowing data encryption and decryption towards a disk.
+Having all encryption/decryption operations done in a single device
+can reduce cost and overheads of the related FIPS certification,
+as ConnectX-6 is FIPS 140-2 level-2 ready.
+The encryption cipher is AES-XTS of 256/512 bit key size.</p>
+<p>MKEY is a memory region object in the hardware,
+that holds address translation information and attributes per memory area.
+Its ID must be tied to addresses provided to the hardware.
+The encryption operations are performed with MKEY read/write transactions,
+when the MKEY is configured to perform crypto operations.</p>
+<p>The encryption does not require text to be aligned to the AES block size (128b).</p>
+<p>See <a class="reference internal" href="../platform/mlx5.html"><span class="doc">NVIDIA MLX5 Common Driver</span></a> guide for more design details.</p>
+</section>
+<section id="aes-gcm">
+<h3><span class="section-number">15.1.2. </span>AES-GCM</h3>
+<p>The supported AAD/digest/key size can be read from <code class="docutils literal notranslate"><span class="pre">dev_info</span></code>.</p>
+<p>In AES-GCM mode, the HW requires continuous input and output of
+Additional Authenticated Data (AAD), payload, and digest (if needed).
+However, the API only provides a single AAD input,
+which means that in the out-of-place mode,
+the AAD will be used in both input and output.
+This reuse of AAD in the out-of-place mode breaks the continuous output,
+which degrades the performance and introduces extra UMR WQE.
+If digest is not continuous after payload will also lead to that extra UMR WQE.</p>
+<p>To address this issue, the API provides <code class="docutils literal notranslate"><span class="pre">min_mbuf_headroom_req</span></code> and
+<code class="docutils literal notranslate"><span class="pre">min_mbuf_tailroom_req</span></code> in <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_info</span></code> as a hint to the PMD.
+It indicates the PMD can use the buffer before and after the mbuf payload
+as AAD and digest space.
+With this hint, the PMD will use the buffer before and after the mbuf payload
+directly via copying AAD and digest.
+However, the application must ensure that there is enough headroom and tailroom
+reserved for the mbuf.
+Or, for non-continuous operations, extra UMR WQE will be used.</p>
+</section>
+</section>
+<section id="configuration">
+<h2><span class="section-number">15.2. </span>Configuration</h2>
+<p>See the <a class="reference internal" href="../platform/mlx5.html#mlx5-common-env"><span class="std std-ref">mlx5 common configuration</span></a>.</p>
+<p>A device comes out of NVIDIA factory with pre-defined import methods.
+There are two possible import methods: wrapped or plaintext (valid for AES-XTS only).</p>
+<p>In case the device is in wrapped mode, it needs to be moved to crypto operational mode.
+In order to move the device to crypto operational mode, credential and KEK
+(Key Encrypting Key) should be set as the first step.
+The credential will be used by the software in order to perform crypto login, and the KEK is
+the AES Key Wrap Algorithm (rfc3394) key that will be used for sensitive data
+wrapping.
+The credential and the AES-XTS keys should be provided to the hardware, as ciphertext
+encrypted by the KEK.</p>
+<p>A keytag (64 bits) should be appended to the AES-XTS keys (before wrapping),
+and will be validated when the hardware attempts to access it.</p>
+<p>When crypto engines are defined to work in wrapped import method, they come out
+of the factory in Commissioning mode, and thus, cannot be used for crypto operations
+yet. A dedicated tool is used for changing the mode from Commissioning to
+Operational, while setting the first import_KEK and credential in plaintext.
+The mlxreg dedicated tool should be used as follows:</p>
+<ul>
+<li><p>Set CRYPTO_OPERATIONAL register to set the device in crypto operational mode.</p>
+<p>The input to this tool is:</p>
+<ul class="simple">
+<li><p>The first credential in plaintext, 40B.</p></li>
+<li><p>The first import_KEK in plaintext: kek size 0 for 16B or 1 for 32B, kek data.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxreg -d /dev/mst/mt4123_pciconf0 --reg_name CRYPTO_OPERATIONAL --get
+</pre></div>
+</div>
+<p>The “wrapped_crypto_operational” value will be “0x00000000”.
+The command to set the register should be executed only once, and all the
+values mentioned above should be specified in the same command.</p>
+<p>Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxreg -d /dev/mst/mt4123_pciconf0 --reg_name CRYPTO_OPERATIONAL \
+--set &quot;credential[0]=0x10000000, credential[1]=0x10000000, kek[0]=0x00000000&quot;
+</pre></div>
+</div>
+<p>All values not specified will remain 0.
+“wrapped_crypto_going_to_commissioning” and  “wrapped_crypto_operational”
+should not be specified.</p>
+<p>All the device ports should set it in order to move to operational mode.
+For BlueField-2, BlueField-3 the internal ports in the ARM system should also be set.</p>
+</li>
+<li><p>Query CRYPTO_OPERATIONAL register to make sure the device is in Operational
+mode.</p>
+<p>Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxreg -d /dev/mst/mt4123_pciconf0 --reg_name CRYPTO_OPERATIONAL --get
+</pre></div>
+</div>
+<p>The “wrapped_crypto_operational” value will be “0x00000001” if the mode was
+successfully changed to operational mode.</p>
+</li>
+</ul>
+<p>On the other hand, in case of plaintext mode, there is no need for all the above,
+DEK is passed in plaintext without keytag.</p>
+<blockquote>
+<div><dl class="simple">
+<dt>The mlx5 crypto PMD can be verified by running the test application::</dt><dd><dl class="simple">
+<dt>Wrapped mode:</dt><dd><p>dpdk-test -c 1 -n 1 -w &lt;dev&gt;,class=crypto,wcs_file=&lt;file_path&gt;
+RTE&gt;&gt;cryptodev_mlx5_autotest</p>
+</dd>
+<dt>Plaintext mode:</dt><dd><p>dpdk-test -c 1 -n 1 -w &lt;dev&gt;,class=crypto
+RTE&gt;&gt;cryptodev_mlx5_autotest</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+<section id="driver-options">
+<h2><span class="section-number">15.3. </span>Driver options</h2>
+<p>Please refer to <a class="reference internal" href="../platform/mlx5.html#mlx5-common-driver-options"><span class="std std-ref">mlx5 common options</span></a>
+for an additional list of options shared with other mlx5 drivers.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">algo</span></code> parameter [int]</p>
+<ul class="simple">
+<li><ol class="arabic simple" start="0">
+<li><p>AES-XTS crypto.</p></li>
+</ol>
+</li>
+<li><ol class="arabic simple">
+<li><p>AES-GCM crypto.</p></li>
+</ol>
+</li>
+</ul>
+<p>Set to zero (AES-XTS) by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">wcs_file</span></code> parameter [string] - mandatory in wrapped mode</p>
+<p>File path including only the wrapped credential in string format of hexadecimal
+numbers, represent 48 bytes (8 bytes IV added by the AES key wrap algorithm).
+This option is valid only for AES-XTS.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">import_kek_id</span></code> parameter [int]</p>
+<p>The identifier of the KEK, default value is 0 represents the operational
+register import_kek..
+This option is valid only for AES-XTS.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">credential_id</span></code> parameter [int]</p>
+<p>The identifier of the credential, default value is 0 represents the operational
+register credential.
+This option is valid only for AES-XTS.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">keytag</span></code> parameter [int]</p>
+<p>The plaintext of the keytag appended to the AES-XTS keys, default value is 0.
+This option is valid only for AES-XTS.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_segs_num</span></code> parameter [int]</p>
+<p>Maximum number of mbuf chain segments(src or dest), default value is 8.</p>
+</li>
+</ul>
+</section>
+<section id="supported-nics">
+<h2><span class="section-number">15.4. </span>Supported NICs</h2>
+<ul class="simple">
+<li><p>NVIDIA® ConnectX®-6 200G MCX654106A-HCAT (2x200G)</p></li>
+<li><p>NVIDIA® ConnectX®-6 Dx</p></li>
+<li><p>NVIDIA® ConnectX®-7</p></li>
+<li><p>NVIDIA® BlueField®-2 SmartNIC</p></li>
+<li><p>NVIDIA® BlueField®-3 SmartNIC</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">15.5. </span>Limitations</h2>
+<ul class="simple">
+<li><p>AES-XTS keys provided in xform must include keytag and should be wrapped.</p></li>
+<li><p>The supported data-unit lengths are 512B and 4KB and 1MB. In case the <cite>dataunit_len</cite>
+is not provided in the cipher xform, the OP length is limited to the above
+values.</p></li>
+<li><p>AES-GCM is supported only on BlueField-3.</p></li>
+<li><p>AES-GCM supports only key import plaintext mode.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">15.6. </span>Prerequisites</h2>
+<section id="fw-prerequisites">
+<h3><span class="section-number">15.6.1. </span>FW Prerequisites</h3>
+<ul class="simple">
+<li><p>xx.31.0328 for ConnectX-6.</p></li>
+<li><p>xx.32.0108 for ConnectX-6 Dx and BlueField-2.</p></li>
+<li><p>xx.36.xxxx for ConnectX-7 and BlueField-3.</p></li>
+<li><p>xx.37.3010 for BlueField-3 and newer for AES-GCM.</p></li>
+</ul>
+</section>
+<section id="linux-prerequisites">
+<h3><span class="section-number">15.6.2. </span>Linux Prerequisites</h3>
+<ul>
+<li><p>NVIDIA MLNX_OFED version: <strong>5.3</strong>.</p></li>
+<li><p>Compilation can be done also with rdma-core v15+.</p>
+<p>See <a class="reference internal" href="../platform/mlx5.html#mlx5-linux-prerequisites"><span class="std std-ref">mlx5 common prerequisites</span></a> for more details.</p>
+</li>
+</ul>
+</section>
+<section id="windows-prerequisites">
+<h3><span class="section-number">15.6.3. </span>Windows Prerequisites</h3>
+<ul class="simple">
+<li><p>NVIDIA WINOF-2 version: <strong>2.60</strong> or higher.
+See <a class="reference internal" href="../platform/mlx5.html#mlx5-windows-prerequisites"><span class="std std-ref">mlx5 common prerequisites</span></a> for more details.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="openssl.html" title="previous chapter"><span class="section-number">14. </span>OpenSSL Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="mvsam.html" title="next chapter"><span class="section-number">16. </span>MVSAM Crypto Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/mlx5.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

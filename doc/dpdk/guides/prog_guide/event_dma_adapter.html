@@ -1,0 +1,378 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>54. Event DMA Adapter Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="55. Dispatcher Library" href="dispatcher_lib.html" />
+    <link rel="prev" title="53. Event Crypto Adapter Library" href="event_crypto_adapter.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="event-dma-adapter-library">
+<h1><span class="section-number">54. </span>Event DMA Adapter Library</h1>
+<p>DPDK <a class="reference internal" href="eventdev.html"><span class="doc">eventdev library</span></a> provides event driven programming model
+with features to schedule events.
+<a class="reference internal" href="dmadev.html"><span class="doc">DMA device library</span></a> provides an interface to DMA poll mode drivers
+that support DMA operations.
+Event DMA adapter is intended to bridge between the event device and the DMA device.</p>
+<p>Packet flow from DMA device to the event device can be accomplished
+using software and hardware based transfer mechanisms.
+The adapter queries an eventdev PMD to determine which mechanism to be used.
+The adapter uses an EAL service core function for software-based packet transfer
+and uses the eventdev PMD functions to configure hardware-based packet transfer
+between DMA device and the event device.
+DMA adapter uses a new event type called <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TYPE_DMADEV</span></code>
+to indicate the source of event.</p>
+<p>Application can choose to submit a DMA operation directly to a DMA device
+or send it to a DMA adapter via eventdev
+based on <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span></code> capability.
+The first mode is known as the event new (<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_NEW</span></code>) mode
+and the second as the event forward (<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code>) mode.
+Choice of mode can be specified while creating the adapter.
+In the former mode, it is the application’s responsibility to enable ingress packet ordering.
+In the latter mode, it is the adapter’s responsibility to enable ingress packet ordering.</p>
+<section id="adapter-modes">
+<h2><span class="section-number">54.1. </span>Adapter Modes</h2>
+<section id="rte-event-dma-adapter-op-new-mode">
+<h3><span class="section-number">54.1.1. </span>RTE_EVENT_DMA_ADAPTER_OP_NEW mode</h3>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_NEW</span></code> mode,
+application submits DMA operations directly to an DMA device.
+The adapter then dequeues DMA completions from the DMA device
+and enqueues them as events to the event device.
+This mode does not ensure ingress ordering
+as the application directly enqueues to the dmadev without going through DMA/atomic stage.
+In this mode, events dequeued from the adapter are treated as new events.
+The application has to specify event information (response information)
+which is needed to enqueue an event after the DMA operation is completed.</p>
+<figure class="align-default" id="id1">
+<span id="figure-event-dma-adapter-op-new"></span><img alt="../_images/event_dma_adapter_op_new.svg" src="../_images/event_dma_adapter_op_new.svg" /><figcaption>
+<p><span class="caption-number">Fig. 54.1 </span><span class="caption-text">Working model of <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_NEW</span></code> mode</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="rte-event-dma-adapter-op-forward-mode">
+<h3><span class="section-number">54.1.2. </span>RTE_EVENT_DMA_ADAPTER_OP_FORWARD mode</h3>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code> mode,
+if the event PMD and DMA PMD supports internal event port
+(<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span></code>),
+the application should use <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_enqueue()</span></code> API
+to enqueue DMA operations as events to DMA adapter.
+If not, application retrieves DMA adapter’s event port
+using <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_event_port_get()</span></code> API,
+links its event queue to this port
+and starts enqueuing DMA operations as events to eventdev
+using <code class="docutils literal notranslate"><span class="pre">rte_event_enqueue_burst()</span></code>.
+The adapter then dequeues the events
+and submits the DMA operations to the dmadev.
+After the DMA operation is complete,
+the adapter enqueues events to the event device.</p>
+<p>Applications can use this mode when ingress packet ordering is needed.
+In this mode, events dequeued from the adapter will be treated as forwarded events.
+Application has to specify event information (response information)
+needed to enqueue the event after the DMA operation has completed.</p>
+<figure class="align-default" id="id2">
+<span id="figure-event-dma-adapter-op-forward"></span><img alt="../_images/event_dma_adapter_op_forward.svg" src="../_images/event_dma_adapter_op_forward.svg" /><figcaption>
+<p><span class="caption-number">Fig. 54.2 </span><span class="caption-text">Working model of <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code> mode</span></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="api-overview">
+<h2><span class="section-number">54.2. </span>API Overview</h2>
+<p>This section has a brief introduction to the event DMA adapter APIs.
+The application is expected to create an adapter
+which is associated with a single eventdev,
+then add dmadev and vchan to the adapter instance.</p>
+<section id="create-an-adapter-instance">
+<h3><span class="section-number">54.2.1. </span>Create an adapter instance</h3>
+<p>An adapter instance is created using <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_create()</span></code>.
+This function is called with event device
+to be associated with the adapter and port configuration
+for the adapter to setup an event port (if the adapter needs to use a service function).</p>
+<p>Adapter can be started in <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_NEW</span></code>
+or <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code> mode.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">enum</span><span class="w"> </span><span class="n">rte_event_dma_adapter_mode</span><span class="w"> </span><span class="n">mode</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_dev_info</span><span class="w"> </span><span class="n">dev_info</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_port_conf</span><span class="w"> </span><span class="n">conf</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">evdev_id</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">dma_id</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dev_info_get</span><span class="p">(</span><span class="n">dma_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">dev_info</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">conf</span><span class="p">.</span><span class="n">new_event_threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_num_events</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">dequeue_depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_event_port_dequeue_depth</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">enqueue_depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_event_port_enqueue_depth</span><span class="p">;</span><span class="w"></span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span><span class="p">;</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dma_adapter_create</span><span class="p">(</span><span class="n">dma_id</span><span class="p">,</span><span class="w"> </span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">,</span><span class="w"> </span><span class="n">mode</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_create_ext()</span></code> function can be used by the application
+to have a finer control on eventdev port allocation and setup.
+The <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_create_ext()</span></code> function is passed a callback function.
+The callback function is invoked if the adapter creates a service function
+and uses an event port for it.
+The callback is expected to fill the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_dma_adapter_conf</span></code> passed to it.</p>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code> mode,
+if the event PMD and DMA PMD supports internal event port
+(<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span></code>),
+events with DMA operations should be enqueued to the DMA adapter
+using <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_enqueue()</span></code> API.
+If not, the event port created by the adapter can be retrieved
+using <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_event_port_get()</span></code> API.
+An application can use this event port to link with an event queue,
+on which it enqueues events towards the DMA adapter using <code class="docutils literal notranslate"><span class="pre">rte_event_enqueue_burst()</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dma_adpt_id</span><span class="p">,</span><span class="w"> </span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_qid</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="n">ev</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">cap</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* Fill in event info and update event_ptr with rte_dma_op */</span><span class="w"></span>
+<span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">ev</span><span class="p">));</span><span class="w"></span>
+<span class="p">.</span><span class="w"></span>
+<span class="p">.</span><span class="w"></span>
+<span class="n">ev</span><span class="p">.</span><span class="n">event_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">op</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dma_adapter_caps_get</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dma_adapter_enqueue</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">nb_events</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dma_adapter_event_port_get</span><span class="p">(</span><span class="n">dma_adpt_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">dma_ev_port_id</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_queue_setup</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_qid</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_port_link</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">app_qid</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ev</span><span class="p">.</span><span class="n">queue_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">app_qid</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_enqueue_burst</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">nb_events</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="event-device-configuration-for-service-based-adapter">
+<h3><span class="section-number">54.2.2. </span>Event device configuration for service based adapter</h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_create()</span></code> is used for creating adapter instance,
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> is automatically incremented,
+and event device is reconfigured with additional event port during service initialization.
+This event device reconfigure logic also
+increments the <code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code> parameter
+if the adapter event port config is of type <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_PORT_CFG_SINGLE_LINK</span></code>.</p>
+<p>Applications using this mode of adapter creation need not configure the event device
+with <code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code> parameters
+required for DMA adapter when the adapter is created using the above-mentioned API.</p>
+</section>
+<section id="querying-adapter-capabilities">
+<h3><span class="section-number">54.2.3. </span>Querying adapter capabilities</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_caps_get()</span></code> function allows the application
+to query the adapter capabilities for an eventdev and dmadev combination.
+This API provides whether dmadev and eventdev are connected using internal HW port or not.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_event_dma_adapter_caps_get</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="adding-vchan-to-the-adapter-instance">
+<h3><span class="section-number">54.2.4. </span>Adding vchan to the adapter instance</h3>
+<p>dmadev device ID and vchan are configured using dmadev APIs.
+For more information, see <a class="reference internal" href="dmadev.html"><span class="doc">dmadev</span></a>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_dma_vchan_conf</span><span class="w"> </span><span class="n">vchan_conf</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_dma_conf</span><span class="w"> </span><span class="n">dev_conf</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">vchan</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">rte_dma_configure</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">dev_conf</span><span class="p">);</span><span class="w"></span>
+<span class="n">rte_dma_vchan_setup</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vchan_conf</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>These dmadev ID and vchan are added to the instance
+using the <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_vchan_add()</span></code> API.
+The same is removed using <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_vchan_del()</span></code> API.
+If hardware supports <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_VCHAN_EV_BIND</span></code> capability,
+event information must be passed to the add API.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cap</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dma_adapter_caps_get</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_EVENT_DMA_ADAPTER_CAP_INTERNAL_PORT_VCHAN_EV_BIND</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="n">event</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_event_dma_adapter_vchan_add</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_event_dma_adapter_vchan_add</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">dma_dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="configuring-service-function">
+<h3><span class="section-number">54.2.5. </span>Configuring service function</h3>
+<p>If the adapter uses a service function, the application is required
+to assign a service core to the service function as show below.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">service_id</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_event_dma_adapter_service_id_get</span><span class="p">(</span><span class="n">dma_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">service_id</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_service_map_lcore_set</span><span class="p">(</span><span class="n">service_id</span><span class="p">,</span><span class="w"> </span><span class="n">CORE_ID</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="set-event-response-information">
+<h3><span class="section-number">54.2.6. </span>Set event response information</h3>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_FORWARD</span></code> / <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DMA_ADAPTER_OP_NEW</span></code> mode,
+the application specifies the dmadev ID and vchan ID in <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_dma_adapter_op</span></code>
+and the event information (response information)
+needed to enqueue an event after the DMA operation has completed.
+The response information is specified in <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event</span></code>
+and appended to the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_dma_adapter_op</span></code>.</p>
+</section>
+<section id="start-the-adapter-instance">
+<h3><span class="section-number">54.2.7. </span>Start the adapter instance</h3>
+<p>The application calls <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_start()</span></code> to start the adapter.
+This function calls the start callbacks of the eventdev PMDs
+for hardware-based eventdev-dmadev connections
+and <code class="docutils literal notranslate"><span class="pre">rte_service_run_state_set()</span></code> to enable the service function if one exists.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_event_dma_adapter_start</span><span class="p">(</span><span class="n">id</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The eventdev to which the event_dma_adapter is connected should be started
+before calling <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_start()</span></code>.</p>
+</div>
+</section>
+<section id="get-adapter-statistics">
+<h3><span class="section-number">54.2.8. </span>Get adapter statistics</h3>
+<p>The  <code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_stats_get()</span></code> function reports counters
+defined in <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_dma_adapter_stats</span></code>.
+The received packet and enqueued event counts are a sum of the counts
+from the eventdev PMD callbacks if the callback is supported,
+and the counts maintained by the service function, if one exists.</p>
+</section>
+<section id="set-get-adapter-runtime-configuration-parameters">
+<h3><span class="section-number">54.2.9. </span>Set/Get adapter runtime configuration parameters</h3>
+<p>The runtime configuration parameters of adapter can be set/get using
+<code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_runtime_params_set()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_event_dma_adapter_runtime_params_get()</span></code> respectively.
+The parameters that can be set/get are defined in
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_dma_adapter_runtime_params</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="event_crypto_adapter.html" title="previous chapter"><span class="section-number">53. </span>Event Crypto Adapter Library</a></li>
+      <li>Next: <a href="dispatcher_lib.html" title="next chapter"><span class="section-number">55. </span>Dispatcher Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/event_dma_adapter.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

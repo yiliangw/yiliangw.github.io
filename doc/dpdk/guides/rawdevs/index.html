@@ -1,0 +1,186 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Rawdev Drivers &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Marvell CNXK BPHY Driver" href="cnxk_bphy.html" />
+    <link rel="prev" title="9. OPDL Eventdev Poll Mode Driver" href="../eventdevs/opdl.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="rawdev-drivers">
+<h1>Rawdev Drivers</h1>
+<p>The following are a list of raw device PMDs, which can be used from an
+application through rawdev API.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cnxk_bphy.html">1. Marvell CNXK BPHY Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#features">1.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#limitations">1.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#device-setup">1.3. Device Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#bphy-cgx-rpm-pmd">1.4. BPHY CGX/RPM PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#bphy-pmd">1.5. BPHY PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_bphy.html#self-test">1.6. Self test</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cnxk_gpio.html">2. Marvell CNXK GPIO Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#features">2.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#requirements">2.2. Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#limitations">2.3. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#device-setup">2.4. Device Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#cnxk-gpio-pmd">2.5. CNXK GPIO PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk_gpio.html#self-test">2.6. Self test</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dpaa2_cmdif.html">3. NXP DPAA2 CMDIF Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2_cmdif.html#features">3.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2_cmdif.html#supported-dpaa2-socs">3.2. Supported DPAA2 SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2_cmdif.html#prerequisites">3.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2_cmdif.html#enabling-logs">3.4. Enabling logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2_cmdif.html#initialization">3.5. Initialization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ifpga.html">4. IFPGA Rawdev Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ifpga.html#implementation-details">4.1. Implementation details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ifpga.html#run-time-parameters">4.2. Run-time parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ifpga.html#ifpga-afu-driver">5. IFPGA AFU Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ifpga.html#id1">5.1. Implementation details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ifpga.html#how-to-test-afu-function">5.2. How to test AFU function</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ifpga.html#open-fpga-stack">6. Open FPGA Stack</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ntb.html">7. NTB Rawdev Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ntb.html#bios-setting-on-intel-xeon">7.1. BIOS setting on Intel Xeon</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ntb.html#device-setup">7.2. Device Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ntb.html#prerequisites">7.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ntb.html#ring-layout">7.4. Ring Layout</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ntb.html#limitation">7.5. Limitation</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../eventdevs/opdl.html" title="previous chapter"><span class="section-number">9. </span>OPDL Eventdev Poll Mode Driver</a></li>
+      <li>Next: <a href="cnxk_bphy.html" title="next chapter"><span class="section-number">1. </span>Marvell CNXK BPHY Driver</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rawdevs/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

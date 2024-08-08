@@ -1,0 +1,868 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>23. DPDK Release 17.11 &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="24. DPDK Release 17.08" href="release_17_08.html" />
+    <link rel="prev" title="22. DPDK Release 18.02" href="release_18_02.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-release-17-11">
+<h1><span class="section-number">23. </span>DPDK Release 17.11</h1>
+<section id="new-features">
+<h2><span class="section-number">23.1. </span>New Features</h2>
+<ul>
+<li><p><strong>Extended port_id range from uint8_t to uint16_t.</strong></p>
+<p>Increased the <code class="docutils literal notranslate"><span class="pre">port_id</span></code> range from 8 bits to 16 bits in order to support
+more than 256 ports in DPDK. All ethdev APIs which have <code class="docutils literal notranslate"><span class="pre">port_id</span></code> as
+parameter have been changed.</p>
+</li>
+<li><p><strong>Modified the return type of rte_eth_stats_reset.</strong></p>
+<p>Changed return type of <code class="docutils literal notranslate"><span class="pre">rte_eth_stats_reset</span></code> from <code class="docutils literal notranslate"><span class="pre">void</span></code> to <code class="docutils literal notranslate"><span class="pre">int</span></code> so
+that the caller can determine whether a device supports the operation or not
+and if the operation was carried out.</p>
+</li>
+<li><p><strong>Added a new driver for Marvell Armada 7k/8k devices.</strong></p>
+<p>Added the new <code class="docutils literal notranslate"><span class="pre">mrvl</span></code> net driver for Marvell Armada 7k/8k devices. See the
+<a class="reference internal" href="../nics/mvpp2.html"><span class="doc">MVPP2 Poll Mode Driver</span></a> NIC guide for more details on this new driver.</p>
+</li>
+<li><p><strong>Updated mlx4 driver.</strong></p>
+<p>Updated the mlx4 driver including the following changes:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Isolated mode (rte_flow) can now be enabled anytime, not only during
+initial device configuration.</p></li>
+<li><p>Flow rules now support up to 4096 priority levels usable at will by
+applications.</p></li>
+<li><p>Enhanced error message to help debugging invalid/unsupported flow rules.</p></li>
+<li><p>Flow rules matching all multicast and promiscuous traffic are now allowed.</p></li>
+<li><p>No more software restrictions on flow rules with the RSS action, their
+configuration is much more flexible.</p></li>
+<li><p>Significantly reduced memory footprint for Rx and Tx queue objects.</p></li>
+<li><p>While supported, UDP RSS is temporarily disabled due to a remaining issue
+with its support in the Linux kernel.</p></li>
+<li><p>The new RSS implementation does not automatically spread traffic according
+to the inner packet of VXLAN frames anymore, only the outer one (like
+other PMDs).</p></li>
+<li><p>Partial (Tx only) support for secondary processes was broken and had to be
+removed.</p></li>
+<li><p>Refactored driver to get rid of dependency on the components provided by
+Mellanox OFED and instead rely on the current and public rdma-core
+package and Linux version from now on.</p></li>
+<li><p>Removed compile-time limitation on number of device instances the PMD
+can support.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Updated mlx5 driver.</strong></p>
+<p>Updated the mlx5 driver including the following changes:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Enabled the PMD to run on top of upstream Linux kernel and rdma-core
+libs, removing the dependency on specific Mellanox OFED libraries.</p></li>
+<li><p>Improved PMD latency performance.</p></li>
+<li><p>Improved PMD memory footprint.</p></li>
+<li><p>Added support for vectorized Rx/Tx burst for ARMv8.</p></li>
+<li><p>Added support for secondary process.</p></li>
+<li><p>Added support for flow counters.</p></li>
+<li><p>Added support for Rx hardware timestamp offload.</p></li>
+<li><p>Added support for device removal event.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Added SoftNIC PMD.</strong></p>
+<p>Added a new SoftNIC PMD. This virtual device provides applications with
+software fallback support for traffic management.</p>
+</li>
+<li><p><strong>Added support for NXP DPAA Devices.</strong></p>
+<p>Added support for NXP’s DPAA devices - LS104x series. This includes:</p>
+<ul class="simple">
+<li><p>DPAA Bus driver</p></li>
+<li><p>DPAA Mempool driver for supporting offloaded packet memory pool</p></li>
+<li><p>DPAA PMD for DPAA devices</p></li>
+</ul>
+<p>See the <a class="reference internal" href="../nics/dpaa.html"><span class="doc">DPAA Poll Mode Driver</span></a> document for more details of this new driver.</p>
+</li>
+<li><p><strong>Updated support for Cavium OCTEONTX Device.</strong></p>
+<p>Updated support for Cavium’s OCTEONTX device (CN83xx). This includes:</p>
+<ul class="simple">
+<li><p>OCTEONTX Mempool driver for supporting offloaded packet memory pool</p></li>
+<li><p>OCTEONTX Ethdev PMD</p></li>
+<li><p>OCTEONTX Eventdev-Ethdev Rx adapter</p></li>
+</ul>
+<p>See the <a class="reference internal" href="../nics/octeontx.html"><span class="doc">OCTEON TX Poll Mode driver</span></a> document for more details of this new driver.</p>
+</li>
+<li><p><strong>Added PF support to the Netronome NFP PMD.</strong></p>
+<p>Added PF support to the Netronome NFP PMD. Previously the NFP PMD only
+supported VFs. PF support is just as a basic DPDK port and has no VF
+management yet.</p>
+<p>PF support comes with firmware upload support which allows the PMD to
+independently work from kernel netdev NFP drivers.</p>
+<p>NFP 4000 devices are also now supported along with previous 6000 devices.</p>
+</li>
+<li><p><strong>Updated bnxt PMD.</strong></p>
+<p>Major enhancements include:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Support for Flow API</p></li>
+<li><p>Support for Tx and Rx descriptor status functions</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Added bus agnostic functions to cryptodev for PMD initialization</strong></p>
+<p>Added new PMD assist, bus independent, functions
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_parse_input_args()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_create()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_destroy()</span></code> for drivers to manage creation and
+destruction of new device instances.</p>
+</li>
+<li><p><strong>Updated QAT crypto PMD.</strong></p>
+<p>Added several performance enhancements:</p>
+<ul class="simple">
+<li><p>Removed atomics from the internal queue pair structure.</p></li>
+<li><p>Added coalesce writes to HEAD CSR on response processing.</p></li>
+<li><p>Added coalesce writes to TAIL CSR on request processing.</p></li>
+</ul>
+<p>In addition support was added for the AES CCM algorithm.</p>
+</li>
+<li><p><strong>Updated the AESNI MB PMD.</strong></p>
+<p>The AESNI MB PMD has been updated with additional support for:</p>
+<ul class="simple">
+<li><p>The DES CBC algorithm.</p></li>
+<li><p>The DES DOCSIS BPI algorithm.</p></li>
+</ul>
+<p>This change requires version 0.47 of the IPsec Multi-buffer library. For
+more details see the <a class="reference internal" href="../cryptodevs/aesni_mb.html"><span class="doc">AES-NI Multi Buffer Crypto Poll Mode Driver</span></a> documentation.</p>
+</li>
+<li><p><strong>Updated the OpenSSL PMD.</strong></p>
+<p>The OpenSSL PMD has been updated with additional support for:</p>
+<ul class="simple">
+<li><p>The DES CBC algorithm.</p></li>
+<li><p>The AES CCM algorithm.</p></li>
+</ul>
+</li>
+<li><p><strong>Added NXP DPAA SEC crypto PMD.</strong></p>
+<p>A new <code class="docutils literal notranslate"><span class="pre">dpaa_sec</span></code> hardware based crypto PMD for NXP DPAA devices has been
+added. See the <a class="reference internal" href="../cryptodevs/dpaa_sec.html"><span class="doc">NXP DPAA CAAM (DPAA_SEC)</span></a> document for more details.</p>
+</li>
+<li><p><strong>Added MRVL crypto PMD.</strong></p>
+<p>A new crypto PMD has been added, which provides several ciphering and hashing
+algorithms. All cryptography operations use the MUSDK library crypto API.
+See the <a class="reference internal" href="../cryptodevs/mvsam.html"><span class="doc">MVSAM Crypto Poll Mode Driver</span></a> document for more details.</p>
+</li>
+<li><p><strong>Add new benchmarking mode to dpdk-test-crypto-perf application.</strong></p>
+<p>Added a new “PMD cyclecount” benchmark mode to the <code class="docutils literal notranslate"><span class="pre">dpdk-test-crypto-perf</span></code>
+application to display a detailed breakdown of CPU cycles used by hardware
+acceleration.</p>
+</li>
+<li><p><strong>Added the Security Offload Library.</strong></p>
+<p>Added an experimental library - <code class="docutils literal notranslate"><span class="pre">rte_security</span></code>. This provide security APIs
+for protocols like IPsec using inline ipsec offload to ethernet devices or
+full protocol offload with lookaside crypto devices.</p>
+<p>See the <a class="reference internal" href="../prog_guide/rte_security.html"><span class="doc">Security Library</span></a> section of the DPDK Programmers
+Guide document for more information.</p>
+</li>
+<li><p><strong>Updated the DPAA2_SEC crypto driver to support rte_security.</strong></p>
+<p>Updated the <code class="docutils literal notranslate"><span class="pre">dpaa2_sec</span></code> crypto PMD to support <code class="docutils literal notranslate"><span class="pre">rte_security</span></code> lookaside
+protocol offload for IPsec.</p>
+</li>
+<li><p><strong>Updated the IXGBE ethernet driver to support rte_security.</strong></p>
+<p>Updated ixgbe ethernet PMD to support <code class="docutils literal notranslate"><span class="pre">rte_security</span></code> inline IPsec offload.</p>
+</li>
+<li><p><strong>Updated i40e driver to support GTP-C/GTP-U.</strong></p>
+<p>Updated i40e PMD to support GTP-C/GTP-U with GTP-C/GTP-U supporting
+profiles which can be programmed by dynamic device personalization (DDP)
+process.</p>
+</li>
+<li><p><strong>Added the i40e ethernet driver to support queue region feature.</strong></p>
+<p>This feature enable queue regions configuration for RSS in PF,
+so that different traffic classes or different packet
+classification types can be separated into different queues in
+different queue regions.</p>
+</li>
+<li><p><strong>Updated ipsec-secgw application to support rte_security.</strong></p>
+<p>Updated the <code class="docutils literal notranslate"><span class="pre">ipsec-secgw</span></code> sample application to support <code class="docutils literal notranslate"><span class="pre">rte_security</span></code>
+actions for ipsec inline and full protocol offload using lookaside crypto
+offload.</p>
+</li>
+<li><p><strong>Added IOMMU support to libvhost-user</strong></p>
+<p>Implemented device IOTLB in the Vhost-user backend, and enabled Virtio’s
+IOMMU feature. The feature is disabled by default, and can be enabled by
+setting <code class="docutils literal notranslate"><span class="pre">RTE_VHOST_USER_IOMMU_SUPPORT</span></code> flag at vhost device registration
+time.</p>
+</li>
+<li><p><strong>Added the Event Ethernet Adapter Library.</strong></p>
+<p>Added the Event Ethernet Adapter library. This library provides APIs for
+eventdev applications to configure the ethdev for eventdev packet flow.</p>
+</li>
+<li><p><strong>Updated DPAA2 Event PMD for the Event Ethernet Adapter.</strong></p>
+<p>Added support for the eventdev ethernet adapter for DPAA2.</p>
+</li>
+<li><p><strong>Added Membership library (rte_member).</strong></p>
+<p>Added a new data structure library called the Membership Library.</p>
+<p>The Membership Library is an extension and generalization of a traditional
+filter (for example Bloom Filter) structure that has multiple usages in a
+wide variety of workloads and applications. In general, the Membership
+Library is a data structure that provides a “set-summary” and responds to
+set-membership queries whether a certain member belongs to a set(s).</p>
+<p>The library provides APIs for DPDK applications to insert a new member,
+delete an existing member, and query the existence of a member in a given
+set, or a group of sets. For the case of a group of sets the library will
+return not only whether the element has been inserted in one of the sets but
+also which set it belongs to.</p>
+<p>See the <a class="reference internal" href="../prog_guide/member_lib.html"><span class="doc">Membership Library</span></a> documentation in the Programmers
+Guide, for more information.</p>
+</li>
+<li><p><strong>Added the Generic Segmentation Offload Library.</strong></p>
+<p>Added the Generic Segmentation Offload (GSO) library to enable
+applications to split large packets (e.g. MTU is 64KB) into small
+ones (e.g. MTU is 1500B). Supported packet types are:</p>
+<ul class="simple">
+<li><p>TCP/IPv4 packets.</p></li>
+<li><p>VxLAN packets, which must have an outer IPv4 header, and contain
+an inner TCP/IPv4 packet.</p></li>
+<li><p>GRE packets, which must contain an outer IPv4 header, and inner
+TCP/IPv4 headers.</p></li>
+</ul>
+<p>The GSO library doesn’t check if the input packets have correct
+checksums, and doesn’t update checksums for output packets.
+Additionally, the GSO library doesn’t process IP fragmented packets.</p>
+</li>
+<li><p><strong>Added the Flow Classification Library.</strong></p>
+<p>Added an experimental Flow Classification library to provide APIs for DPDK
+applications to classify an input packet by matching it against a set of
+flow rules. It uses the <code class="docutils literal notranslate"><span class="pre">librte_table</span></code> API to manage the flow rules.</p>
+</li>
+</ul>
+</section>
+<section id="resolved-issues">
+<h2><span class="section-number">23.2. </span>Resolved Issues</h2>
+<ul>
+<li><p><strong>Service core fails to call service callback due to atomic lock</strong></p>
+<p>In a specific configuration of multi-thread unsafe services and service
+cores, a service core previously did not correctly release the atomic lock
+on the service. This would result in the cores polling the service, but it
+looked like another thread was executing the service callback. The logic for
+atomic locking of the services has been fixed and refactored for readability.</p>
+</li>
+</ul>
+</section>
+<section id="api-changes">
+<h2><span class="section-number">23.3. </span>API Changes</h2>
+<ul>
+<li><p><strong>Ethdev device name length increased.</strong></p>
+<p>The size of internal device name has been increased to 64 characters
+to allow for storing longer bus specific names.</p>
+</li>
+<li><p><strong>Removed the Ethdev RTE_ETH_DEV_DETACHABLE flag.</strong></p>
+<p>Removed the Ethdev <code class="docutils literal notranslate"><span class="pre">RTE_ETH_DEV_DETACHABLE</span></code> flag. This flag is not
+required anymore, with the new hotplug implementation. It has been removed
+from the ether library. Its semantics are now expressed at the bus and PMD
+level.</p>
+</li>
+<li><p><strong>Service cores API updated for usability</strong></p>
+<p>The service cores API has been changed, removing pointers from the API where
+possible, and instead using integer IDs to identify each service. This
+simplifies application code, aids debugging, and provides better
+encapsulation. A summary of the main changes made is as follows:</p>
+<ul class="simple">
+<li><p>Services identified by ID not by <code class="docutils literal notranslate"><span class="pre">rte_service_spec</span></code> pointer</p></li>
+<li><p>Reduced API surface by using <code class="docutils literal notranslate"><span class="pre">set</span></code> functions instead of enable/disable</p></li>
+<li><p>Reworked <code class="docutils literal notranslate"><span class="pre">rte_service_register</span></code> to provide the service ID to registrar</p></li>
+<li><p>Reworked start and stop APIs into <code class="docutils literal notranslate"><span class="pre">rte_service_runstate_set</span></code></p></li>
+<li><p>Added API to set runstate of service implementation to indicate readiness</p></li>
+</ul>
+</li>
+<li><p><strong>The following changes have been made in the mempool library</strong></p>
+<ul class="simple">
+<li><p>Moved <code class="docutils literal notranslate"><span class="pre">flags</span></code> datatype from <code class="docutils literal notranslate"><span class="pre">int</span></code> to <code class="docutils literal notranslate"><span class="pre">unsigned</span> <span class="pre">int</span></code> for
+<code class="docutils literal notranslate"><span class="pre">rte_mempool</span></code>.</p></li>
+<li><p>Removed <code class="docutils literal notranslate"><span class="pre">__rte_unused</span> <span class="pre">int</span> <span class="pre">flag</span></code> param from <code class="docutils literal notranslate"><span class="pre">rte_mempool_generic_put</span></code>
+and <code class="docutils literal notranslate"><span class="pre">rte_mempool_generic_get</span></code> API.</p></li>
+<li><p>Added <code class="docutils literal notranslate"><span class="pre">flags</span></code> param in <code class="docutils literal notranslate"><span class="pre">rte_mempool_xmem_size</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_mempool_xmem_usage</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mem_phy2mch</span></code> was used in Xen dom0 to obtain the physical address;
+remove this API as Xen dom0 support was removed.</p></li>
+</ul>
+</li>
+<li><p><strong>Added IOVA aliases related to physical address handling.</strong></p>
+<p>Some data types, structure members and functions related to physical address
+handling are deprecated and have new aliases with IOVA wording. For example:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">phys_addr_t</span></code> can be often replaced by <code class="docutils literal notranslate"><span class="pre">rte_iova_t</span></code> of same size.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BAD_PHYS_ADDR</span></code> is often replaced by <code class="docutils literal notranslate"><span class="pre">RTE_BAD_IOVA</span></code> of same value.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_memseg.phys_addr</span></code> is aliased with <code class="docutils literal notranslate"><span class="pre">rte_memseg.iova_addr</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mem_virt2phy()</span></code> can often be replaced by <code class="docutils literal notranslate"><span class="pre">rte_mem_virt2iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_malloc_virt2phy</span></code> is aliased with <code class="docutils literal notranslate"><span class="pre">rte_malloc_virt2iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_memzone.phys_addr</span></code> is aliased with <code class="docutils literal notranslate"><span class="pre">rte_memzone.iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mempool_objhdr.physaddr</span></code> is aliased with
+<code class="docutils literal notranslate"><span class="pre">rte_mempool_objhdr.iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mempool_memhdr.phys_addr</span></code> is aliased with
+<code class="docutils literal notranslate"><span class="pre">rte_mempool_memhdr.iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mempool_virt2phy()</span></code> can be replaced by <code class="docutils literal notranslate"><span class="pre">rte_mempool_virt2iova()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mempool_populate_phys*()</span></code> are aliased with
+<code class="docutils literal notranslate"><span class="pre">rte_mempool_populate_iova*()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mbuf.buf_physaddr</span></code> is aliased with <code class="docutils literal notranslate"><span class="pre">rte_mbuf.buf_iova</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_mbuf_data_dma_addr*()</span></code> are aliased with <code class="docutils literal notranslate"><span class="pre">rte_mbuf_data_iova*()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_mtophys*</span></code> are aliased with <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_iova*()</span></code>.</p></li>
+</ul>
+</li>
+<li><p><strong>PCI bus API moved outside of the EAL</strong></p>
+<p>The PCI bus previously implemented within the EAL has been moved.
+A first part has been added as an RTE library providing PCI helpers to
+parse device locations or other such utilities.
+A second part consisting of the actual bus driver has been moved to its
+proper subdirectory, without changing its functionalities.</p>
+<p>As such, several PCI-related functions are not exposed by the EAL anymore:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_detach</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_dump</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_ioport_map</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_ioport_read</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_ioport_unmap</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_ioport_write</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_map_device</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_probe</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_probe_one</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_read_config</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_register</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_scan</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_unmap_device</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_unregister</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pci_write_config</span></code></p></li>
+</ul>
+<p>These functions are made available either as part of <code class="docutils literal notranslate"><span class="pre">librte_pci</span></code> or
+<code class="docutils literal notranslate"><span class="pre">librte_bus_pci</span></code>.</p>
+</li>
+<li><p><strong>Moved vdev bus APIs outside of the EAL</strong></p>
+<p>Moved the following APIs from <code class="docutils literal notranslate"><span class="pre">librte_eal</span></code> to <code class="docutils literal notranslate"><span class="pre">librte_bus_vdev</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_vdev_init</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_vdev_register</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_vdev_uninit</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_vdev_unregister</span></code></p></li>
+</ul>
+</li>
+<li><p><strong>Add return value to stats_get dev op API</strong></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">stats_get</span></code> dev op API return value has been changed to be int.
+In this way PMDs can return an error value in case of failure at stats
+getting process time.</p>
+</li>
+<li><p><strong>Modified the rte_cryptodev_allocate_driver function.</strong></p>
+<p>Modified the <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_allocate_driver()</span></code> function in the cryptodev
+library. An extra parameter <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">cryptodev_driver</span> <span class="pre">*crypto_drv</span></code> has been
+added.</p>
+</li>
+<li><p><strong>Removed virtual device bus specific functions from librte_cryptodev.</strong></p>
+<p>The functions <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_vdev_parse_init_params()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_vdev_pmd_init()</span></code> have been removed from librte_cryptodev
+and have been replaced by non bus specific functions
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_parse_input_args()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_create()</span></code>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_create_vdev()</span></code> function was removed to avoid the
+dependency on vdev in librte_cryptodev; instead, users can call
+<code class="docutils literal notranslate"><span class="pre">rte_vdev_init()</span></code> directly.</p>
+</li>
+<li><p><strong>Removed PCI device bus specific functions from librte_cryptodev.</strong></p>
+<p>The functions <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pci_generic_probe()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pci_generic_remove()</span></code> have been removed from librte_cryptodev
+and have been replaced by non bus specific functions
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_create()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_pmd_destroy()</span></code>.</p>
+</li>
+<li><p><strong>Removed deprecated functions to manage log level or type.</strong></p>
+<p>The functions <code class="docutils literal notranslate"><span class="pre">rte_set_log_level()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_get_log_level()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_set_log_type()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_get_log_type()</span></code> have been removed.</p>
+<p>They are respectively replaced by <code class="docutils literal notranslate"><span class="pre">rte_log_set_global_level()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_log_get_global_level()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_log_set_level()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_log_get_level()</span></code>.</p>
+</li>
+<li><p><strong>Removed mbuf flags PKT_RX_VLAN_PKT and PKT_RX_QINQ_PKT.</strong></p>
+<p>The <code class="docutils literal notranslate"><span class="pre">mbuf</span></code> flags <code class="docutils literal notranslate"><span class="pre">PKT_RX_VLAN_PKT</span></code> and <code class="docutils literal notranslate"><span class="pre">PKT_RX_QINQ_PKT</span></code> have
+been removed since their behavior was not properly described.</p>
+</li>
+<li><p><strong>Added mbuf flags PKT_RX_VLAN and PKT_RX_QINQ.</strong></p>
+<p>Two <code class="docutils literal notranslate"><span class="pre">mbuf</span></code> flags have been added to indicate that the VLAN
+identifier has been saved in the <code class="docutils literal notranslate"><span class="pre">mbuf</span></code> structure. For instance:</p>
+<ul class="simple">
+<li><p>If VLAN is not stripped and TCI is saved: <code class="docutils literal notranslate"><span class="pre">PKT_RX_VLAN</span></code></p></li>
+<li><p>If VLAN is stripped and TCI is saved: <code class="docutils literal notranslate"><span class="pre">PKT_RX_VLAN</span> <span class="pre">|</span> <span class="pre">PKT_RX_VLAN_STRIPPED</span></code></p></li>
+</ul>
+</li>
+<li><p><strong>Modified the vlan_offload_set_t function prototype in the ethdev library.</strong></p>
+<p>Modified the <code class="docutils literal notranslate"><span class="pre">vlan_offload_set_t</span></code> function prototype in the ethdev
+library.  The return value has been changed from <code class="docutils literal notranslate"><span class="pre">void</span></code> to <code class="docutils literal notranslate"><span class="pre">int</span></code> so the
+caller can determine whether the backing device supports the operation or if
+the operation was successfully performed.</p>
+</li>
+</ul>
+</section>
+<section id="abi-changes">
+<h2><span class="section-number">23.4. </span>ABI Changes</h2>
+<ul>
+<li><p><strong>Extended port_id range.</strong></p>
+<p>The size of the field <code class="docutils literal notranslate"><span class="pre">port_id</span></code> in the <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_data</span></code> structure
+has changed, as described in the <cite>New Features</cite> section above.</p>
+</li>
+<li><p><strong>New parameter added to rte_eth_dev.</strong></p>
+<p>A new parameter <code class="docutils literal notranslate"><span class="pre">security_ctx</span></code> has been added to <code class="docutils literal notranslate"><span class="pre">rte_eth_dev</span></code> to
+support security operations like IPsec inline.</p>
+</li>
+<li><p><strong>New parameter added to rte_cryptodev.</strong></p>
+<p>A new parameter <code class="docutils literal notranslate"><span class="pre">security_ctx</span></code> has been added to <code class="docutils literal notranslate"><span class="pre">rte_cryptodev</span></code> to
+support security operations like lookaside crypto.</p>
+</li>
+</ul>
+</section>
+<section id="removed-items">
+<h2><span class="section-number">23.5. </span>Removed Items</h2>
+<ul class="simple">
+<li><p>Xen dom0 in EAL has been removed, as well as the xenvirt PMD and vhost_xen.</p></li>
+<li><p>The crypto performance unit tests have been removed,
+replaced by the <code class="docutils literal notranslate"><span class="pre">dpdk-test-crypto-perf</span></code> application.</p></li>
+</ul>
+</section>
+<section id="shared-library-versions">
+<h2><span class="section-number">23.6. </span>Shared Library Versions</h2>
+<p>The libraries prepended with a plus sign were incremented in this version.</p>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="w"> </span> librte_acl.so.2<span class="w"></span>
+<span class="gi">+ librte_bitratestats.so.2</span><span class="w"></span>
+<span class="gi">+ librte_bus_dpaa.so.1</span><span class="w"></span>
+<span class="gi">+ librte_bus_fslmc.so.1</span><span class="w"></span>
+<span class="gi">+ librte_bus_pci.so.1</span><span class="w"></span>
+<span class="gi">+ librte_bus_vdev.so.1</span><span class="w"></span>
+<span class="w"> </span> librte_cfgfile.so.2<span class="w"></span>
+<span class="w"> </span> librte_cmdline.so.2<span class="w"></span>
+<span class="gi">+ librte_cryptodev.so.4</span><span class="w"></span>
+<span class="w"> </span> librte_distributor.so.1<span class="w"></span>
+<span class="gi">+ librte_eal.so.6</span><span class="w"></span>
+<span class="gi">+ librte_ethdev.so.8</span><span class="w"></span>
+<span class="gi">+ librte_eventdev.so.3</span><span class="w"></span>
+<span class="gi">+ librte_flow_classify.so.1</span><span class="w"></span>
+<span class="w"> </span> librte_gro.so.1<span class="w"></span>
+<span class="gi">+ librte_gso.so.1</span><span class="w"></span>
+<span class="w"> </span> librte_hash.so.2<span class="w"></span>
+<span class="w"> </span> librte_ip_frag.so.1<span class="w"></span>
+<span class="w"> </span> librte_jobstats.so.1<span class="w"></span>
+<span class="w"> </span> librte_kni.so.2<span class="w"></span>
+<span class="w"> </span> librte_kvargs.so.1<span class="w"></span>
+<span class="w"> </span> librte_latencystats.so.1<span class="w"></span>
+<span class="w"> </span> librte_lpm.so.2<span class="w"></span>
+<span class="w"> </span> librte_mbuf.so.3<span class="w"></span>
+<span class="gi">+ librte_mempool.so.3</span><span class="w"></span>
+<span class="w"> </span> librte_meter.so.1<span class="w"></span>
+<span class="w"> </span> librte_metrics.so.1<span class="w"></span>
+<span class="w"> </span> librte_net.so.1<span class="w"></span>
+<span class="gi">+ librte_pci.so.1</span><span class="w"></span>
+<span class="gi">+ librte_pdump.so.2</span><span class="w"></span>
+<span class="w"> </span> librte_pipeline.so.3<span class="w"></span>
+<span class="gi">+ librte_pmd_bnxt.so.2</span><span class="w"></span>
+<span class="gi">+ librte_pmd_bond.so.2</span><span class="w"></span>
+<span class="gi">+ librte_pmd_i40e.so.2</span><span class="w"></span>
+<span class="gi">+ librte_pmd_ixgbe.so.2</span><span class="w"></span>
+<span class="w"> </span> librte_pmd_ring.so.2<span class="w"></span>
+<span class="gi">+ librte_pmd_softnic.so.1</span><span class="w"></span>
+<span class="gi">+ librte_pmd_vhost.so.2</span><span class="w"></span>
+<span class="w"> </span> librte_port.so.3<span class="w"></span>
+<span class="w"> </span> librte_power.so.1<span class="w"></span>
+<span class="w"> </span> librte_reorder.so.1<span class="w"></span>
+<span class="w"> </span> librte_ring.so.1<span class="w"></span>
+<span class="w"> </span> librte_sched.so.1<span class="w"></span>
+<span class="gi">+ librte_security.so.1</span><span class="w"></span>
+<span class="gi">+ librte_table.so.3</span><span class="w"></span>
+<span class="w"> </span> librte_timer.so.1<span class="w"></span>
+<span class="w"> </span> librte_vhost.so.3<span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="tested-platforms">
+<h2><span class="section-number">23.7. </span>Tested Platforms</h2>
+<ul>
+<li><p>Intel(R) platforms with Intel(R) NICs combinations</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>CPU</p>
+<ul>
+<li><p>Intel(R) Atom(TM) CPU C2758 &#64; 2.40GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU D-1540 &#64; 2.00GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU D-1541 &#64; 2.10GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-4667 v3 &#64; 2.00GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2699 v3 &#64; 2.30GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2695 v4 &#64; 2.10GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2658 v2 &#64; 2.40GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2658 v3 &#64; 2.20GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>CentOS 7.2</p></li>
+<li><p>Fedora 25</p></li>
+<li><p>Fedora 26</p></li>
+<li><p>FreeBSD 11</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.3</p></li>
+<li><p>SUSE Enterprise Linux 12</p></li>
+<li><p>Wind River Linux 8</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>Ubuntu 16.10</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Intel(R) 82599ES 10 Gigabit Ethernet Controller</p>
+<ul>
+<li><p>Firmware version: 0x61bf0001</p></li>
+<li><p>Device id (pf/vf): 8086:10fb / 8086:10ed</p></li>
+<li><p>Driver version: 5.2.3 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Corporation Ethernet Connection X552/X557-AT 10GBASE-T</p>
+<ul>
+<li><p>Firmware version: 0x800003e7</p></li>
+<li><p>Device id (pf/vf): 8086:15ad / 8086:15a8</p></li>
+<li><p>Driver version: 4.4.6 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter X710-DA4 (4x10G)</p>
+<ul>
+<li><p>Firmware version: 6.01 0x80003205</p></li>
+<li><p>Device id (pf/vf): 8086:1572 / 8086:154c</p></li>
+<li><p>Driver version: 2.1.26 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter X710-DA2 (2x10G)</p>
+<ul>
+<li><p>Firmware version: 6.01 0x80003204</p></li>
+<li><p>Device id (pf/vf): 8086:1572 / 8086:154c</p></li>
+<li><p>Driver version: 2.1.26 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter XXV710-DA2 (2x25G)</p>
+<ul>
+<li><p>Firmware version: 6.01 0x80003221</p></li>
+<li><p>Device id (pf/vf): 8086:158b</p></li>
+<li><p>Driver version: 2.1.26 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter XL710-QDA2 (2X40G)</p>
+<ul>
+<li><p>Firmware version: 6.01 0x8000321c</p></li>
+<li><p>Device id (pf/vf): 8086:1583 / 8086:154c</p></li>
+<li><p>Driver version: 2.1.26 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Corporation I350 Gigabit Network Connection</p>
+<ul>
+<li><p>Firmware version: 1.63, 0x80000dda</p></li>
+<li><p>Device id (pf/vf): 8086:1521 / 8086:1520</p></li>
+<li><p>Driver version: 5.3.0-k (igb)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Intel(R) platforms with Mellanox(R) NICs combinations</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Platform details:</p>
+<ul>
+<li><p>Intel(R) Xeon(R) CPU E5-2697A v4 &#64; 2.60GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2697 v3 &#64; 2.60GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2650 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2640 &#64; 2.50GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2620 v4 &#64; 2.10GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux Server release 7.3 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.2 (Maipo)</p></li>
+<li><p>Ubuntu 16.10</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>Ubuntu 14.04</p></li>
+</ul>
+</li>
+<li><p>MLNX_OFED: 4.2-1.0.0.0</p></li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox(R) ConnectX(R)-3 Pro 40G MCX354A-FCC_Ax (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 10G MCX4111A-XCAT (1x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 10G MCX4121A-XCAT (2x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 25G MCX4111A-ACAT (1x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 40G MCX4131A-BCAT/MCX413A-BCAT (1x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 40G MCX415A-BCAT (1x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX4131A-GCAT/MCX413A-GCAT (1x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX414A-BCAT (2x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX415A-GCAT/MCX416A-BCAT/MCX416A-GCAT
+(2x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX415A-CCAT (1x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 100G MCX416A-CCAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 10G MCX4121A-XCAT (2x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX-5 Ex EN 100G MCX516A-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:1019</p></li>
+<li><p>Firmware version: 16.21.1000</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>ARM platforms with Mellanox(R) NICs combinations</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Platform details:</p>
+<ul>
+<li><p>Qualcomm ARM 1.1 2500MHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Ubuntu 16.04</p></li>
+</ul>
+</li>
+<li><p>MLNX_OFED: 4.2-1.0.0.0</p></li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.21.1000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.21.1000</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Release Notes</a><ul>
+      <li>Previous: <a href="release_18_02.html" title="previous chapter"><span class="section-number">22. </span>DPDK Release 18.02</a></li>
+      <li>Next: <a href="release_17_08.html" title="next chapter"><span class="section-number">24. </span>DPDK Release 17.08</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rel_notes/release_17_11.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

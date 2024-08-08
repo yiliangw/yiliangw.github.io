@@ -1,0 +1,332 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. Intel(R) FPGA LTE FEC Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. Intel(R) FPGA 5GNR FEC Poll Mode Driver" href="fpga_5gnr_fec.html" />
+    <link rel="prev" title="3. SW Turbo Poll Mode Driver" href="turbo_sw.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="intel-r-fpga-lte-fec-poll-mode-driver">
+<h1><span class="section-number">4. </span>Intel(R) FPGA LTE FEC Poll Mode Driver</h1>
+<p>The BBDEV FPGA LTE FEC poll mode driver (PMD) supports an FPGA implementation of a VRAN
+Turbo Encode / Decode LTE wireless acceleration function, using Intel’s PCI-e and FPGA
+based Vista Creek device.</p>
+<section id="features">
+<h2><span class="section-number">4.1. </span>Features</h2>
+<p>FPGA LTE FEC PMD supports the following features:</p>
+<ul class="simple">
+<li><p>Turbo Encode in the DL with total throughput of 4.5 Gbits/s</p></li>
+<li><p>Turbo Decode in the UL with total throughput of 1.5 Gbits/s assuming 8 decoder iterations</p></li>
+<li><p>8 VFs per PF (physical device)</p></li>
+<li><p>Maximum of 32 UL queues per VF</p></li>
+<li><p>Maximum of 32 DL queues per VF</p></li>
+<li><p>PCIe Gen-3 x8 Interface</p></li>
+<li><p>MSI-X</p></li>
+<li><p>SR-IOV</p></li>
+</ul>
+<p>FPGA LTE FEC PMD supports the following BBDEV capabilities:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>For the turbo encode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_24B_ATTACH</span></code> :  set to attach CRC24B to CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_RATE_MATCH</span></code> :  if set then do not do Rate Match bypass</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_ENC_INTERRUPTS</span></code> :  set for encoder dequeue interrupts</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For the turbo decode operation:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_TYPE_24B</span></code> :  check CRC24B from CB(s)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_SUBBLOCK_DEINTERLEAVE</span></code> :  perform subblock de-interleave</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_INTERRUPTS</span></code> :  set for decoder dequeue interrupts</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_NEG_LLR_1_BIT_IN</span></code> :  set if negative LLR encoder i/p is supported</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_TB_CRC_24B_KEEP</span></code> :  keep CRC24B bits appended while decoding</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">4.2. </span>Limitations</h2>
+<p>FPGA LTE FEC does not support the following:</p>
+<ul class="simple">
+<li><p>Scatter-Gather function</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">4.3. </span>Installation</h2>
+<p>Section 3 of the DPDK manual provides instructions on installing and compiling DPDK.</p>
+<p>DPDK requires hugepages to be configured as detailed in section 2 of the DPDK manual.
+The bbdev test application has been tested with a configuration 40 x 1GB hugepages. The
+hugepage configuration of a server may be examined using:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">grep Huge* /proc/meminfo</span>
+</pre></div>
+</div>
+</section>
+<section id="initialization">
+<h2><span class="section-number">4.4. </span>Initialization</h2>
+<p>When the device first powers up, its PCI Physical Functions (PF) can be listed through this command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo lspci -vd1172:5052</span>
+</pre></div>
+</div>
+<p>The physical and virtual functions are compatible with Linux UIO drivers:
+<code class="docutils literal notranslate"><span class="pre">vfio_pci</span></code> and <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code>. However, in order to work the FPGA LTE FEC device firstly needs
+to be bound to one of these linux drivers through DPDK.</p>
+<p>For more details on how to bind the PF device and create VF devices, see
+<a class="reference internal" href="../linux_gsg/linux_drivers.html#linux-gsg-binding-kernel"><span class="std std-ref">Binding and Unbinding Network Ports to/from the Kernel Modules</span></a>.</p>
+<section id="configure-the-vfs-through-pf">
+<h3><span class="section-number">4.4.1. </span>Configure the VFs through PF</h3>
+<p>The PCI virtual functions must be configured before working or getting assigned
+to VMs/Containers. The configuration involves allocating the number of hardware
+queues, priorities, load balance, bandwidth and other settings necessary for the
+device to perform FEC functions.</p>
+<p>This configuration needs to be executed at least once after reboot or PCI FLR and can
+be achieved by using the function <code class="docutils literal notranslate"><span class="pre">rte_fpga_lte_fec_configure()</span></code>, which sets up the
+parameters defined in <code class="docutils literal notranslate"><span class="pre">rte_fpga_lte_fec_conf</span></code> structure:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_fpga_lte_fec_conf</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">pf_mode_en</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">vf_ul_queues_number</span><span class="p">[</span><span class="n">FPGA_LTE_FEC_NUM_VFS</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">vf_dl_queues_number</span><span class="p">[</span><span class="n">FPGA_LTE_FEC_NUM_VFS</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">ul_bandwidth</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dl_bandwidth</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">ul_load_balance</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dl_load_balance</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">flr_time_out</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">pf_mode_en</span></code>: identifies whether only PF is to be used, or the VFs. PF and
+VFs are mutually exclusive and cannot run simultaneously.
+Set to 1 for PF mode enabled.
+If PF mode is enabled all queues available in the device are assigned
+exclusively to PF and 0 queues given to VFs.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vf_*l_queues_number</span></code>: defines the hardware queue mapping for every VF.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*l_bandwidth</span></code>: in case of congestion on PCIe interface. The device
+allocates different bandwidth to UL and DL. The weight is configured by this
+setting. The unit of weight is 3 code blocks. For example, if the code block
+cbps (code block per second) ratio between UL and DL is 12:1, then the
+configuration value should be set to 36:3. The schedule algorithm is based
+on code block regardless the length of each block.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">*l_load_balance</span></code>: hardware queues are load-balanced in a round-robin
+fashion. Queues get filled first-in first-out until they reach a pre-defined
+watermark level, if exceeded, they won’t get assigned new code blocks..
+This watermark is defined by this setting.</p>
+<p>If all hardware queues exceeds the watermark, no code blocks will be
+streamed in from UL/DL code block FIFO.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">flr_time_out</span></code>: specifies how many 16.384us to be FLR time out. The
+time_out = flr_time_out x 16.384us. For instance, if you want to set 10ms for
+the FLR time out then set this setting to 0x262=610.</p></li>
+</ul>
+<p>An example configuration code calling the function <code class="docutils literal notranslate"><span class="pre">rte_fpga_lte_fec_configure()</span></code> is shown
+below:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_fpga_lte_fec_conf</span><span class="w"> </span><span class="n">conf</span><span class="p">;</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">conf</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_fpga_lte_fec_conf</span><span class="p">));</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">pf_mode_en</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">FPGA_LTE_FEC_NUM_VFS</span><span class="p">;</span><span class="w"> </span><span class="o">++</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">conf</span><span class="p">.</span><span class="n">vf_ul_queues_number</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">conf</span><span class="p">.</span><span class="n">vf_dl_queues_number</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">4</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">ul_bandwidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">dl_bandwidth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">dl_load_balance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">ul_load_balance</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* setup FPGA PF */</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_fpga_lte_fec_configure</span><span class="p">(</span><span class="n">info</span><span class="o">-&gt;</span><span class="n">dev_name</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">);</span><span class="w"></span>
+<span class="n">TEST_ASSERT_SUCCESS</span><span class="p">(</span><span class="n">ret</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="s">&quot;Failed to configure 4G FPGA PF for bbdev %s&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="n">info</span><span class="o">-&gt;</span><span class="n">dev_name</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="test-application">
+<h2><span class="section-number">4.5. </span>Test Application</h2>
+<p>BBDEV provides a test application, <code class="docutils literal notranslate"><span class="pre">test-bbdev.py</span></code> and range of test data for testing
+the functionality of the device, depending on the device’s capabilities.</p>
+<p>For more details on how to use the test application,
+see <a class="reference internal" href="../tools/testbbdev.html#test-bbdev-application"><span class="std std-ref">dpdk-test-bbdev Application</span></a>.</p>
+<section id="test-vectors">
+<h3><span class="section-number">4.5.1. </span>Test Vectors</h3>
+<p>In addition to the simple turbo decoder and turbo encoder tests, bbdev also provides
+a range of additional tests under the test_vectors folder, which may be useful. The results
+of these tests will depend on the FPGA LTE FEC capabilities:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>turbo decoder tests:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c1_k6144_r0_e10376_crc24b_sbd_negllr_high_snr.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c1_k6144_r0_e10376_crc24b_sbd_negllr_low_snr.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c1_k6144_r0_e34560_negllr.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c1_k6144_r0_e34560_sbd_negllr.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c2_k3136_r0_e4920_sbd_negllr_crc24b.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_dec_c2_k3136_r0_e4920_sbd_negllr.data</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>turbo encoder tests:</dt><dd><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k40_r0_e1190_rm.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k40_r0_e1194_rm.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k40_r0_e1196_rm.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k40_r0_e272_rm.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k6144_r0_e18444.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c1_k6144_r0_e32256_crc24b_rm.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c2_k5952_r0_e17868_crc24b.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c3_k4800_r2_e14412_crc24b.data</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">turbo_enc_c4_k4800_r2_e14412_crc24b.data</span></code></p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="alternate-baseband-device-configuration-tool">
+<h3><span class="section-number">4.5.2. </span>Alternate Baseband Device configuration tool</h3>
+<p>On top of the embedded configuration feature supported in test-bbdev using “- -init-device”
+option, there is also a tool available to perform that device configuration using a companion
+application.
+The <code class="docutils literal notranslate"><span class="pre">pf_bb_config</span></code> application notably enables then to run bbdev-test from the VF
+and not only limited to the PF as captured above.</p>
+<p>See for more details: <a class="reference external" href="https://github.com/intel/pf-bb-config">https://github.com/intel/pf-bb-config</a></p>
+<p>Specifically for the BBDEV FPGA LTE FEC PMD, the command below can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./pf_bb_config FPGA_LTE -c fpga_lte/fpga_lte_config_vf.cfg</span>
+<span class="go">./test-bbdev.py -e=&quot;-c 0xff0 -a${VF_PCI_ADDR}&quot; -c validation -n 64 -b 32 -l 1 -v ./turbo_dec_default.data</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Baseband Device Drivers</a><ul>
+      <li>Previous: <a href="turbo_sw.html" title="previous chapter"><span class="section-number">3. </span>SW Turbo Poll Mode Driver</a></li>
+      <li>Next: <a href="fpga_5gnr_fec.html" title="next chapter"><span class="section-number">5. </span>Intel(R) FPGA 5GNR FEC Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/bbdevs/fpga_lte_fec.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

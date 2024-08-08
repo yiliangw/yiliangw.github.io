@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. CN9K REE Regexdev Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. NVIDIA MLX5 RegEx Driver" href="mlx5.html" />
+    <link rel="prev" title="1. Overview of RegEx Drivers Features" href="features_overview.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cn9k-ree-regexdev-driver">
+<h1><span class="section-number">4. </span>CN9K REE Regexdev Driver</h1>
+<p>The CN9K REE PMD (<strong>librte_regex_cn9k</strong>) provides poll mode
+regexdev driver support for the inbuilt regex device found in the <strong>Marvell CN9K</strong>
+SoC family.</p>
+<p>More information about CN9K SoC can be found at <a class="reference external" href="https://www.marvell.com/embedded-processors/infrastructure-processors/">Marvell Official Website</a>.</p>
+<section id="features">
+<h2><span class="section-number">4.1. </span>Features</h2>
+<p>Features of the CN9K REE PMD are:</p>
+<ul class="simple">
+<li><p>36 queues</p></li>
+<li><p>Up to 254 matches for each regex operation</p></li>
+</ul>
+</section>
+<section id="prerequisites-and-compilation-procedure">
+<h2><span class="section-number">4.2. </span>Prerequisites and Compilation procedure</h2>
+<blockquote>
+<div><p>See <a class="reference internal" href="../platform/cnxk.html"><span class="doc">Marvell cnxk platform guide</span></a> for setup information.</p>
+</div></blockquote>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">4.3. </span>Device Setup</h2>
+<p>The CN9K REE devices will need to be bound to a user-space IO driver
+for use. The script <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script included with DPDK can be
+used to view the state of the devices and to bind them to a suitable
+DPDK-supported kernel driver. When querying the status of the devices,
+they will appear under the category of “REGEX devices”, i.e. the command
+<code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span> <span class="pre">--status-dev</span> <span class="pre">regex</span></code> can be used to see the state of
+those devices alone.</p>
+</section>
+<section id="debugging-options">
+<h2><span class="section-number">4.4. </span>Debugging Options</h2>
+<span id="table-cn9k-regex-debug-options"></span><table class="docutils align-default" id="id1">
+<caption><span class="caption-number">Table 4.2 </span><span class="caption-text">CN9K regex device debug options</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 17%" />
+<col style="width: 79%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Component</p></th>
+<th class="head"><p>EAL log command</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>REE</p></td>
+<td><p>–log-level=’pmd.regex.cn9k,8’</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">REGEX Device Drivers</a><ul>
+      <li>Previous: <a href="features_overview.html" title="previous chapter"><span class="section-number">1. </span>Overview of RegEx Drivers Features</a></li>
+      <li>Next: <a href="mlx5.html" title="next chapter"><span class="section-number">5. </span>NVIDIA MLX5 RegEx Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/regexdevs/cn9k.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

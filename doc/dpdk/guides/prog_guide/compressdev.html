@@ -1,0 +1,754 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>21. Compression Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="22. RegEx Device Library" href="regexdev.html" />
+    <link rel="prev" title="20. Cryptography Device Library" href="cryptodev_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="compression-device-library">
+<h1><span class="section-number">21. </span>Compression Device Library</h1>
+<p>The compression framework provides a generic set of APIs to perform compression services
+as well as to query and configure compression devices both physical(hardware) and virtual(software)
+to perform those services. The framework currently only supports lossless compression schemes:
+Deflate and LZS.</p>
+<section id="device-management">
+<h2><span class="section-number">21.1. </span>Device Management</h2>
+<section id="device-creation">
+<h3><span class="section-number">21.1.1. </span>Device Creation</h3>
+<p>Physical compression devices are discovered during the bus probe of the EAL function
+which is executed at DPDK initialization, based on their unique device identifier.
+For e.g. PCI devices can be identified using PCI BDF (bus/bridge, device, function).
+Specific physical compression devices, like other physical devices in DPDK can be
+listed using the EAL command line options.</p>
+<p>Virtual devices can be created by two mechanisms, either using the EAL command
+line options or from within the application using an EAL API directly.</p>
+<p>From the command line using the –vdev EAL option</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev  &#39;&lt;PMD name&gt;,socket_id=0&#39;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>If a DPDK application requires multiple software compression PMD devices then the
+required number of <code class="docutils literal notranslate"><span class="pre">--vdev</span></code> args with appropriate libraries are to be added.</p></li>
+<li><p>An application with multiple compression device instances exposed by the same PMD must
+specify a unique name for each device.</p></li>
+</ul>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">--vdev</span>&#160; <span class="pre">'pmd0'</span> <span class="pre">--vdev</span>&#160; <span class="pre">'pmd1'</span></code></p>
+</div>
+<p>Or, by using the rte_vdev_init API within the application code.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_vdev_init</span><span class="p">(</span><span class="s">&quot;&lt;pmd_name&gt;&quot;</span><span class="p">,</span><span class="s">&quot;socket_id=0&quot;</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>All virtual compression devices support the following initialization parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id</span></code> - socket on which to allocate the device resources on.</p></li>
+</ul>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">21.1.2. </span>Device Identification</h3>
+<p>Each device, whether virtual or physical, is uniquely designated by two
+identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the compression device in all functions
+exported by the compressdev API.</p></li>
+<li><p>A device name used to designate the compression device in console messages, for
+administration or debugging purposes.</p></li>
+</ul>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">21.1.3. </span>Device Configuration</h3>
+<p>The configuration of each compression device includes the following operations:</p>
+<ul class="simple">
+<li><p>Allocation of resources, including hardware resources if a physical device.</p></li>
+<li><p>Resetting the device into a well-known default state.</p></li>
+<li><p>Initialization of statistics counters.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_compressdev_configure</span></code> API is used to configure a compression device.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_compressdev_config</span></code> structure is used to pass the configuration
+parameters.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+</section>
+<section id="configuration-of-queue-pairs">
+<h3><span class="section-number">21.1.4. </span>Configuration of Queue Pairs</h3>
+<p>Each compression device queue pair is individually configured through the
+<code class="docutils literal notranslate"><span class="pre">rte_compressdev_queue_pair_setup</span></code> API.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">max_inflight_ops</span></code> is used to pass maximum number of
+<code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code> that could be present in a queue at a time.
+The PMD can then allocate resources accordingly on a specified socket.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+</section>
+<section id="logical-cores-memory-and-queue-pair-relationships">
+<h3><span class="section-number">21.1.5. </span>Logical Cores, Memory and Queue Pair Relationships</h3>
+<p>The Compressdev library supports NUMA similarly as described in Cryptodev library section.</p>
+<p>A queue pair cannot be shared, and should be exclusively used by a single processing
+context for enqueuing operations or dequeuing operations on the same compression device,
+since sharing would require global locks and hinder performance. It is however possible
+to use a different logical core to dequeue an operation on a queue pair from the logical
+core on which it was enqueued. This means that for a compression burst, enqueue/dequeue
+APIs are a logical place to transition from one logical core to another in a
+data processing pipeline.</p>
+</section>
+</section>
+<section id="device-features-and-capabilities">
+<h2><span class="section-number">21.2. </span>Device Features and Capabilities</h2>
+<p>Compression devices define their functionality through two mechanisms, global device
+features and algorithm features. Global device features identify device
+wide level features which are applicable to the whole device, such as supported hardware
+acceleration and CPU features. List of compression device features can be seen in the
+RTE_COMPDEV_FF_XXX macros.</p>
+<p>The algorithm features are features which the device supports per-algorithm,
+such as a stateful compression/decompression, checksums operation etc.
+The list of algorithm features can be seen in the RTE_COMP_FF_XXX macros.</p>
+<section id="capabilities">
+<h3><span class="section-number">21.2.1. </span>Capabilities</h3>
+<p>Each PMD has a list of capabilities, including algorithms listed in
+the enum <code class="docutils literal notranslate"><span class="pre">rte_comp_algorithm</span></code>, its associated feature flag, and
+sliding window range in log base 2 value. The sliding window range
+defines the minimum and maximum size of a lookup window that an algorithm uses
+to find duplicates.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+<p>Each Compression poll mode driver defines its array of capabilities
+for each algorithm it supports. See the PMD implementation for capability
+initialization.</p>
+</section>
+<section id="capabilities-discovery">
+<h3><span class="section-number">21.2.2. </span>Capabilities Discovery</h3>
+<p>PMD capability and features are discovered via the <code class="docutils literal notranslate"><span class="pre">rte_compressdev_info_get</span></code> function.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_compressdev_info</span></code> structure contains all the relevant information for the device.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+</section>
+</section>
+<section id="compression-operation">
+<h2><span class="section-number">21.3. </span>Compression Operation</h2>
+<p>DPDK compression supports two types of compression methodologies:</p>
+<ul class="simple">
+<li><p>Stateless - data associated with a compression operation is compressed without any reference
+to another compression operation.</p></li>
+<li><p>Stateful - data in each compression operation is compressed with reference to previous compression
+operations in the same data stream i.e. history of data is maintained between the operations.</p></li>
+</ul>
+<p>For more explanation, please refer to the RFC <a class="reference external" href="https://www.ietf.org/rfc/rfc1951.txt">https://www.ietf.org/rfc/rfc1951.txt</a></p>
+<section id="operation-representation">
+<h3><span class="section-number">21.3.1. </span>Operation Representation</h3>
+<p>A compression operation is described via <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_comp_op</span></code>, which contains both input and
+output data. The operation structure includes the operation type (stateless or stateful),
+the operation status, the priv_xform/stream handle, source, destination and checksum buffer
+pointers. It also contains the source mempool from which the operation is allocated.
+The PMD updates the consumed field with the amount of data read from the source buffer,
+and the produced field with the amount of data written into the destination buffer,
+along with status of operation.
+See the section <a class="reference internal" href="#compressdev-prod-cons-op-status"><span class="std std-ref">Produced, Consumed And Operation Status</span></a>: for more details.</p>
+<p>The compression operations mempool also has the ability to allocate private memory with the
+operation for the application’s use. The application software is responsible for specifying
+all the operation specific fields in the <code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code> structure, which are then used
+by the compression PMD to process the requested operation.</p>
+</section>
+<section id="operation-management-and-allocation">
+<h3><span class="section-number">21.3.2. </span>Operation Management and Allocation</h3>
+<p>The compressdev library provides an API set for managing compression operations which
+utilize the Mempool Library to allocate operation buffers. Therefore, it ensures
+that the compression operation is interleaved optimally across the channels and
+ranks for optimal processing.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code> contains a field indicating the pool it originated from.</p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_comp_op_alloc()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_comp_op_bulk_alloc()</span></code> are used to allocate
+compression operations from a given compression operation mempool.
+The operation gets reset before being returned to a user so that the operation
+is always in a good known state before use by the application.</p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_comp_op_free()</span></code> is called by the application to return an operation to
+its allocating pool.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+</section>
+<section id="passing-source-data-as-mbuf-chain">
+<h3><span class="section-number">21.3.3. </span>Passing source data as mbuf-chain</h3>
+<p>If input data is scattered across several different buffers, then
+the application can either parse through all such buffers and make one
+mbuf-chain and enqueue it for processing or, alternatively, it can
+make multiple sequential enqueue_burst() calls for each of them,
+processing them statefully. See <a class="reference internal" href="#compressdev-stateful-op"><span class="std std-ref">Compression API Stateful operation</span></a>:
+for stateful processing of ops.</p>
+</section>
+<section id="operation-status">
+<h3><span class="section-number">21.3.4. </span>Operation Status</h3>
+<p>Each operation carries status information updated by the PMD after it is processed.
+The following are currently supported:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_SUCCESS,</dt><dd><p>Operation is successfully completed</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_NOT_PROCESSED,</dt><dd><p>Operation has not yet been processed by the device</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_INVALID_ARGS,</dt><dd><p>Operation failed due to invalid arguments in request</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_ERROR,</dt><dd><p>Operation failed because of internal error</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_INVALID_STATE,</dt><dd><p>Operation is invoked in invalid state</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_OUT_OF_SPACE_TERMINATED,</dt><dd><p>Output buffer ran out of space during processing. Error case,
+PMD cannot continue from here.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>RTE_COMP_OP_STATUS_OUT_OF_SPACE_RECOVERABLE,</dt><dd><p>Output buffer ran out of space before operation completed, but this
+is not an error case. Output data up to op.produced can be used and
+the next op in the stream should continue on from op.consumed+1.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="operation-status-after-enqueue-dequeue">
+<h3><span class="section-number">21.3.5. </span>Operation status after enqueue / dequeue</h3>
+<p>Some of the above values may arise in the op after an
+<code class="docutils literal notranslate"><span class="pre">rte_compressdev_enqueue_burst()</span></code>. If the number of ops enqueued &lt; the number of ops requested
+then the app should check the op.status of nb_enqd+1.
+If the status is RTE_COMP_OP_STATUS_NOT_PROCESSED, it likely indicates a full-queue case for a
+hardware device, and a retry after dequeuing some ops is likely to be successful.
+If the op holds any other status, e.g. RTE_COMP_OP_STATUS_INVALID_ARGS, a retry with
+the same op is unlikely to be successful.</p>
+</section>
+<section id="produced-consumed-and-operation-status">
+<span id="compressdev-prod-cons-op-status"></span><h3><span class="section-number">21.3.6. </span>Produced, Consumed And Operation Status</h3>
+<ul class="simple">
+<li><dl class="simple">
+<dt>If the status is RTE_COMP_OP_STATUS_SUCCESS,</dt><dd><p>consumed = amount of data read from input buffer, and
+produced = amount of data written in destination buffer</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If status is RTE_COMP_OP_STATUS_ERROR,</dt><dd><p>consumed = produced = undefined</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If status is RTE_COMP_OP_STATUS_OUT_OF_SPACE_TERMINATED,</dt><dd><p>consumed = 0 and
+produced = usually 0, but in decompression cases a PMD may return &gt; 0
+i.e. amount of data successfully produced until out of space condition
+hit. Application can consume output data in this case, if required.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>If status is RTE_COMP_OP_STATUS_OUT_OF_SPACE_RECOVERABLE,</dt><dd><p>consumed = amount of data read, and
+produced = amount of data successfully produced until
+out of space condition hit. The PMD has ability to recover
+from here, so an application can submit the next op from
+consumed+1, and a destination buffer with available space.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+</section>
+<section id="transforms">
+<h2><span class="section-number">21.4. </span>Transforms</h2>
+<p>Compression transforms (<code class="docutils literal notranslate"><span class="pre">rte_comp_xform</span></code>) are the mechanism
+to specify the details of the compression operation such as algorithm,
+window size, and checksum.</p>
+</section>
+<section id="compression-api-hash-support">
+<h2><span class="section-number">21.5. </span>Compression API Hash support</h2>
+<p>The compression API allows an application to enable digest calculation
+alongside compression and decompression of data. A PMD reflects its
+support for hash algorithms via capability algo feature flags.
+If supported, the PMD always calculates the digest on plaintext i.e.
+before compression and after decompression.</p>
+<p>Currently supported list of hash algos are SHA-1 and SHA2 family
+SHA256.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+<p>If required, the application should set the valid hash algo in compress
+or decompress xforms during <code class="docutils literal notranslate"><span class="pre">rte_compressdev_stream_create()</span></code>
+or <code class="docutils literal notranslate"><span class="pre">rte_compressdev_private_xform_create()</span></code>, and pass a valid
+output buffer in <code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code> hash field struct to store the
+resulting digest. The buffer passed should be contiguous and large
+enough to store digest, which is 20 bytes for SHA-1 and
+32 bytes for SHA2-256.</p>
+</section>
+<section id="compression-api-stateless-operation">
+<h2><span class="section-number">21.6. </span>Compression API Stateless operation</h2>
+<p>An op is processed stateless if it has
+- op_type set to RTE_COMP_OP_STATELESS
+- flush value set to RTE_COMP_FLUSH_FULL or RTE_COMP_FLUSH_FINAL
+(required only on compression side),
+- All required input in source buffer</p>
+<p>When all of the above conditions are met, the PMD initiates stateless processing
+and releases acquired resources after processing of current operation is
+complete. The application can enqueue multiple stateless ops in a single burst
+and must attach priv_xform handle to such ops.</p>
+<section id="priv-xform-in-stateless-operation">
+<h3><span class="section-number">21.6.1. </span>priv_xform in Stateless operation</h3>
+<p>A priv_xform is private data managed internally by the PMD to do stateless processing.
+A priv_xform is initialized by an application providing a generic xform structure
+to <code class="docutils literal notranslate"><span class="pre">rte_compressdev_private_xform_create</span></code>, which returns an opaque priv_xform reference.
+If the PMD supports SHAREABLE priv_xform, indicated via algorithm feature flag,
+then the application can attach the same priv_xform with many stateless ops at a time.
+If not, then the application needs to create as many priv_xforms as it expects to have
+stateless operations in-flight.</p>
+<figure class="align-default" id="id8">
+<img alt="../_images/stateless-op.svg" src="../_images/stateless-op.svg" /><figcaption>
+<p><span class="caption-number">Fig. 21.1 </span><span class="caption-text">Stateless Ops using Non-Shareable priv_xform</span></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id9">
+<img alt="../_images/stateless-op-shared.svg" src="../_images/stateless-op-shared.svg" /><figcaption>
+<p><span class="caption-number">Fig. 21.2 </span><span class="caption-text">Stateless Ops using Shareable priv_xform</span></p>
+</figcaption>
+</figure>
+<p>The application should call <code class="docutils literal notranslate"><span class="pre">rte_compressdev_private_xform_create()</span></code> and attach it to a stateless
+op before enqueuing them for processing and free via <code class="docutils literal notranslate"><span class="pre">rte_compressdev_private_xform_free()</span></code>
+during termination.</p>
+<p>An example pseudocode to setup and process NUM_OPS stateless ops with each of length OP_LEN
+using priv_xform would look like:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * pseudocode for stateless compression</span>
+<span class="cm"> */</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_get_dev_id</span><span class="p">(</span><span class="o">&lt;</span><span class="n">PMD</span><span class="w"> </span><span class="n">name</span><span class="o">&gt;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* configure the device. */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_configure</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to configure compressdev %u&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_queue_pair_setup</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_MAX_INFLIGHT_OPS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="n">socket_id</span><span class="p">())</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to setup queue pair</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_start</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to start device</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* setup compress transform */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_comp_xform</span><span class="w"> </span><span class="n">compress_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_COMPRESS</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">compress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_ALGO_DEFLATE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">deflate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">huffman</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_HUFFMAN_DEFAULT</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_LEVEL_PMD_DEFAULT</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">chksum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_CHECKSUM_NONE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">window_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DEFAULT_WINDOW_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">hash_algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_HASH_ALGO_NONE</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="cm">/* create priv_xform and initialize it for the compression device. */</span><span class="w"></span>
+<span class="n">rte_compressdev_info</span><span class="w"> </span><span class="n">dev_info</span><span class="p">;</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">priv_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">shareable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="n">rte_compressdev_info_get</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">dev_info</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dev_info</span><span class="p">.</span><span class="n">capabilities</span><span class="o">-&gt;</span><span class="n">comp_feature_flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_COMP_FF_SHAREABLE_PRIV_XFORM</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_compressdev_private_xform_create</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">compress_xform</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">priv_xform</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">shareable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* create operation pool via call to rte_comp_op_pool_create and alloc ops */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_comp_op</span><span class="w"> </span><span class="o">*</span><span class="n">comp_ops</span><span class="p">[</span><span class="n">NUM_OPS</span><span class="p">];</span><span class="w"></span>
+<span class="n">rte_comp_op_bulk_alloc</span><span class="p">(</span><span class="n">op_pool</span><span class="p">,</span><span class="w"> </span><span class="n">comp_ops</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_OPS</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* prepare ops for compression operations */</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NUM_OPS</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_comp_op</span><span class="w"> </span><span class="o">*</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">comp_ops</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">shareable</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_compressdev_private_xform_create</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">compress_xform</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">op</span><span class="o">-&gt;</span><span class="n">priv_xform</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="k">else</span><span class="w"></span>
+<span class="w">        </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">private_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">priv_xform</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">op_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_OP_STATELESS</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">flush_flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_FLUSH_FINAL</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">src</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">dst</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">src</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">OP_LEN</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">input_chksum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">setup</span><span class="w"> </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">m_src</span><span class="w"> </span><span class="n">and</span><span class="w"> </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">m_dst</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">num_enqd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_enqueue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">comp_ops</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_OPS</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* wait for this to complete before enqueuing next*/</span><span class="w"></span>
+<span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">num_deque</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_dequeue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">processed_ops</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_OPS</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">num_dqud</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">num_enqd</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="stateless-and-out-of-space">
+<h3><span class="section-number">21.6.2. </span>Stateless and OUT_OF_SPACE</h3>
+<p>OUT_OF_SPACE is a condition when the output buffer runs out of space and where the PMD
+still has more data to produce. If the PMD runs into such condition, then the PMD returns
+RTE_COMP_OP_OUT_OF_SPACE_TERMINATED error. In such case, the PMD resets itself and can set
+consumed=0 and produced=amount of output it could produce before hitting out_of_space.
+The application would need to resubmit the whole input with a larger output buffer, if it
+wants the operation to be completed.</p>
+</section>
+<section id="hash-in-stateless">
+<h3><span class="section-number">21.6.3. </span>Hash in Stateless</h3>
+<p>If hash is enabled, the digest buffer will contain valid data after an op is successfully
+processed i.e. dequeued with status = RTE_COMP_OP_STATUS_SUCCESS.</p>
+</section>
+<section id="checksum-in-stateless">
+<h3><span class="section-number">21.6.4. </span>Checksum in Stateless</h3>
+<p>If checksum is enabled, checksum will only be available after an op is successfully
+processed i.e. dequeued with status = RTE_COMP_OP_STATUS_SUCCESS.</p>
+</section>
+</section>
+<section id="compression-api-stateful-operation">
+<span id="compressdev-stateful-op"></span><h2><span class="section-number">21.7. </span>Compression API Stateful operation</h2>
+<p>The compression API provides RTE_COMP_FF_STATEFUL_COMPRESSION and
+RTE_COMP_FF_STATEFUL_DECOMPRESSION feature flag for the PMD to reflect
+its support for Stateful operations.</p>
+<p>A Stateful operation in DPDK compression means the application invokes enqueue
+burst() multiple times to process a related chunk of data because the
+application broke the data into several ops.</p>
+<p>In such cases
+- ops are setup with op_type RTE_COMP_OP_STATEFUL,
+- all ops except the last are set with flush value = RTE_COMP_FLUSH_NONE/SYNC
+and the last is set with flush value RTE_COMP_FLUSH_FULL/FINAL.</p>
+<p>In case of either one or all of the above conditions, the PMD initiates
+stateful processing and releases acquired resources after processing the
+operation with flush value = RTE_COMP_FLUSH_FULL/FINAL is complete.
+Unlike stateless, the application can enqueue only one stateful op from
+a particular stream at a time and must attach a stream handle
+to each op.</p>
+<section id="stream-in-stateful-operation">
+<h3><span class="section-number">21.7.1. </span>Stream in Stateful operation</h3>
+<p>A stream in DPDK compression is a logical entity which identifies a related set of ops.
+For example, one large file broken into multiple chunks, then the file is represented by a stream,
+and each chunk of that file is represented by a compression op <code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code>.
+Whenever an application wants stateful processing of such data, then it must get a stream handle
+via making call to <code class="docutils literal notranslate"><span class="pre">rte_compressdev_stream_create()</span></code> with an xform, which will return an opaque
+stream handle to attach to all of the ops carrying data of that stream.
+In stateful processing, every op requires previous op data for compression/decompression.
+A PMD allocates and sets up resources such as history, states, etc. within a stream,
+which are maintained during the processing of related ops.</p>
+<p>Unlike priv_xforms, a stream is always a NON_SHAREABLE entity. One stream handle must be attached
+to only one set of related ops and cannot be reused until all of them are processed with a
+success/failure status.</p>
+<figure class="align-default" id="id10">
+<img alt="../_images/stateful-op.svg" src="../_images/stateful-op.svg" /><figcaption>
+<p><span class="caption-number">Fig. 21.3 </span><span class="caption-text">Stateful Ops</span></p>
+</figcaption>
+</figure>
+<p>An application should call <code class="docutils literal notranslate"><span class="pre">rte_compressdev_stream_create()</span></code> and attach it to the op before
+enqueuing them for processing and free via <code class="docutils literal notranslate"><span class="pre">rte_compressdev_stream_free()</span></code> during
+termination. All ops that are to be processed statefully should carry the <em>same</em> stream.</p>
+<p>See the <a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a> for details.</p>
+<p>An example pseudocode to set up and process a stream having NUM_CHUNKS,
+with each chunk size of CHUNK_LEN, would look like:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * pseudocode for stateful compression</span>
+<span class="cm"> */</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_get_dev_id</span><span class="p">(</span><span class="o">&lt;</span><span class="n">PMD</span><span class="w"> </span><span class="n">name</span><span class="o">&gt;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* configure the  device. */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_configure</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to configure compressdev %u&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_queue_pair_setup</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_MAX_INFLIGHT_OPS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">socket_id</span><span class="p">())</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to setup queue pair</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_compressdev_start</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to start device</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* setup compress transform. */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_comp_xform</span><span class="w"> </span><span class="n">compress_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_COMPRESS</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">compress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_ALGO_DEFLATE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">deflate</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">huffman</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_HUFFMAN_DEFAULT</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">level</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_LEVEL_PMD_DEFAULT</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">chksum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_CHECKSUM_NONE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">window_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DEFAULT_WINDOW_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">hash_algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_HASH_ALGO_NONE</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="cm">/* create stream */</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">stream</span><span class="p">;</span><span class="w"></span>
+<span class="n">rte_compressdev_stream_create</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">compress_xform</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">stream</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* create an op pool and allocate ops */</span><span class="w"></span>
+<span class="n">rte_comp_op_bulk_alloc</span><span class="p">(</span><span class="n">op_pool</span><span class="p">,</span><span class="w"> </span><span class="n">comp_ops</span><span class="p">,</span><span class="w"> </span><span class="n">NUM_CHUNKS</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Prepare source and destination mbufs for compression operations */</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NUM_CHUNKS</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_pktmbuf_append</span><span class="p">(</span><span class="n">mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">CHUNK_LEN</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Not enough room in the mbuf</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">comp_ops</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">m_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_pktmbuf_append</span><span class="p">(</span><span class="n">dst_mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">CHUNK_LEN</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Not enough room in the mbuf</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">comp_ops</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">m_dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dst_mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Set up the compress operations. */</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">NUM_CHUNKS</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_comp_op</span><span class="w"> </span><span class="o">*</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">comp_ops</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">stream</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">stream</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">m_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">src_buf</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">m_dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dst_buf</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">op_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_OP_STATEFUL</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">NUM_CHUNKS</span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* set to final, if last chunk*/</span><span class="w"></span>
+<span class="w">        </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">flush_flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_FLUSH_FINAL</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* set to NONE, for all intermediary ops */</span><span class="w"></span>
+<span class="w">        </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">flush_flag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_COMP_FLUSH_NONE</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">src</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">dst</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">src</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">CHUNK_LEN</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">input_chksum</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">num_enqd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_enqueue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">op</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* wait for this to complete before enqueuing next*/</span><span class="w"></span>
+<span class="w">    </span><span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">num_deqd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_compressdev_dequeue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">processed_ops</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">num_deqd</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">num_enqd</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* analyze the amount of consumed and produced data before pushing next op*/</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="stateful-and-out-of-space">
+<h3><span class="section-number">21.7.2. </span>Stateful and OUT_OF_SPACE</h3>
+<p>If a PMD supports stateful operation, then an OUT_OF_SPACE status is not an actual
+error for the PMD. In such a case, the PMD returns with status
+RTE_COMP_OP_STATUS_OUT_OF_SPACE_RECOVERABLE with consumed = number of input bytes
+read, and produced = length of complete output buffer.
+The application should enqueue the next op with source starting at consumed+1, and an
+output buffer with available space.</p>
+</section>
+<section id="hash-in-stateful">
+<h3><span class="section-number">21.7.3. </span>Hash in Stateful</h3>
+<p>If enabled, the digest buffer will contain valid digest after the last op in a stream
+(having flush = RTE_COMP_FLUSH_FINAL) is successfully processed i.e. dequeued
+with status = RTE_COMP_OP_STATUS_SUCCESS.</p>
+</section>
+<section id="checksum-in-stateful">
+<h3><span class="section-number">21.7.4. </span>Checksum in Stateful</h3>
+<p>If enabled, the checksum will only be available after the last op in a stream
+(having flush = RTE_COMP_FLUSH_FINAL) is successfully processed i.e. dequeued
+with status = RTE_COMP_OP_STATUS_SUCCESS.</p>
+</section>
+</section>
+<section id="burst-in-compression-api">
+<h2><span class="section-number">21.8. </span>Burst in compression API</h2>
+<p>Scheduling of compression operations on DPDK’s application data path is
+performed using a burst oriented asynchronous API set. A queue pair on a compression
+device accepts a burst of compression operations using the enqueue burst API.
+On physical devices the enqueue burst API will place the operations to be processed
+on the device’s hardware input queue, for virtual devices the processing of the
+operations is usually completed during the enqueue call to the compression
+device. The dequeue burst API will retrieve any processed operations available
+from the queue pair on the compression device, from physical devices this is usually
+directly from the devices processed queue, and for virtual device’s from an
+<code class="docutils literal notranslate"><span class="pre">rte_ring</span></code> where processed operations are placed after being processed on the
+enqueue call.</p>
+<p>A burst in DPDK compression can be a combination of stateless and stateful operations with a
+condition that for stateful ops only one op at a time should be enqueued from a particular stream
+i.e. two ops should never belong to the same stream in a single burst.
+However, a burst may contain multiple stateful ops, as long as each op is attached to a different
+stream, i.e. a burst can look like:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 17%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 19%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>enqueue_burst</p></td>
+<td><p>op1.no_flush</p></td>
+<td><p>op2.no_flush</p></td>
+<td><p>op3.flush_final</p></td>
+<td><p>op4.no_flush</p></td>
+<td><p>op5.no_flush</p></td>
+</tr>
+</tbody>
+</table>
+<p>Where, op1 .. op5 all belong to different independent data units. op1, op2, op4, op5 must be
+stateful as stateless ops can only use flush full or final and op3 can be of type stateless or
+stateful. Every op with type set to RTE_COMP_OP_STATELESS must be attached to priv_xform and
+every op with type set to RTE_COMP_OP_STATEFUL <em>must</em> be attached to stream.</p>
+<p>Since each operation in a burst is independent and thus can be completed
+out of order, applications which need ordering should setup a per-op user data
+area, with reordering information so that it can determine enqueue order at
+dequeue.</p>
+<p>Also, if multiple threads calls enqueue_burst() on the same queue pair then it’s
+the application’s responsibility to use a proper locking mechanism to ensure
+exclusive enqueuing of operations.</p>
+<section id="enqueue-dequeue-burst-apis">
+<h3><span class="section-number">21.8.1. </span>Enqueue / Dequeue Burst APIs</h3>
+<p>The burst enqueue API uses a compression device identifier and a queue pair
+identifier to specify the compression device queue pair to schedule the processing on.
+The <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> parameter is the number of operations to process which are
+supplied in the <code class="docutils literal notranslate"><span class="pre">ops</span></code> array of <code class="docutils literal notranslate"><span class="pre">rte_comp_op</span></code> structures.
+The enqueue function returns the number of operations it actually enqueued for
+processing, a return value equal to <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> means that all packets have been
+enqueued.</p>
+<p>The dequeue API uses the same format as the enqueue API but
+the <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> and <code class="docutils literal notranslate"><span class="pre">ops</span></code> parameters are now used to specify the max processed
+operations the user wishes to retrieve and the location in which to store them.
+The API call returns the actual number of processed operations returned, this
+can never be larger than <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code>.</p>
+</section>
+</section>
+<section id="sample-code">
+<h2><span class="section-number">21.9. </span>Sample code</h2>
+<p>There are unit test applications that show how to use the compressdev library inside
+<code class="docutils literal notranslate"><span class="pre">app/test/test_compressdev.c</span></code></p>
+<section id="compression-device-api">
+<h3><span class="section-number">21.9.1. </span>Compression Device API</h3>
+<p>The compressdev Library API is described in the
+<a class="reference external" href="https://doc.dpdk.org/api/rte__compressdev_8h.html">DPDK API Reference</a>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="cryptodev_lib.html" title="previous chapter"><span class="section-number">20. </span>Cryptography Device Library</a></li>
+      <li>Next: <a href="regexdev.html" title="next chapter"><span class="section-number">22. </span>RegEx Device Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/compressdev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

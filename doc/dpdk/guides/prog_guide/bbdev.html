@@ -1,0 +1,2015 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>19. Wireless Baseband Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="20. Cryptography Device Library" href="cryptodev_lib.html" />
+    <link rel="prev" title="18. Traffic Management API" href="traffic_management.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="wireless-baseband-device-library">
+<h1><span class="section-number">19. </span>Wireless Baseband Device Library</h1>
+<p>The Wireless Baseband library provides a common programming framework that
+abstracts HW accelerators based on FPGA and/or Fixed Function Accelerators that
+assist with 3GPP Physical Layer processing. Furthermore, it decouples the
+application from the compute-intensive wireless functions by abstracting their
+optimized libraries to appear as virtual bbdev devices.</p>
+<p>The functional scope of the BBDEV library are those functions in relation to
+the 3GPP Layer 1 signal processing (channel coding, modulation, …).</p>
+<p>The framework currently only supports FEC function.</p>
+<section id="design-principles">
+<h2><span class="section-number">19.1. </span>Design Principles</h2>
+<p>The Wireless Baseband library follows the same ideology of DPDK’s Ethernet
+Device and Crypto Device frameworks. Wireless Baseband provides a generic
+acceleration abstraction framework which supports both physical (hardware) and
+virtual (software) wireless acceleration functions.</p>
+</section>
+<section id="device-management">
+<h2><span class="section-number">19.2. </span>Device Management</h2>
+<section id="device-creation">
+<h3><span class="section-number">19.2.1. </span>Device Creation</h3>
+<p>Physical bbdev devices are discovered during the PCI probe/enumeration of the
+EAL function which is executed at DPDK initialization, based on
+their PCI device identifier, each unique PCI BDF (bus/bridge, device,
+function).</p>
+<p>Virtual devices can be created by two mechanisms, either using the EAL command
+line options or from within the application using an EAL API directly.</p>
+<p>From the command line using the –vdev EAL option</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev &#39;baseband_turbo_sw,max_nb_queues=8,socket_id=0&#39;</span>
+</pre></div>
+</div>
+<p>Or using the rte_vdev_init API within the application code.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_vdev_init</span><span class="p">(</span><span class="s">&quot;baseband_turbo_sw&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;max_nb_queues=2,socket_id=0&quot;</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>All virtual bbdev devices support the following initialization parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">max_nb_queues</span></code> - maximum number of queues supported by the device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id</span></code> - socket on which to allocate the device resources on.</p></li>
+</ul>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">19.2.2. </span>Device Identification</h3>
+<p>Each device, whether virtual or physical is uniquely designated by two
+identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the bbdev device in all functions
+exported by the bbdev API.</p></li>
+<li><p>A device name used to designate the bbdev device in console messages, for
+administration or debugging purposes. For ease of use, the port name includes
+the port index.</p></li>
+</ul>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">19.2.3. </span>Device Configuration</h3>
+<p>From the application point of view, each instance of a bbdev device consists of
+one or more queues identified by queue IDs. While different devices may have
+different capabilities (e.g. support different operation types), all queues on
+a device support identical configuration possibilities. A queue is configured
+for only one type of operation and is configured at initialization time.
+When an operation is enqueued to a specific queue ID, the result is dequeued
+from the same queue ID.</p>
+<p>Configuration of a device has two different levels: configuration that applies
+to the whole device, and configuration that applies to a single queue.</p>
+<p>Device configuration is applied with
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_setup_queues(dev_id,num_queues,socket_id)</span></code>
+and queue configuration is applied with
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_queue_configure(dev_id,queue_id,conf)</span></code>. Note that, although all
+queues on a device support same capabilities, they can be configured differently
+and will then behave differently.
+Devices supporting interrupts can enable them by using
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_intr_enable(dev_id)</span></code>.</p>
+<p>The configuration of each bbdev device includes the following operations:</p>
+<ul class="simple">
+<li><p>Allocation of resources, including hardware resources if a physical device.</p></li>
+<li><p>Resetting the device into a well-known default state.</p></li>
+<li><p>Initialization of statistics counters.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_bbdev_setup_queues</span></code> API is used to setup queues for a bbdev device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_bbdev_setup_queues</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_queues</span><span class="p">,</span><span class="w"></span>
+<span class="w">         </span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">num_queues</span></code> argument identifies the total number of queues to setup for
+this device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id</span></code> specifies which socket will be used to allocate the memory.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_bbdev_intr_enable</span></code> API is used to enable interrupts for a bbdev
+device, if supported by the driver. Should be called before starting the device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_bbdev_intr_enable</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="queues-configuration">
+<h3><span class="section-number">19.2.4. </span>Queues Configuration</h3>
+<p>Each bbdev devices queue is individually configured through the
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_queue_configure()</span></code> API.
+Each queue resources may be allocated on a specified socket.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_queue_conf</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">socket</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">queue_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">priority</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">bool</span><span class="w"> </span><span class="n">deferred_start</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_bbdev_op_type</span><span class="w"> </span><span class="n">op_type</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="device-queues-management">
+<h3><span class="section-number">19.2.5. </span>Device &amp; Queues Management</h3>
+<p>After initialization, devices are in a stopped state, so must be started by the
+application. If an application is finished using a device it can close the
+device. Once closed, it cannot be restarted.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_start</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">)</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_stop</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">)</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_close</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">)</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_queue_start</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">)</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_queue_stop</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>By default, all queues are started when the device is started, but they can be
+stopped individually.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_queue_start</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">)</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_queue_stop</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="logical-cores-memory-and-queues-relationships">
+<h3><span class="section-number">19.2.6. </span>Logical Cores, Memory and Queues Relationships</h3>
+<p>The bbdev poll mode device driver library supports NUMA architecture, in which
+a processor’s logical cores and interfaces utilize it’s local memory. Therefore
+with baseband operations, the mbuf being operated on should be allocated from memory
+pools created in the local memory. The buffers should, if possible, remain on
+the local processor to obtain the best performance results and buffer
+descriptors should be populated with mbufs allocated from a mempool allocated
+from local memory.</p>
+<p>The run-to-completion model also performs better, especially in the case of
+virtual bbdev devices, if the baseband operation and data buffers are in local
+memory instead of a remote processor’s memory. This is also true for the
+pipe-line model provided all logical cores used are located on the same processor.</p>
+<p>Multiple logical cores should never share the same queue for enqueuing
+operations or dequeuing operations on the same bbdev device since this would
+require global locks and hinder performance. It is however possible to use a
+different logical core to dequeue an operation on a queue pair from the logical
+core which it was enqueued on. This means that a baseband burst enqueue/dequeue
+APIs are a logical place to transition from one logical core to another in a
+packet processing pipeline.</p>
+</section>
+</section>
+<section id="device-operation-capabilities">
+<h2><span class="section-number">19.3. </span>Device Operation Capabilities</h2>
+<p>Capabilities (in terms of operations supported, max number of queues, etc.)
+identify what a bbdev is capable of performing that differs from one device to
+another. For the full scope of the bbdev capability see the definition of the
+structure in the <em>DPDK API Reference</em>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_cap</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>A device reports its capabilities when registering itself in the bbdev framework.
+With the aid of this capabilities mechanism, an application can query devices to
+discover which operations within the 3GPP physical layer they are capable of
+performing. Below is an example of the capabilities for a PMD it supports in
+relation to Turbo Encoding and Decoding operations.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_cap</span><span class="w"> </span><span class="n">bbdev_capabilities</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_OP_TURBO_DEC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">cap</span><span class="p">.</span><span class="n">turbo_dec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">capability_flags</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_SUBBLOCK_DEINTERLEAVE</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_POS_LLR_1_BIT_IN</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_NEG_LLR_1_BIT_IN</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_CRC_TYPE_24B</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_DEC_TB_CRC_24B_KEEP</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                </span><span class="n">RTE_BBDEV_TURBO_EARLY_TERMINATION</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">max_llr_modulus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">num_buffers_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_TURBO_MAX_CODE_BLOCKS</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">num_buffers_hard_out</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                    </span><span class="n">RTE_BBDEV_TURBO_MAX_CODE_BLOCKS</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">num_buffers_soft_out</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">type</span><span class="w">   </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_OP_TURBO_ENC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">cap</span><span class="p">.</span><span class="n">turbo_enc</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">capability_flags</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                    </span><span class="n">RTE_BBDEV_TURBO_CRC_24B_ATTACH</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                    </span><span class="n">RTE_BBDEV_TURBO_CRC_24A_ATTACH</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                    </span><span class="n">RTE_BBDEV_TURBO_RATE_MATCH</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">                    </span><span class="n">RTE_BBDEV_TURBO_RV_INDEX_BYPASS</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">num_buffers_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_TURBO_MAX_CODE_BLOCKS</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">num_buffers_dst</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_TURBO_MAX_CODE_BLOCKS</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="n">RTE_BBDEV_END_OF_CAPABILITIES_LIST</span><span class="p">()</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<section id="capabilities-discovery">
+<h3><span class="section-number">19.3.1. </span>Capabilities Discovery</h3>
+<p>Discovering the features and capabilities of a bbdev device poll mode driver
+is achieved through the <code class="docutils literal notranslate"><span class="pre">rte_bbdev_info_get()</span></code> function.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_info_get</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_info</span><span class="w"> </span><span class="o">*</span><span class="n">dev_info</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This allows the user to query a specific bbdev PMD and get all the device
+capabilities. The <code class="docutils literal notranslate"><span class="pre">rte_bbdev_info</span></code> structure provides two levels of
+information:</p>
+<ul class="simple">
+<li><p>Device relevant information, like: name and related rte_bus.</p></li>
+<li><p>Driver specific information, as defined by the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_bbdev_driver_info</span></code>
+structure, this is where capabilities reside along with other specifics like:
+maximum queue sizes and priority level.</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_driver_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Driver name */</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">driver_name</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Maximum number of queues supported by the device */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">max_num_queues</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Maximum number of queues supported per operation type */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_queues</span><span class="p">[</span><span class="n">RTE_BBDEV_OP_TYPE_SIZE_MAX</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Priority level supported per operation type */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">queue_priority</span><span class="p">[</span><span class="n">RTE_BBDEV_OP_TYPE_SIZE_MAX</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Queue size limit (queue size must also be power of 2) */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">queue_size_lim</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Set if device off-loads operation to hardware  */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">bool</span><span class="w"> </span><span class="n">hardware_accelerated</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Max value supported by queue priority for DL */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">max_dl_queue_priority</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Max value supported by queue priority for UL */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">max_ul_queue_priority</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Set if device supports per-queue interrupts */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">bool</span><span class="w"> </span><span class="n">queue_intr_supported</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Device Status */</span><span class="w"></span>
+<span class="w">	</span><span class="k">enum</span><span class="w"> </span><span class="n">rte_bbdev_device_status</span><span class="w"> </span><span class="n">device_status</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** HARQ memory available in kB */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">harq_buffer_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Minimum alignment of buffers, in bytes */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">min_alignment</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Byte endianness (RTE_BIG_ENDIAN/RTE_LITTLE_ENDIAN) supported</span>
+<span class="cm">	 *  for input/output data</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">data_endianness</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Default queue configuration used if none is supplied  */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_queue_conf</span><span class="w"> </span><span class="n">default_queue_conf</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Device operation capabilities */</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_cap</span><span class="w"> </span><span class="o">*</span><span class="n">capabilities</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Device cpu_flag requirements */</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_cpu_flag_t</span><span class="w"> </span><span class="o">*</span><span class="n">cpu_flag_reqs</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** FFT windowing width for 2048 FFT - size defined in capability. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="o">*</span><span class="n">fft_window_width</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; NUMA socket that device is on */</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">dev_name</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Unique device name */</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_device</span><span class="w"> </span><span class="o">*</span><span class="n">device</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Device Information */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_queues</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Number of queues currently configured */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">bool</span><span class="w"> </span><span class="n">started</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Set if device is currently started */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_driver_info</span><span class="w"> </span><span class="n">drv</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Info from device driver */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="capabilities-details-for-ldpc-decoder">
+<h3><span class="section-number">19.3.2. </span>Capabilities details for LDPC Decoder</h3>
+<p>On top of the <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_&lt;*&gt;</span></code> capabilities
+the device also exposes the LLR numerical representation
+expected by the decoder as a fractional fixed-point representation.
+For instance, when the representation (<code class="docutils literal notranslate"><span class="pre">llr_size</span></code>, <code class="docutils literal notranslate"><span class="pre">llr_decimals</span></code>) = (8, 2) respectively,
+this means that each input LLR in the data provided by the application must be computed
+as 8 total bits (including sign bit)
+where 2 of these are fractions bits (also referred to as S8.2 format).
+It is up to the user application during LLR generation to scale the LLR
+according to this optimal numerical representation.
+Any mis-scaled LLR would cause wireless performance degradation.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">harq_buffer_size</span></code> exposes the amount of dedicated DDR
+made available for the device operation.
+This is specific for accelerator non-integrated on the CPU (separate PCIe device)
+which may include separate on-card memory.</p>
+</section>
+<section id="capabilities-details-for-fft-function">
+<h3><span class="section-number">19.3.3. </span>Capabilities details for FFT function</h3>
+<p>The total number of distinct time windows supported
+for the post-FFT point-wise multiplication is exposed as <code class="docutils literal notranslate"><span class="pre">fft_windows_num</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">window_index</span></code> provided for each cyclic shift
+in each <code class="docutils literal notranslate"><span class="pre">rte_bbdev_op_fft</span></code> operation is expected to be limited to that size.</p>
+<p>The information related to the width of each of these pre-configured window
+is also exposed using the <code class="docutils literal notranslate"><span class="pre">fft_window_width</span></code> array.
+This provides the number of non-null samples
+used for each window index when scaling back the size to a reference of 1024 FFT.
+The actual shape size is effectively scaled up or down
+based on the dynamic size of the FFT operation being used.</p>
+<p>This allows to distinguish different version of the flexible pointwise windowing
+applied to the FFT and exposes this platform configuration to the application.</p>
+</section>
+<section id="other-optional-capabilities-exposed-during-device-discovery">
+<h3><span class="section-number">19.3.4. </span>Other optional capabilities exposed during device discovery</h3>
+<p>The device status can be used to expose additional information
+related to the state of the platform notably based on its configuration state
+or related to error management (correctable or non).</p>
+<p>The queue topology exposed to the device is provided on top of the capabilities.
+This provides the number of queues available
+for the exposed bbdev device (the physical device may have more)
+for each operation as well as the different level of priority available for arbitration.
+These are based on the arrays and parameters
+<code class="docutils literal notranslate"><span class="pre">num_queues</span></code>, <code class="docutils literal notranslate"><span class="pre">queue_priority</span></code>, <code class="docutils literal notranslate"><span class="pre">max_num_queues</span></code>, <code class="docutils literal notranslate"><span class="pre">queue_size_lim</span></code>.</p>
+</section>
+</section>
+<section id="operation-processing">
+<h2><span class="section-number">19.4. </span>Operation Processing</h2>
+<p>Scheduling of baseband operations on DPDK’s application data path is
+performed using a burst oriented asynchronous API set. A queue on a bbdev
+device accepts a burst of baseband operations using enqueue burst API. On physical
+bbdev devices the enqueue burst API will place the operations to be processed
+on the device’s hardware input queue, for virtual devices the processing of the
+baseband operations is usually completed during the enqueue call to the bbdev
+device. The dequeue burst API will retrieve any processed operations available
+from the queue on the bbdev device, from physical devices this is usually
+directly from the device’s processed queue, and for virtual device’s from a
+<code class="docutils literal notranslate"><span class="pre">rte_ring</span></code> where processed operations are placed after being processed on the
+enqueue call.</p>
+<section id="enqueue-dequeue-burst-apis">
+<h3><span class="section-number">19.4.1. </span>Enqueue / Dequeue Burst APIs</h3>
+<p>The burst enqueue API uses a bbdev device identifier and a queue
+identifier to specify the bbdev device queue to schedule the processing on.
+The <code class="docutils literal notranslate"><span class="pre">num_ops</span></code> parameter is the number of operations to process which are
+supplied in the <code class="docutils literal notranslate"><span class="pre">ops</span></code> array of <code class="docutils literal notranslate"><span class="pre">rte_bbdev_*_op</span></code> structures.
+The enqueue function returns the number of operations it actually enqueued for
+processing, a return value equal to <code class="docutils literal notranslate"><span class="pre">num_ops</span></code> means that all packets have been
+enqueued.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_bbdev_enqueue_enc_ops</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_enc_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_bbdev_enqueue_dec_ops</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_dec_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The dequeue API uses the same format as the enqueue API of processed but
+the <code class="docutils literal notranslate"><span class="pre">num_ops</span></code> and <code class="docutils literal notranslate"><span class="pre">ops</span></code> parameters are now used to specify the max processed
+operations the user wishes to retrieve and the location in which to store them.
+The API call returns the actual number of processed operations returned, this
+can never be larger than <code class="docutils literal notranslate"><span class="pre">num_ops</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_bbdev_dequeue_enc_ops</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_enc_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_bbdev_dequeue_dec_ops</span><span class="p">(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_dec_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="operation-representation">
+<h3><span class="section-number">19.4.2. </span>Operation Representation</h3>
+<p>An encode bbdev operation is represented by <code class="docutils literal notranslate"><span class="pre">rte_bbdev_enc_op</span></code> structure,
+and by <code class="docutils literal notranslate"><span class="pre">rte_bbdev_dec_op</span></code> for decode. These structures act as metadata
+containers for all necessary information required for the bbdev operation to be
+processed on a particular bbdev device poll mode driver.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_enc_op</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">status</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">opaque_data</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_turbo_enc</span><span class="w"> </span><span class="n">turbo_enc</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_ldpc_enc</span><span class="w"> </span><span class="n">ldpc_enc</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_dec_op</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">status</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">opaque_data</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_turbo_dec</span><span class="w"> </span><span class="n">turbo_enc</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_ldpc_dec</span><span class="w"> </span><span class="n">ldpc_enc</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The operation structure by itself defines the operation type. It includes an
+operation status, a reference to the operation specific data, which can vary in
+size and content depending on the operation being provisioned. It also contains
+the source mempool for the operation, if it is allocated from a mempool.</p>
+<p>If bbdev operations are allocated from a bbdev operation mempool, see next
+section, there is also the ability to allocate private memory with the
+operation for applications purposes.</p>
+<p>Application software is responsible for specifying all the operation specific
+fields in the <code class="docutils literal notranslate"><span class="pre">rte_bbdev_*_op</span></code> structure which are then used by the bbdev PMD
+to process the requested operation.</p>
+</section>
+<section id="operation-management-and-allocation">
+<h3><span class="section-number">19.4.3. </span>Operation Management and Allocation</h3>
+<p>The bbdev library provides an API set for managing bbdev operations which
+utilize the Mempool Library to allocate operation buffers. Therefore, it ensures
+that the bbdev operation is interleaved optimally across the channels and
+ranks for optimal processing.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_bbdev_op_pool_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_bbdev_op_type</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_elements</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">cache_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">rte_bbdev_*_op_alloc_bulk()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_bbdev_*_op_free_bulk()</span></code> are used to
+allocate bbdev operations of a specific type from a given bbdev operation mempool.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_enc_op_alloc_bulk</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_enc_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="n">rte_bbdev_dec_op_alloc_bulk</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_dec_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">rte_bbdev_*_op_free_bulk()</span></code> is called by the application to return an
+operation to its allocating pool.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="n">rte_bbdev_dec_op_free_bulk</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_dec_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="n">rte_bbdev_enc_op_free_bulk</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_enc_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">num_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="bbdev-inbound-outbound-memory">
+<h3><span class="section-number">19.4.4. </span>BBDEV Inbound/Outbound Memory</h3>
+<p>The bbdev operation structure contains all the mutable data relating to
+performing Turbo and LDPC coding on a referenced mbuf data buffer. It is used for either
+encode or decode operations.</p>
+<table class="colwidths-given docutils align-default" id="id1">
+<caption><span class="caption-number">Table 19.1 </span><span class="caption-text">Operation I/O</span></caption>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 38%" />
+<col style="width: 38%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>FEC</p></th>
+<th class="head"><p>In</p></th>
+<th class="head"><p>Out</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Turbo Encode</p></td>
+<td><p>input</p></td>
+<td><p>output</p></td>
+</tr>
+<tr class="row-odd"><td><p>Turbo Decode</p></td>
+<td><p>input</p></td>
+<td><p>hard output</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td></td>
+<td><p>soft output (optional)</p></td>
+</tr>
+<tr class="row-odd"><td><p>LDPC Encode</p></td>
+<td><p>input</p></td>
+<td><p>output</p></td>
+</tr>
+<tr class="row-even"><td><p>LDPC Decode</p></td>
+<td><p>input</p></td>
+<td><p>hard output</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>HQ combine (optional)</p></td>
+<td><p>HQ combine (optional)</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td></td>
+<td><p>soft output (optional)</p></td>
+</tr>
+</tbody>
+</table>
+<p>It is expected that the application provides input and output mbuf pointers
+allocated and ready to use.</p>
+<p>The baseband framework supports FEC coding on Code Blocks (CB) and
+Transport Blocks (TB).</p>
+<p>For the output buffer(s), the application is required to provide an allocated
+and free mbuf, to which the resulting output will be written.</p>
+<p>The support of split “scattered” buffers is a driver-specific feature, so it is
+reported individually by the supporting driver as a capability.</p>
+<p>Input and output data buffers are identified by <code class="docutils literal notranslate"><span class="pre">rte_bbdev_op_data</span></code> structure,
+as follows:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This structure has three elements:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">data</span></code>: This is the mbuf data structure representing the data for BBDEV
+operation.</p>
+<p>This mbuf pointer can point to one Code Block (CB) data buffer or multiple CBs
+contiguously located next to each other. A Transport Block (TB) represents a
+whole piece of data that is divided into one or more CBs. Maximum number of
+CBs can be contained in one TB is defined by
+<code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_(TURBO/LDPC)MAX_CODE_BLOCKS</span></code>.</p>
+<p>An mbuf data structure cannot represent more than one TB. The smallest piece
+of data that can be contained in one mbuf is one CB.
+An mbuf can include one contiguous CB, subset of contiguous CBs that are
+belonging to one TB, or all contiguous CBs that belong to one TB.</p>
+<p>If a BBDEV PMD supports the extended capability “Scatter-Gather”, then it is
+capable of collecting (gathering) non-contiguous (scattered) data from
+multiple locations in the memory.
+This capability is reported by the capability flags:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_ENC_SCATTER_GATHER</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_SCATTER_GATHER</span></code>,</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_ENC_SCATTER_GATHER</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_DEC_SCATTER_GATHER</span></code>.</p></li>
+</ul>
+<p>Chained mbuf data structures are only accepted if a BBDEV PMD supports this
+feature. A chained mbuf can represent one non-contiguous CB or multiple non-contiguous
+CBs. The first mbuf segment in the given chained mbuf represents the first piece
+of the CB. Offset is only applicable to the first segment. <code class="docutils literal notranslate"><span class="pre">length</span></code> is the
+total length of the CB.</p>
+<p>BBDEV driver is responsible for identifying where the split is and enqueue
+the split data to its internal queues.</p>
+<p>If BBDEV PMD does not support this feature, it will assume inbound mbuf data
+contains one segment.</p>
+<p>The output mbuf data though is always one segment, even if the input was a
+chained mbuf.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">offset</span></code>: This is the starting point of the BBDEV (encode/decode) operation,
+in bytes.</p>
+<p>BBDEV starts to read data past this offset.
+In case of chained mbuf, this offset applies only to the first mbuf segment.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">length</span></code>: This is the total data length to be processed in one operation,
+in bytes.</p>
+<p>In case the mbuf data is representing one CB, this is the length of the CB
+undergoing the operation.
+If it is for multiple CBs, this is the total length of those CBs undergoing
+the operation.
+If it is for one TB, this is the total length of the TB under operation.
+In case of chained mbuf, this data length includes the lengths of the
+“scattered” data segments undergoing the operation.</p>
+</li>
+</ul>
+</section>
+<section id="bbdev-turbo-encode-operation">
+<h3><span class="section-number">19.4.5. </span>BBDEV Turbo Encode Operation</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_turbo_enc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The input CB or TB data */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The rate matched CB or TB output buffer */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Flags from rte_bbdev_op_te_flag_bitmasks */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Rv index for rate matching [0:3] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">rv_index</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** [0 - TB : 1 - CB] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">code_block_mode</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Code Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_enc_turbo_cb_params</span><span class="w"> </span><span class="n">cb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Transport Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_enc_turbo_tb_params</span><span class="w"> </span><span class="n">tb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The Turbo encode structure includes the <code class="docutils literal notranslate"><span class="pre">input</span></code> and <code class="docutils literal notranslate"><span class="pre">output</span></code> mbuf
+data pointers. The provided mbuf pointer of <code class="docutils literal notranslate"><span class="pre">input</span></code> needs to be big
+enough to stretch for extra CRC trailers.</p>
+<table class="colwidths-given docutils align-default" id="id2">
+<caption><span class="caption-number">Table 19.2 </span><span class="caption-text"><strong>struct rte_bbdev_op_turbo_enc</strong> parameters</span></caption>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>input</p></td>
+<td><p>input CB or TB data</p></td>
+</tr>
+<tr class="row-odd"><td><p>output</p></td>
+<td><p>rate matched CB or TB output buffer</p></td>
+</tr>
+<tr class="row-even"><td><p>op_flags</p></td>
+<td><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-odd"><td><p>rv_index</p></td>
+<td><p>redundancy version index [0..3]</p></td>
+</tr>
+<tr class="row-even"><td><p>code_block_mode</p></td>
+<td><p>code block or transport block mode</p></td>
+</tr>
+<tr class="row-odd"><td><p>cb_params</p></td>
+<td><p>code block specific parameters (code block mode only)</p></td>
+</tr>
+<tr class="row-even"><td><p>tb_params</p></td>
+<td><p>transport block specific parameters (transport block mode only)</p></td>
+</tr>
+</tbody>
+</table>
+<p>The encode interface works on both the code block (CB) and the transport block
+(TB). An operation executes in “CB-mode” when the CB is standalone. While
+“TB-mode” executes when an operation performs on one or multiple CBs that
+belong to a TB. Therefore, a given data can be standalone CB, full-size TB or
+partial TB. Partial TB means that only a subset of CBs belonging to a bigger TB
+are being enqueued.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> It is assumed that all enqueued ops in one <code class="docutils literal notranslate"><span class="pre">rte_bbdev_enqueue_enc_ops()</span></code>
+call belong to one mode, either CB-mode or TB-mode.</p>
+</div></blockquote>
+<p>In case that the TB is smaller than Z (6144 bits), then effectively the TB = CB.
+CRC24A is appended to the tail of the CB. The application is responsible for
+calculating and appending CRC24A before calling BBDEV in case that the
+underlying driver does not support CRC24A generation.</p>
+<p>In CB-mode, CRC24A/B is an optional operation.
+The CB parameter <code class="docutils literal notranslate"><span class="pre">k</span></code> is the size of the CB (this maps to K as described
+in 3GPP TS 36.212 section 5.1.2), this size is inclusive of CRC24A/B.
+The <code class="docutils literal notranslate"><span class="pre">length</span></code> is inclusive of CRC24A/B and equals to <code class="docutils literal notranslate"><span class="pre">k</span></code> in this case.</p>
+<p>Not all BBDEV PMDs are capable of CRC24A/B calculation. Flags
+<code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_24A_ATTACH</span></code> and <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_CRC_24B_ATTACH</span></code>
+informs the application with relevant capability. These flags can be set in the
+<code class="docutils literal notranslate"><span class="pre">op_flags</span></code> parameter to indicate to BBDEV to calculate and append CRC24A/B
+to CB before going forward with Turbo encoding.</p>
+<p>Output format of the CB encode will have the encoded CB in <code class="docutils literal notranslate"><span class="pre">e</span></code> size output
+(this maps to E described in 3GPP TS 36.212 section 5.1.4.1.2). The output mbuf
+buffer size needs to be big enough to hold the encoded buffer of size <code class="docutils literal notranslate"><span class="pre">e</span></code>.</p>
+<p>In TB-mode, CRC24A is assumed to be pre-calculated and appended to the inbound
+TB mbuf data buffer.
+The output mbuf data structure is expected to be allocated by the application
+with enough room for the output data.</p>
+<p>The difference between the partial and full-size TB is that we need to know the
+index of the first CB in this group and the number of CBs contained within.
+The first CB index is given by <code class="docutils literal notranslate"><span class="pre">r</span></code> but the number of the remaining CBs is
+calculated automatically by BBDEV before passing down to the driver.</p>
+<p>The number of remaining CBs should not be confused with <code class="docutils literal notranslate"><span class="pre">c</span></code>. <code class="docutils literal notranslate"><span class="pre">c</span></code> is the
+total number of CBs that composes the whole TB (this maps to C as
+described in 3GPP TS 36.212 section 5.1.2).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">length</span></code> is total size of the CBs inclusive of any CRC24A and CRC24B in
+case they were appended by the application.</p>
+<p>The case when one CB belongs to TB and is being enqueued individually to BBDEV,
+this case is considered as a special case of partial TB where its number of CBs
+is 1. Therefore, it requires to get processed in TB-mode.</p>
+<p>The figure below visualizes the encoding of CBs using BBDEV interface in
+TB-mode. CB-mode is a reduced version, where only one CB exists:</p>
+<figure class="align-default" id="id3">
+<span id="figure-turbo-tb-encode"></span><img alt="../_images/turbo_tb_encode.svg" src="../_images/turbo_tb_encode.svg" /><figcaption>
+<p><span class="caption-number">Fig. 19.1 </span><span class="caption-text">Turbo encoding of Code Blocks in mbuf structure</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="bbdev-turbo-decode-operation">
+<h3><span class="section-number">19.4.6. </span>BBDEV Turbo Decode Operation</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_turbo_dec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The Virtual Circular Buffer, wk, size 3*Kpi for each CB */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The hard decisions buffer for the decoded output,</span>
+<span class="cm">	 * size K for each CB</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">hard_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The soft LLR output buffer - optional */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">soft_output</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Flags from rte_bbdev_op_td_flag_bitmasks */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Rv index for rate matching [0:3] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">rv_index</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The minimum number of iterations to perform in decoding all CBs in</span>
+<span class="cm">	 * this operation - input</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">iter_min</span><span class="o">:</span><span class="mi">4</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The maximum number of iterations to perform in decoding all CBs in</span>
+<span class="cm">	 * this operation - input</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">iter_max</span><span class="o">:</span><span class="mi">4</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The maximum number of iterations that were performed in decoding</span>
+<span class="cm">	 * all CBs in this decode operation - output</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">iter_count</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** 5 bit extrinsic scale (scale factor on extrinsic info) */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">ext_scale</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of MAP engines to use in decode,</span>
+<span class="cm">	 *  must be power of 2 (or 0 to auto-select)</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">num_maps</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** [0 - TB : 1 - CB] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">code_block_mode</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Code Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_dec_turbo_cb_params</span><span class="w"> </span><span class="n">cb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Transport Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_dec_turbo_tb_params</span><span class="w"> </span><span class="n">tb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The Turbo decode structure includes the <code class="docutils literal notranslate"><span class="pre">input</span></code>, <code class="docutils literal notranslate"><span class="pre">hard_output</span></code> and
+optionally the <code class="docutils literal notranslate"><span class="pre">soft_output</span></code> mbuf data pointers.</p>
+<table class="colwidths-given docutils align-default" id="id4">
+<caption><span class="caption-number">Table 19.3 </span><span class="caption-text"><strong>struct rte_bbdev_op_turbo_dec</strong> parameters</span></caption>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>input</p></td>
+<td><p>virtual circular buffer, wk, size 3*Kpi for each CB</p></td>
+</tr>
+<tr class="row-odd"><td><p>hard output</p></td>
+<td><p>hard decisions buffer, decoded output, size K for each CB</p></td>
+</tr>
+<tr class="row-even"><td><p>soft output</p></td>
+<td><p>soft LLR output buffer (optional)</p></td>
+</tr>
+<tr class="row-odd"><td><p>op_flags</p></td>
+<td><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-even"><td><p>rv_index</p></td>
+<td><p>redundancy version index [0..3]</p></td>
+</tr>
+<tr class="row-odd"><td><p>iter_max</p></td>
+<td><p>maximum number of iterations to perform in decode all CBs</p></td>
+</tr>
+<tr class="row-even"><td><p>iter_min</p></td>
+<td><p>minimum number of iterations to perform in decoding all CBs</p></td>
+</tr>
+<tr class="row-odd"><td><p>iter_count</p></td>
+<td><p>number of iterations to performed in decoding all CBs</p></td>
+</tr>
+<tr class="row-even"><td><p>ext_scale</p></td>
+<td><p>scale factor on extrinsic info (5 bits)</p></td>
+</tr>
+<tr class="row-odd"><td><p>num_maps</p></td>
+<td><p>number of MAP engines to use in decode</p></td>
+</tr>
+<tr class="row-even"><td><p>code_block_mode</p></td>
+<td><p>code block or transport block mode</p></td>
+</tr>
+<tr class="row-odd"><td><p>cb_params</p></td>
+<td><p>code block specific parameters (code block mode only)</p></td>
+</tr>
+<tr class="row-even"><td><p>tb_params</p></td>
+<td><p>transport block specific parameters (transport block mode only)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Similarly, the decode interface works on both the code block (CB) and the
+transport block (TB). An operation executes in “CB-mode” when the CB is
+standalone. While “TB-mode” executes when an operation performs on one or
+multiple CBs that belong to a TB. Therefore, a given data can be standalone CB,
+full-size TB or partial TB. Partial TB means that only a subset of CBs belonging
+to a bigger TB are being enqueued.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> It is assumed that all enqueued ops in one <code class="docutils literal notranslate"><span class="pre">rte_bbdev_enqueue_dec_ops()</span></code>
+call belong to one mode, either CB-mode or TB-mode.</p>
+</div></blockquote>
+<p>The CB parameter <code class="docutils literal notranslate"><span class="pre">k</span></code> is the size of the decoded CB (this maps to K as described in
+3GPP TS 36.212 section 5.1.2), this size is inclusive of CRC24A/B.
+The <code class="docutils literal notranslate"><span class="pre">length</span></code> is inclusive of CRC24A/B and equals to <code class="docutils literal notranslate"><span class="pre">k</span></code> in this case.</p>
+<p>The input encoded CB data is the Virtual Circular Buffer data stream, wk, with
+the null padding included as described in 3GPP TS 36.212 section 5.1.4.1.2 and
+shown in 3GPP TS 36.212 section 5.1.4.1 Figure 5.1.4-1.
+The size of the virtual circular buffer is 3*Kpi, where Kpi is the 32 byte
+aligned value of K, as specified in 3GPP TS 36.212 section 5.1.4.1.1.</p>
+<p>Each byte in the input circular buffer is the LLR value of each bit of the
+original CB.</p>
+<p><code class="docutils literal notranslate"><span class="pre">hard_output</span></code> is a mandatory capability that all BBDEV PMDs support. This is
+the decoded CBs of K sizes (CRC24A/B is the last 24-bit in each decoded CB).
+Soft output is an optional capability for BBDEV PMDs. Setting flag
+<code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_TURBO_DEC_TB_CRC_24B_KEEP</span></code> in <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> directs BBDEV to retain
+CRC24B at the end of each CB. This might be useful for the application in debug
+mode.
+An LLR rate matched output is computed in the <code class="docutils literal notranslate"><span class="pre">soft_output</span></code> buffer structure
+for the given CB parameter <code class="docutils literal notranslate"><span class="pre">e</span></code> size (this maps to E described in
+3GPP TS 36.212 section 5.1.4.1.2). The output mbuf buffer size needs to be big
+enough to hold the encoded buffer of size <code class="docutils literal notranslate"><span class="pre">e</span></code>.</p>
+<p>The first CB Virtual Circular Buffer (VCB) index is given by <code class="docutils literal notranslate"><span class="pre">r</span></code> but the
+number of the remaining CB VCBs is calculated automatically by BBDEV before
+passing down to the driver.</p>
+<p>The number of remaining CB VCBs should not be confused with <code class="docutils literal notranslate"><span class="pre">c</span></code>. <code class="docutils literal notranslate"><span class="pre">c</span></code> is the
+total number of CBs that composes the whole TB (this maps to C as
+described in 3GPP TS 36.212 section 5.1.2).</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">length</span></code> is total size of the CBs inclusive of any CRC24A and CRC24B in
+case they were appended by the application.</p>
+<p>The case when one CB belongs to TB and is being enqueued individually to BBDEV,
+this case is considered as a special case of partial TB where its number of CBs
+is 1. Therefore, it requires to get processed in TB-mode.</p>
+<p>The output mbuf data structure is expected to be allocated by the application
+with enough room for the output data.</p>
+<p>The figure below visualizes the decoding of CBs using BBDEV interface in
+TB-mode. CB-mode is a reduced version, where only one CB exists:</p>
+<figure class="align-default" id="id5">
+<span id="figure-turbo-tb-decode"></span><img alt="../_images/turbo_tb_decode.svg" src="../_images/turbo_tb_decode.svg" /><figcaption>
+<p><span class="caption-number">Fig. 19.2 </span><span class="caption-text">Turbo decoding of Code Blocks in mbuf structure</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="bbdev-ldpc-encode-operation">
+<h3><span class="section-number">19.4.7. </span>BBDEV LDPC Encode Operation</h3>
+<p>The operation flags that can be set for each LDPC encode operation are
+given below.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> The actual operation flags that may be used with a specific
+BBDEV PMD are dependent on the driver capabilities as reported via
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_info_get()</span></code>, and may be a subset of those below.</p>
+</div></blockquote>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Description of LDPC encode capability flags</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_INTERLEAVER_BYPASS</dt><dd><p>Set to bypass bit-level interleaver on output stream</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_RATE_MATCH</dt><dd><p>Set to enabling the RATE_MATCHING processing</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_24A_ATTACH</dt><dd><p>Set to attach transport block CRC-24A</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_24B_ATTACH</dt><dd><p>Set to attach code block CRC-24B</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_16_ATTACH</dt><dd><p>Set to attach code block CRC-16</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_ENC_INTERRUPTS</dt><dd><p>Set if a device supports encoder dequeue interrupts</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_ENC_SCATTER_GATHER</dt><dd><p>Set if a device supports scatter-gather functionality</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_ENC_CONCATENATION</dt><dd><p>Set if a device supports concatenation of non byte aligned output</p>
+</dd>
+</dl>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The structure passed for each LDPC encode operation is given below,
+with the operation flags forming a bitmask in the <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> field.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_ldpc_enc</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The input TB or CB data */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The rate matched TB or CB output buffer */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">output</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Flags from rte_bbdev_op_ldpcenc_flag_bitmasks */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Rate matching redundancy version */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">rv_index</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** 1: LDPC Base graph 1, 2: LDPC Base graph 2.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">basegraph</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Zc, LDPC lifting size.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">z_c</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Ncb, length of the circular buffer in bits.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.4.2.1]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">n_cb</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Qm, modulation order {2,4,6,8,10}.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.4.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">q_m</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of Filler bits, n_filler = K – K’</span>
+<span class="cm">	 *  [3GPP TS38.212 section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">n_filler</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** [0 - TB : 1 - CB] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">code_block_mode</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Code Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_enc_ldpc_cb_params</span><span class="w"> </span><span class="n">cb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Transport Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_enc_ldpc_tb_params</span><span class="w"> </span><span class="n">tb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The LDPC encode parameters are set out in the table below.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 14%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head" colspan="2"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>input</p></td>
+<td colspan="2"><p>input CB or TB data</p></td>
+</tr>
+<tr class="row-odd"><td><p>output</p></td>
+<td colspan="2"><p>rate matched CB or TB output buffer</p></td>
+</tr>
+<tr class="row-even"><td><p>op_flags</p></td>
+<td colspan="2"><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-odd"><td><p>rv_index</p></td>
+<td colspan="2"><p>redundancy version index [0..3]</p></td>
+</tr>
+<tr class="row-even"><td><p>basegraph</p></td>
+<td colspan="2"><p>Basegraph 1 or 2</p></td>
+</tr>
+<tr class="row-odd"><td><p>z_c</p></td>
+<td colspan="2"><p>Zc, LDPC lifting size</p></td>
+</tr>
+<tr class="row-even"><td><p>n_cb</p></td>
+<td colspan="2"><p>Ncb, length of the circular buffer in bits.</p></td>
+</tr>
+<tr class="row-odd"><td><p>q_m</p></td>
+<td colspan="2"><p>Qm, modulation order {2,4,6,8,10}</p></td>
+</tr>
+<tr class="row-even"><td><p>n_filler</p></td>
+<td colspan="2"><p>number of filler bits</p></td>
+</tr>
+<tr class="row-odd"><td><p>code_block_mode</p></td>
+<td colspan="2"><p>code block or transport block mode</p></td>
+</tr>
+<tr class="row-even"><td><p>op_flags</p></td>
+<td colspan="2"><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>cb_params</strong></p></td>
+<td colspan="2"><p>code block specific parameters (code block mode only)</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>e</p></td>
+<td><p>E, length of the rate matched output sequence in bits</p></td>
+</tr>
+<tr class="row-odd"><td><p><strong>tb_params</strong></p></td>
+<td colspan="2"><p>transport block specific parameters (transport block mode only)</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>c</p></td>
+<td><p>number of CBs in the TB or partial TB</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>r</p></td>
+<td><p>index of the first CB in the inbound mbuf data</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>c_ab</p></td>
+<td><p>number of CBs that use Ea before switching to Eb</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>ea</p></td>
+<td><p>Ea, length of the RM output sequence in bits, r &lt; cab</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>eb</p></td>
+<td><p>Eb, length of the RM output sequence in bits, r &gt;= cab</p></td>
+</tr>
+</tbody>
+</table>
+<p>The mbuf input <code class="docutils literal notranslate"><span class="pre">input</span></code> is mandatory for all BBDEV PMDs and is the
+incoming code block or transport block data.</p>
+<p>The mbuf output <code class="docutils literal notranslate"><span class="pre">output</span></code> is mandatory and is the encoded CB(s). In
+CB-mode ut contains the encoded CB of size <code class="docutils literal notranslate"><span class="pre">e</span></code> (E  in 3GPP TS 38.212
+section 6.2.5). In TB-mode it contains multiple contiguous encoded CBs
+of size <code class="docutils literal notranslate"><span class="pre">ea</span></code> or <code class="docutils literal notranslate"><span class="pre">eb</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">output</span></code> buffer is allocated by the application with enough room
+for the output data.</p>
+<p>The encode interface works on both a code block (CB) and a transport
+block (TB) basis.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> All enqueued ops in one <code class="docutils literal notranslate"><span class="pre">rte_bbdev_enqueue_enc_ops()</span></code>
+call belong to one mode, either CB-mode or TB-mode.</p>
+</div></blockquote>
+<p>The valid modes of operation are:</p>
+<ul class="simple">
+<li><p>CB-mode: one CB (attach CRC24B if required)</p></li>
+<li><p>CB-mode: one CB making up one TB (attach CRC24A if required)</p></li>
+<li><p>TB-mode: one or more CB of a partial TB (attach CRC24B(s) if required)</p></li>
+<li><p>TB-mode: one or more CB of a complete TB (attach CRC24AB(s) if required)</p></li>
+</ul>
+<p>In CB-mode if <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24A_ATTACH</span></code> is set then CRC24A
+is appended to the CB. If <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24A_ATTACH</span></code> is not
+set the application is responsible for calculating and appending CRC24A
+before calling BBDEV. The input data mbuf <code class="docutils literal notranslate"><span class="pre">length</span></code> is inclusive of
+CRC24A/B where present and is equal to the code block size <code class="docutils literal notranslate"><span class="pre">K</span></code>.</p>
+<p>In TB-mode, CRC24A is assumed to be pre-calculated and appended to the
+inbound TB data buffer, unless the <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24A_ATTACH</span></code>
+flag is set when it is the  responsibility of BBDEV. The input data
+mbuf <code class="docutils literal notranslate"><span class="pre">length</span></code> is total size of the CBs inclusive of any CRC24A and
+CRC24B in the case they were appended by the application.</p>
+<p>Not all BBDEV PMDs may be capable of CRC24A/B calculation. Flags
+<code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24A_ATTACH</span></code> and <code class="docutils literal notranslate"><span class="pre">RTE_BBDEV_LDPC_CRC_24B_ATTACH</span></code>
+inform the application of the relevant capability. These flags can be set
+in the <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> parameter to indicate BBDEV to calculate and append
+CRC24A to CB before going forward with LDPC encoding.</p>
+<p>The difference between the partial and full-size TB is that BBDEV needs
+the index of the first CB in this group and the number of CBs in the group.
+The first CB index is given by <code class="docutils literal notranslate"><span class="pre">r</span></code> but the number of the CBs is
+calculated by BBDEV before signalling to the driver.</p>
+<p>The number of CBs in the group should not be confused with <code class="docutils literal notranslate"><span class="pre">c</span></code>, the
+total number of CBs in the full TB (<code class="docutils literal notranslate"><span class="pre">C</span></code> as per 3GPP TS 38.212 section 5.2.2)</p>
+<p>Figure <a class="reference internal" href="#figure-turbo-tb-encode"><span class="std std-numref">Fig. 19.1</span></a> above
+showing the Turbo encoding of CBs using BBDEV interface in TB-mode
+is also valid for LDPC encode.</p>
+</section>
+<section id="bbdev-ldpc-decode-operation">
+<h3><span class="section-number">19.4.8. </span>BBDEV LDPC Decode Operation</h3>
+<p>The operation flags that can be set for each LDPC decode operation are
+given below.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> The actual operation flags that may be used with a specific
+BBDEV PMD are dependent on the driver capabilities as reported via
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_info_get()</span></code>, and may be a subset of those below.</p>
+</div></blockquote>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Description of LDPC decode capability flags</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_TYPE_24A_CHECK</dt><dd><p>Set for transport block CRC-24A checking</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_TYPE_24B_CHECK</dt><dd><p>Set for code block CRC-24B checking</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_TYPE_24B_DROP</dt><dd><p>Set to drop the last CRC bits decoding output</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_CRC_TYPE_16_CHECK</dt><dd><p>Set for code block CRC-16 checking</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_DEINTERLEAVER_BYPASS</dt><dd><p>Set for bit-level de-interleaver bypass on input stream</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_HQ_COMBINE_IN_ENABLE</dt><dd><p>Set for HARQ combined input stream enable</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_HQ_COMBINE_OUT_ENABLE</dt><dd><p>Set for HARQ combined output stream enable</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl>
+<dt>RTE_BBDEV_LDPC_DECODE_BYPASS</dt><dd><p>Set for LDPC decoder bypass</p>
+<p>RTE_BBDEV_LDPC_HQ_COMBINE_OUT_ENABLE must be set</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_DECODE_SOFT_OUT</dt><dd><p>Set for soft-output stream  enable</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_SOFT_OUT_RM_BYPASS</dt><dd><p>Set for Rate-Matching bypass on soft-out stream</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_SOFT_OUT_DEINTERLEAVER_BYPASS</dt><dd><p>Set for bit-level de-interleaver bypass on soft-output stream</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl>
+<dt>RTE_BBDEV_LDPC_ITERATION_STOP_ENABLE</dt><dd><p>Set for iteration stopping on successful decode condition enable</p>
+<p>Where a successful decode is a successful syndrome check</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_DEC_INTERRUPTS</dt><dd><p>Set if a device supports decoder dequeue interrupts</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_DEC_SCATTER_GATHER</dt><dd><p>Set if a device supports scatter-gather functionality</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_HARQ_6BIT_COMPRESSION</dt><dd><p>Set if a device supports input/output HARQ compression
+Data is packed as 6 bits by dropping and saturating the MSBs</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_LLR_COMPRESSION</dt><dd><p>Set if a device supports input LLR compression
+Data is packed as 6 bits by dropping and saturating the MSBs</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_IN_ENABLE</dt><dd><p>Set if a device supports HARQ input to device’s internal memory</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_OUT_ENABLE</dt><dd><p>Set if a device supports HARQ output to device’s internal memory</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_LOOPBACK</dt><dd><p>Set if a device supports loopback access to HARQ internal memory</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_FILLERS</dt><dd><p>Set if a device includes LLR filler bits in HARQ circular buffer</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><p>RTE_BBDEV_LDPC_HARQ_4BIT_COMPRESSION
+Set if a device supports input/output 4 bits HARQ compression</p></td>
+</tr>
+</tbody>
+</table>
+<p>The structure passed for each LDPC decode operation is given below,
+with the operation flags forming a bitmask in the <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> field.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_ldpc_dec</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The Virtual Circular Buffer for this code block, one LLR</span>
+<span class="cm">	 * per bit of the original CB.</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The hard decisions buffer for the decoded output,</span>
+<span class="cm">	 * size K for each CB</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">hard_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The soft LLR output LLR stream buffer - optional */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">soft_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The HARQ combined LLR stream input buffer - optional */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">harq_combined_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The HARQ combined LLR stream output buffer - optional */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">harq_combined_output</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Flags from rte_bbdev_op_ldpcdec_flag_bitmasks */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">	</span><span class="cm">/** Rate matching redundancy version</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.4.2.1]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">rv_index</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The maximum number of iterations to perform in decoding CB in</span>
+<span class="cm">	 *  this operation - input</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">iter_max</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** The number of iterations that were performed in decoding</span>
+<span class="cm">	 * CB in this decode operation - output</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">iter_count</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** 1: LDPC Base graph 1, 2: LDPC Base graph 2.</span>
+<span class="cm">	 * [3GPP TS38.212, section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">basegraph</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Zc, LDPC lifting size.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">z_c</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Ncb, length of the circular buffer in bits.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.4.2.1]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">n_cb</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Qm, modulation order {1,2,4,6,8}.</span>
+<span class="cm">	 *  [3GPP TS38.212, section 5.4.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">q_m</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of Filler bits, n_filler = K – K’</span>
+<span class="cm">	 *  [3GPP TS38.212 section 5.2.2]</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">n_filler</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** [0 - TB : 1 - CB] */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">code_block_mode</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Code Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_dec_ldpc_cb_params</span><span class="w"> </span><span class="n">cb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/** Struct which stores Transport Block specific parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_dec_ldpc_tb_params</span><span class="w"> </span><span class="n">tb_params</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The LDPC decode parameters are set out in the table below.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 19%" />
+<col style="width: 14%" />
+<col style="width: 66%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head" colspan="2"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>input</p></td>
+<td colspan="2"><p>input CB or TB data</p></td>
+</tr>
+<tr class="row-odd"><td><p>hard_output</p></td>
+<td colspan="2"><p>hard decisions buffer, decoded output</p></td>
+</tr>
+<tr class="row-even"><td><p>soft_output</p></td>
+<td colspan="2"><p>soft LLR output buffer (optional)</p></td>
+</tr>
+<tr class="row-odd"><td><p>harq_comb_input</p></td>
+<td colspan="2"><p>HARQ combined input buffer (optional)</p></td>
+</tr>
+<tr class="row-even"><td><p>harq_comb_output</p></td>
+<td colspan="2"><p>HARQ combined output buffer (optional)</p></td>
+</tr>
+<tr class="row-odd"><td><p>op_flags</p></td>
+<td colspan="2"><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-even"><td><p>rv_index</p></td>
+<td colspan="2"><p>redundancy version index [0..3]</p></td>
+</tr>
+<tr class="row-odd"><td><p>basegraph</p></td>
+<td colspan="2"><p>Basegraph 1 or 2</p></td>
+</tr>
+<tr class="row-even"><td><p>z_c</p></td>
+<td colspan="2"><p>Zc, LDPC lifting size</p></td>
+</tr>
+<tr class="row-odd"><td><p>n_cb</p></td>
+<td colspan="2"><p>Ncb, length of the circular buffer in bits.</p></td>
+</tr>
+<tr class="row-even"><td><p>q_m</p></td>
+<td colspan="2"><p>Qm, modulation order {1,2,4,6,8} from pi/2-BPSK to 256QAM</p></td>
+</tr>
+<tr class="row-odd"><td><p>n_filler</p></td>
+<td colspan="2"><p>number of filler bits</p></td>
+</tr>
+<tr class="row-even"><td><p>iter_max</p></td>
+<td colspan="2"><p>maximum number of iterations to perform in decode all CBs</p></td>
+</tr>
+<tr class="row-odd"><td><p>iter_count</p></td>
+<td colspan="2"><p>number of iterations performed in decoding all CBs</p></td>
+</tr>
+<tr class="row-even"><td><p>code_block_mode</p></td>
+<td colspan="2"><p>code block or transport block mode</p></td>
+</tr>
+<tr class="row-odd"><td><p>op_flags</p></td>
+<td colspan="2"><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>cb_params</strong></p></td>
+<td colspan="2"><p>code block specific parameters (code block mode only)</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>e</p></td>
+<td><p>E, length of the rate matched output sequence in bits</p></td>
+</tr>
+<tr class="row-even"><td><p><strong>tb_params</strong></p></td>
+<td colspan="2"><p>transport block specific parameters (transport block mode only)</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>c</p></td>
+<td><p>number of CBs in the TB or partial TB</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>r</p></td>
+<td><p>index of the first CB in the inbound mbuf data</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>c_ab</p></td>
+<td><p>number of CBs that use Ea before switching to Eb</p></td>
+</tr>
+<tr class="row-even"><td></td>
+<td><p>ea</p></td>
+<td><p>Ea, length of the RM output sequence in bits, r &lt; cab</p></td>
+</tr>
+<tr class="row-odd"><td></td>
+<td><p>eb</p></td>
+<td><p>Eb, length of the RM output sequence in bits  r &gt;= cab</p></td>
+</tr>
+</tbody>
+</table>
+<p>The mbuf input <code class="docutils literal notranslate"><span class="pre">input</span></code> encoded CB data is mandatory for all BBDEV PMDs
+and is the Virtual Circular Buffer data stream with null padding.
+Each byte in the input circular buffer is the LLR value of each bit of
+the original CB.</p>
+<p>The mbuf output <code class="docutils literal notranslate"><span class="pre">hard_output</span></code> is mandatory and is the decoded CBs size
+K (CRC24A/B is the last 24-bit in each decoded CB).</p>
+<p>The mbuf output <code class="docutils literal notranslate"><span class="pre">soft_output</span></code> is optional and is an LLR rate matched
+output of size <code class="docutils literal notranslate"><span class="pre">e</span></code> (this is <code class="docutils literal notranslate"><span class="pre">E</span></code> as per 3GPP TS 38.212 section 6.2.5).</p>
+<p>The mbuf input <code class="docutils literal notranslate"><span class="pre">harq_combine_input</span></code> is optional and is a buffer with
+the input to the HARQ combination function of the device. If the
+capability RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_IN_ENABLE is set
+then the HARQ is stored in memory internal to the device and not visible
+to BBDEV.</p>
+<p>The mbuf output <code class="docutils literal notranslate"><span class="pre">harq_combine_output</span></code> is optional and is a buffer for
+the output of the HARQ combination function of the device. If the
+capability RTE_BBDEV_LDPC_INTERNAL_HARQ_MEMORY_OUT_ENABLE is set
+then the HARQ is stored in memory internal to the device and not visible
+to BBDEV.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>More explicitly for a typical usage of HARQ retransmission
+in a VRAN application using a HW PMD, there will be 2 cases.</p>
+<p>For 1st transmission, only the HARQ output is enabled:</p>
+<ul class="simple">
+<li><p>the harq_combined_output.offset is provided to a given address.
+ie. typically an integer index * 32K,
+where the index is tracked by the application based on code block index
+for a given UE and HARQ process.</p></li>
+<li><p>the related operation flag would notably include
+RTE_BBDEV_LDPC_HQ_COMBINE_OUT_ENABLE and RTE_BBDEV_LDPC_HARQ_6BIT_COMPRESSION.</p></li>
+<li><p>note that no explicit flush or reset of the memory is required.</p></li>
+</ul>
+<p>For 2nd transmission, an input is also required to benefit from HARQ combination gain:</p>
+<ul class="simple">
+<li><p>the changes mentioned above are the same (note that rvIndex may be adjusted).</p></li>
+<li><p>the operation flag would additionally include the LDPC_HQ_COMBINE_IN_ENABLE flag.</p></li>
+<li><p>the harq_combined_input.offset must be set to the address of the related code block
+(ie. same as the harq_combine_output index above for the same code block, HARQ process, UE).</p></li>
+<li><p>the harq_combined_input.length must be set to the length
+which was provided back in the related harq_combined_output.length
+when it has processed and dequeued (previous HARQ iteration).</p></li>
+</ul>
+</div>
+<p>The output mbuf data structures are expected to be allocated by the
+application with enough room for the output data.</p>
+<p>As with the LDPC encode, the decode interface works on both a code block
+(CB) and a transport block (TB) basis.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> All enqueued ops in one <code class="docutils literal notranslate"><span class="pre">rte_bbdev_enqueue_dec_ops()</span></code>
+call belong to one mode, either CB-mode or TB-mode.</p>
+</div></blockquote>
+<p>The valid modes of operation are:</p>
+<ul class="simple">
+<li><p>CB-mode: one CB (check CRC24B if required)</p></li>
+<li><p>CB-mode: one CB making up one TB (check CRC24A if required)</p></li>
+<li><p>TB-mode: one or more CB making up a partial TB (check CRC24B(s) if required)</p></li>
+<li><p>TB-mode: one or more CB making up a complete TB (check CRC24B(s) if required)</p></li>
+</ul>
+<p>The mbuf <code class="docutils literal notranslate"><span class="pre">length</span></code> is inclusive of CRC24A/B where present and is equal
+the code block size <code class="docutils literal notranslate"><span class="pre">K</span></code>.</p>
+<p>The first CB Virtual Circular Buffer (VCB) index is given by <code class="docutils literal notranslate"><span class="pre">r</span></code> but the
+number of the remaining CB VCBs is calculated automatically by BBDEV
+and passed down to the driver.</p>
+<p>The number of remaining CB VCBs should not be confused with <code class="docutils literal notranslate"><span class="pre">c</span></code>, the
+total number of CBs in the full TB (<code class="docutils literal notranslate"><span class="pre">C</span></code> as per 3GPP TS 38.212 section 5.2.2)</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">length</span></code> is total size of the CBs inclusive of any CRC24A and CRC24B in
+case they were appended by the application.</p>
+<p>Figure <a class="reference internal" href="#figure-turbo-tb-decode"><span class="std std-numref">Fig. 19.2</span></a> above
+showing the Turbo decoding of CBs using BBDEV interface in TB-mode
+is also valid for LDPC decode.</p>
+</section>
+<section id="bbdev-fft-operation">
+<h3><span class="section-number">19.4.9. </span>BBDEV FFT Operation</h3>
+<p>This operation allows to run a combination of DFT and/or IDFT and/or time-domain windowing.
+These can be used in a modular fashion (using bypass modes) or as a processing pipeline
+which can be used for FFT-based baseband signal processing.</p>
+<p>In more details it allows :</p>
+<ul class="simple">
+<li><p>to process the data first through an IDFT of adjustable size and padding;</p></li>
+<li><p>to perform the windowing as a programmable cyclic shift offset of the data
+followed by a pointwise multiplication by a time domain window;</p></li>
+<li><p>to process the related data through a DFT of adjustable size and
+de-padding for each such cyclic shift output.</p></li>
+</ul>
+<p>A flexible number of Rx antennas are being processed in parallel with the same configuration.
+The API allows more generally for flexibility in what the PMD may support (capability flags) and
+flexibility to adjust some of the parameters of the processing.</p>
+<p>The structure passed for each FFT operation is given below,
+with the operation flags forming a bitmask in the <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> field.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> The actual operation flags that may be used with a specific
+bbdev PMD are dependent on the driver capabilities as reported via
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_info_get()</span></code>, and may be a subset of those below.</p>
+</div></blockquote>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_fft</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Input data starting from first antenna. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">base_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Output data starting from first antenna and first cyclic shift. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">base_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Optional frequency window input data. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">dewindowing_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Optional power measurement output data. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">power_meas_output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Flags from rte_bbdev_op_fft_flag_bitmasks. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Input sequence size in 32-bits points. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">input_sequence_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Padding at the start of the sequence. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">input_leading_padding</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Output sequence size in 32-bits points. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">output_sequence_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Depadding at the start of the DFT output. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">output_leading_depadding</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Window index being used for each cyclic shift output. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">window_index</span><span class="p">[</span><span class="n">RTE_BBDEV_MAX_CS_2</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Bitmap of the cyclic shift output requested. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">cs_bitmap</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of antennas as a log2 – 8 to 128. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">num_antennas_log2</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** iDFT size as a log2 - 32 to 2048. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">idft_log2</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** DFT size as a log2 - 8 to 2048. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dft_log2</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Adjustment of position of the cyclic shifts - -31 to 31. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int8_t</span><span class="w"> </span><span class="n">cs_time_adjustment</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** iDFT shift down. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int8_t</span><span class="w"> </span><span class="n">idft_shift</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** DFT shift down. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int8_t</span><span class="w"> </span><span class="n">dft_shift</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** NCS reciprocal factor. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">ncs_reciprocal</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Power measurement out shift down. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">power_shift</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Adjust the FP6 exponent for INT&lt;-&gt;FP16 conversion. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">fp16_exp_adjust</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Frequency resampling : 0: Transparent Mode1: 4/3 Resample2: 2/3 Resample. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int8_t</span><span class="w"> </span><span class="n">freq_resample_mode</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Output depadded size prior to frequency resampling. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">output_depadded_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Time error correction initial phase. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">cs_theta_0</span><span class="p">[</span><span class="n">RTE_BBDEV_MAX_CS</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Time error correction phase increment. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cs_theta_d</span><span class="p">[</span><span class="n">RTE_BBDEV_MAX_CS</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/* Time offset per CS of time domain samples. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int8_t</span><span class="w"> </span><span class="n">time_offset</span><span class="p">[</span><span class="n">RTE_BBDEV_MAX_CS</span><span class="p">];</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Description of FFT capability flags</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_WINDOWING</dt><dd><p>Set to enable/support windowing in time domain</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_CS_ADJUSTMENT</dt><dd><p>Set to enable/support  the cyclic shift time offset adjustment</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_DFT_BYPASS</dt><dd><p>Set to bypass the DFT and use directly the IDFT as an option</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_IDFT_BYPASS</dt><dd><p>Set to bypass the IDFT and use directly the DFT as an option</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_WINDOWING_BYPASS</dt><dd><p>Set to bypass the time domain windowing  as an option</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_POWER_MEAS</dt><dd><p>Set to provide an optional power measurement of the DFT output</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_FP16_INPUT</dt><dd><p>Set if the input data shall use FP16 format instead of INT16</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_FP16_OUTPUT</dt><dd><p>Set if the output data shall use FP16 format instead of INT16</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_TIMING_OFFSET_PER_CS</dt><dd><p>Set if device supports adjusting time offset per CS</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_TIMING_ERROR</dt><dd><p>Set if device supports correcting for timing error</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_DEWINDOWING</dt><dd><p>Set if enabling the option FFT Dewindowing in Frequency domain</p>
+</dd>
+</dl>
+</td>
+</tr>
+<tr class="row-odd"><td><dl class="simple">
+<dt>RTE_BBDEV_FFT_FREQ_RESAMPLING</dt><dd><p>Set if device supports the optional frequency resampling</p>
+</dd>
+</dl>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The FFT parameters are set out in the table below.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>base_input</p></td>
+<td><p>input data</p></td>
+</tr>
+<tr class="row-odd"><td><p>base_output</p></td>
+<td><p>output data</p></td>
+</tr>
+<tr class="row-even"><td><p>dewindowing_input</p></td>
+<td><p>optional frequency domain dewindowing input data</p></td>
+</tr>
+<tr class="row-odd"><td><p>power_meas_output</p></td>
+<td><p>optional output data with power measurement on DFT output</p></td>
+</tr>
+<tr class="row-even"><td><p>op_flags</p></td>
+<td><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-odd"><td><p>input_sequence_size</p></td>
+<td><p>size of the input sequence in 32-bits points per antenna</p></td>
+</tr>
+<tr class="row-even"><td><p>input_leading_padding</p></td>
+<td><p>number of points padded at the start of input data</p></td>
+</tr>
+<tr class="row-odd"><td><p>output_sequence_size</p></td>
+<td><p>size of the output sequence per antenna and cyclic shift</p></td>
+</tr>
+<tr class="row-even"><td><p>output_leading_depadding</p></td>
+<td><p>number of points de-padded at the start of output data</p></td>
+</tr>
+<tr class="row-odd"><td><p>window_index</p></td>
+<td><p>optional windowing profile index used for each cyclic shift</p></td>
+</tr>
+<tr class="row-even"><td><p>cs_bitmap</p></td>
+<td><p>bitmap of the cyclic shift output requested (LSB for index 0)</p></td>
+</tr>
+<tr class="row-odd"><td><p>num_antennas_log2</p></td>
+<td><p>number of antennas as a log2 (10 maps to 1024…)</p></td>
+</tr>
+<tr class="row-even"><td><p>idft_log2</p></td>
+<td><p>IDFT size as a log2</p></td>
+</tr>
+<tr class="row-odd"><td><p>dft_log2</p></td>
+<td><p>DFT size as a log2</p></td>
+</tr>
+<tr class="row-even"><td><p>cs_time_adjustment</p></td>
+<td><p>adjustment of time position of all the cyclic shift output</p></td>
+</tr>
+<tr class="row-odd"><td><p>idft_shift</p></td>
+<td><p>shift down of signal level post iDFT</p></td>
+</tr>
+<tr class="row-even"><td><p>dft_shift</p></td>
+<td><p>shift down of signal level post DFT</p></td>
+</tr>
+<tr class="row-odd"><td><p>ncs_reciprocal</p></td>
+<td><p>inverse of max number of CS normalized to 15b (ie. 231 for 12)</p></td>
+</tr>
+<tr class="row-even"><td><p>power_shift</p></td>
+<td><p>shift down of level of power measurement when enabled</p></td>
+</tr>
+<tr class="row-odd"><td><p>fp16_exp_adjust</p></td>
+<td><p>value added to FP16 exponent at conversion from INT16</p></td>
+</tr>
+<tr class="row-even"><td><p>freq_resample_mode</p></td>
+<td><p>frequency ressampling mode (0:transparent, 1-2: resample)</p></td>
+</tr>
+<tr class="row-odd"><td><p>output_depadded_size</p></td>
+<td><p>output depadded size prior to frequency resampling</p></td>
+</tr>
+<tr class="row-even"><td><p>cs_theta_0</p></td>
+<td><p>timing error correction initial phase</p></td>
+</tr>
+<tr class="row-odd"><td><p>cs_theta_d</p></td>
+<td><p>timing error correction phase increment</p></td>
+</tr>
+<tr class="row-even"><td><p>time_offset</p></td>
+<td><p>time offset per CS of time domain samples</p></td>
+</tr>
+</tbody>
+</table>
+<p>The mbuf input <code class="docutils literal notranslate"><span class="pre">base_input</span></code> is mandatory for all bbdev PMDs and
+is the incoming data for the processing. Its size may not fit into an actual mbuf,
+but the structure is used to pass iova address.
+The mbuf output <code class="docutils literal notranslate"><span class="pre">output</span></code> is mandatory and is output of the FFT processing chain.
+Each point is a complex number of 32bits :
+either as 2 INT16 or as 2 FP16 based when the option supported.
+The data layout is based on contiguous concatenation of output data
+first by cyclic shift then by antenna.</p>
+</section>
+<section id="bbdev-mld-ts-operation">
+<h3><span class="section-number">19.4.10. </span>BBDEV MLD-TS Operation</h3>
+<p>This operation allows to run the Tree Search (TS) portion of a Maximum Likelihood processing (MLD).</p>
+<p>This alternate equalization option accelerates the exploration of the best combination of
+transmitted symbols across layers minimizing the Euclidean distance between the received and
+reconstructed signal, then generates the LLRs to be used by the LDPC Decoder.
+The input is the results of the Q R decomposition: Q^Hy signal and R matrix.</p>
+<p>The structure passed for each MLD-TS operation is given below,
+with the operation flags forming a bitmask in the <code class="docutils literal notranslate"><span class="pre">op_flags</span></code> field.</p>
+<blockquote>
+<div><p><strong>NOTE:</strong> The actual operation flags that may be used with a specific
+bbdev PMD are dependent on the driver capabilities as reported via
+<code class="docutils literal notranslate"><span class="pre">rte_bbdev_info_get()</span></code>, and may be a subset of those below.</p>
+</div></blockquote>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_mldts</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Input data QHy from QR decomposition. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">qhy_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Input data R from QR decomposition. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">r_input</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Output data post MLD-TS. */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_bbdev_op_data</span><span class="w"> </span><span class="n">output</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Flags from *rte_bbdev_op_MLDTS_flag_bitmasks*. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">op_flags</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of RBs. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_rbs</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Number of layers 2-&gt;4. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_layers</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Modulation order (2-&gt;8 QPSK to 256QAM). */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">q_m</span><span class="p">[</span><span class="n">RTE_BBDEV_MAX_MLD_LAYERS</span><span class="p">];</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Row repetition for the same R matrix - subcarriers. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">r_rep</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/** Column repetition for the same R matrix - symbols. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">c_rep</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Description of MLD-TS capability flags</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><dl class="simple">
+<dt>RTE_BBDEV_MLDTS_REP</dt><dd><p>Set if the option to use repeated data from R channel is supported</p>
+</dd>
+</dl>
+</td>
+</tr>
+</tbody>
+</table>
+<p>The MLD-TS parameters are set out in the table below.</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Parameter</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>qhy_input</p></td>
+<td><p>input data qHy</p></td>
+</tr>
+<tr class="row-odd"><td><p>r_input</p></td>
+<td><p>input data R triangular matrix</p></td>
+</tr>
+<tr class="row-even"><td><p>output</p></td>
+<td><p>output data (LLRs)</p></td>
+</tr>
+<tr class="row-odd"><td><p>op_flags</p></td>
+<td><p>bitmask of all active operation capabilities</p></td>
+</tr>
+<tr class="row-even"><td><p>num_rbs</p></td>
+<td><p>number of Resource Blocks</p></td>
+</tr>
+<tr class="row-odd"><td><p>num_layers</p></td>
+<td><p>number of overlapping layers</p></td>
+</tr>
+<tr class="row-even"><td><p>q_m</p></td>
+<td><p>array of modulation order for each layer</p></td>
+</tr>
+<tr class="row-odd"><td><p>r_rep</p></td>
+<td><p>optional row repetition for the R matrix (subcarriers)</p></td>
+</tr>
+<tr class="row-even"><td><p>c_rep</p></td>
+<td><p>optional column repetition for the R matrix (symbols)</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="sample-code">
+<h2><span class="section-number">19.5. </span>Sample code</h2>
+<p>The baseband device sample application gives an introduction on how to use the
+bbdev framework, by giving a sample code performing a loop-back operation with a
+baseband processor capable of transceiving data packets.</p>
+<p>The following sample C-like pseudo-code shows the basic steps to encode several
+buffers using (<strong>sw_turbo</strong>) bbdev PMD.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* EAL Init */</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eal_init</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="n">argv</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Invalid EAL arguments</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Get number of available bbdev devices */</span><span class="w"></span>
+<span class="n">nb_bbdevs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_count</span><span class="p">();</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nb_bbdevs</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;No bbdevs detected!</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Create bbdev op pools */</span><span class="w"></span>
+<span class="n">bbdev_op_pool</span><span class="p">[</span><span class="n">RTE_BBDEV_OP_TURBO_ENC</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_bbdev_op_pool_create</span><span class="p">(</span><span class="s">&quot;bbdev_op_pool_enc&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="n">RTE_BBDEV_OP_TURBO_ENC</span><span class="p">,</span><span class="w"> </span><span class="n">NB_MBUF</span><span class="p">,</span><span class="w"> </span><span class="mi">128</span><span class="p">,</span><span class="w"> </span><span class="n">rte_socket_id</span><span class="p">());</span><span class="w"></span>
+
+<span class="cm">/* Get information for this device */</span><span class="w"></span>
+<span class="n">rte_bbdev_info_get</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Setup BBDEV device queues */</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_setup_queues</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">qs_nb</span><span class="p">,</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s">&quot;ERROR(%d): BBDEV %u not configured properly</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">ret</span><span class="p">,</span><span class="w"> </span><span class="n">dev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* setup device queues */</span><span class="w"></span>
+<span class="n">qconf</span><span class="p">.</span><span class="n">socket</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">socket_id</span><span class="p">;</span><span class="w"></span>
+<span class="n">qconf</span><span class="p">.</span><span class="n">queue_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">drv</span><span class="p">.</span><span class="n">queue_size_lim</span><span class="p">;</span><span class="w"></span>
+<span class="n">qconf</span><span class="p">.</span><span class="n">op_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BBDEV_OP_TURBO_ENC</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">q_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">q_id</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">qs_nb</span><span class="p">;</span><span class="w"> </span><span class="n">q_id</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Configure all queues belonging to this bbdev device */</span><span class="w"></span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_queue_configure</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">q_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">qconf</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="s">&quot;ERROR(%d): BBDEV %u queue %u not configured properly</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="n">ret</span><span class="p">,</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">q_id</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Start bbdev device */</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_start</span><span class="p">(</span><span class="n">dev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Create the mbuf mempool for pkts */</span><span class="w"></span>
+<span class="n">mbuf_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_pktmbuf_pool_create</span><span class="p">(</span><span class="s">&quot;bbdev_mbuf_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="n">NB_MBUF</span><span class="p">,</span><span class="w"> </span><span class="n">MEMPOOL_CACHE_SIZE</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="n">RTE_MBUF_DEFAULT_BUF_SIZE</span><span class="p">,</span><span class="w"> </span><span class="n">rte_socket_id</span><span class="p">());</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mbuf_pool</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="s">&quot;Unable to create &#39;%s&#39; pool</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">pool_name</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">global_exit_flag</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Allocate burst of op structures in preparation for enqueue */</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_bbdev_enc_op_alloc_bulk</span><span class="p">(</span><span class="n">bbdev_op_pool</span><span class="p">[</span><span class="n">RTE_BBDEV_OP_TURBO_ENC</span><span class="p">],</span><span class="w"></span>
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">,</span><span class="w"> </span><span class="n">op_num</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Allocate input mbuf pkts */</span><span class="w"></span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_pktmbuf_alloc_bulk</span><span class="p">(</span><span class="n">mbuf_pool</span><span class="p">,</span><span class="w"> </span><span class="n">input_pkts_burst</span><span class="p">,</span><span class="w"> </span><span class="n">MAX_PKT_BURST</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Allocate output mbuf pkts */</span><span class="w"></span>
+<span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_pktmbuf_alloc_bulk</span><span class="p">(</span><span class="n">mbuf_pool</span><span class="p">,</span><span class="w"> </span><span class="n">output_pkts_burst</span><span class="p">,</span><span class="w"> </span><span class="n">MAX_PKT_BURST</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">j</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">op_num</span><span class="p">;</span><span class="w"> </span><span class="n">j</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Append the size of the ethernet header */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_pktmbuf_append</span><span class="p">(</span><span class="n">input_pkts_burst</span><span class="p">[</span><span class="n">j</span><span class="p">],</span><span class="w"></span>
+<span class="w">                </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* set op */</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">turbo_enc</span><span class="p">.</span><span class="n">input</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">            </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">turbo_enc</span><span class="o">-&gt;</span><span class="n">input</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">            </span><span class="n">rte_pktmbuf_pkt_len</span><span class="p">(</span><span class="n">bbdev_pkts</span><span class="p">[</span><span class="n">j</span><span class="p">]);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">turbo_enc</span><span class="o">-&gt;</span><span class="n">input</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">            </span><span class="n">input_pkts_burst</span><span class="p">[</span><span class="n">j</span><span class="p">];</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">turbo_enc</span><span class="o">-&gt;</span><span class="n">output</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">            </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">ops_burst</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">turbo_enc</span><span class="o">-&gt;</span><span class="n">output</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                </span><span class="n">output_pkts_burst</span><span class="p">[</span><span class="n">j</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Enqueue packets on BBDEV device */</span><span class="w"></span>
+<span class="w">    </span><span class="n">op_num</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_enqueue_enc_ops</span><span class="p">(</span><span class="n">qconf</span><span class="o">-&gt;</span><span class="n">bbdev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">qconf</span><span class="o">-&gt;</span><span class="n">bbdev_qs</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="w"> </span><span class="n">ops_burst</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">MAX_PKT_BURST</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Dequeue packets from BBDEV device*/</span><span class="w"></span>
+<span class="w">    </span><span class="n">op_num</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_bbdev_dequeue_enc_ops</span><span class="p">(</span><span class="n">qconf</span><span class="o">-&gt;</span><span class="n">bbdev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">qconf</span><span class="o">-&gt;</span><span class="n">bbdev_qs</span><span class="p">[</span><span class="n">q</span><span class="p">],</span><span class="w"> </span><span class="n">ops_burst</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">MAX_PKT_BURST</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<section id="bbdev-device-api">
+<h3><span class="section-number">19.5.1. </span>BBDEV Device API</h3>
+<p>The bbdev Library API is described in the <em>DPDK API Reference</em> document.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="traffic_management.html" title="previous chapter"><span class="section-number">18. </span>Traffic Management API</a></li>
+      <li>Next: <a href="cryptodev_lib.html" title="next chapter"><span class="section-number">20. </span>Cryptography Device Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/bbdev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

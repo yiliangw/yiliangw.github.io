@@ -1,0 +1,296 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>44. Federal Information Processing Standards (FIPS) CryptoDev Validation &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="45. IPsec Security Gateway Sample Application" href="ipsec_secgw.html" />
+    <link rel="prev" title="43. PTP Client Sample Application" href="ptpclient.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="federal-information-processing-standards-fips-cryptodev-validation">
+<h1><span class="section-number">44. </span>Federal Information Processing Standards (FIPS) CryptoDev Validation</h1>
+<section id="overview">
+<h2><span class="section-number">44.1. </span>Overview</h2>
+<p>Federal Information Processing Standards (FIPS) are publicly announced standards
+developed by the United States federal government for use in computer systems by
+non-military government agencies and government contractors.</p>
+<p>This application is used to parse and perform symmetric cryptography
+computation to the NIST Cryptographic Algorithm Validation Program (CAVP) and
+Automated Crypto Validation Protocol (ACVP) test vectors.</p>
+<p>For an algorithm implementation to be listed on a cryptographic module
+validation certificate as an Approved security function, the algorithm
+implementation must meet all the requirements of FIPS 140-2 (in case of CAVP)
+and FIPS 140-3 (in case of ACVP) and must successfully complete the
+cryptographic algorithm validation process.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">44.2. </span>Limitations</h2>
+</section>
+<section id="cavp">
+<h2><span class="section-number">44.3. </span>CAVP</h2>
+<ul>
+<li><p>The version of request file supported is <code class="docutils literal notranslate"><span class="pre">CAVS</span> <span class="pre">21.0</span></code>.</p></li>
+<li><p>If the header comment in a <code class="docutils literal notranslate"><span class="pre">.req</span></code> file does not contain a Algo tag
+i.e <code class="docutils literal notranslate"><span class="pre">AES,TDES,GCM</span></code> you need to manually add it into the header comment for
+example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># VARIABLE KEY - KAT for CBC / # TDES VARIABLE KEY - KAT for CBC
+</pre></div>
+</div>
+</li>
+<li><p>The application does not supply the test vectors. The user is expected to
+obtain the test vector files from <a class="reference external" href="https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/block-ciphers">CAVP</a> website. To obtain the <code class="docutils literal notranslate"><span class="pre">.req</span></code> files you need to
+email a person from the NIST website and pay for the <code class="docutils literal notranslate"><span class="pre">.req</span></code> files.
+The <code class="docutils literal notranslate"><span class="pre">.rsp</span></code> files from the site can be used to validate and compare with
+the <code class="docutils literal notranslate"><span class="pre">.rsp</span></code> files created by the FIPS application.</p></li>
+<li><dl class="simple">
+<dt>Supported test vectors</dt><dd><ul class="simple">
+<li><p>AES-CBC (128,192,256) - GFSbox, KeySbox, MCT, MMT</p></li>
+<li><p>AES-GCM (128,192,256) - EncryptExtIV, Decrypt</p></li>
+<li><p>AES-CCM (128) - VADT, VNT, VPT, VTT, DVPT</p></li>
+<li><p>AES-CMAC (128) - Generate, Verify</p></li>
+<li><p>HMAC (SHA1, SHA224, SHA256, SHA384, SHA512)</p></li>
+<li><p>TDES-CBC (1 Key, 2 Keys, 3 Keys) - MMT, Monte, Permop, Subkey, Varkey,
+VarText</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="acvp">
+<h2><span class="section-number">44.4. </span>ACVP</h2>
+<ul class="simple">
+<li><p>The application does not supply the test vectors. The user is expected to
+obtain the test vector files from <a class="reference external" href="https://pages.nist.gov/ACVP">ACVP</a>
+website.</p></li>
+<li><dl class="simple">
+<dt>Supported test vectors</dt><dd><ul>
+<li><p>AES-CBC (128,192,256) - AFT, MCT</p></li>
+<li><p>AES-GCM (128,192,256) - AFT</p></li>
+<li><p>AES-CCM (128,192,256) - AFT</p></li>
+<li><p>AES-CMAC (128,192,256) - AFT</p></li>
+<li><p>AES-CTR (128,192,256) - AFT, CTR</p></li>
+<li><p>AES-GMAC (128,192,256) - AFT</p></li>
+<li><p>AES-XTS (128,256) - AFT</p></li>
+<li><p>HMAC (SHA1, SHA224, SHA256, SHA384, SHA512, SHA3_224, SHA3_256, SHA3_384, SHA3_512)</p></li>
+<li><p>SHA (1, 224, 256, 384, 512) - AFT, MCT</p></li>
+<li><p>SHA3 (224, 256, 384, 512) - AFT, MCT</p></li>
+<li><p>SHAKE (128, 256) - AFT, MCT, VOT</p></li>
+<li><p>TDES-CBC - AFT, MCT</p></li>
+<li><p>TDES-ECB - AFT, MCT</p></li>
+<li><p>RSA</p></li>
+<li><p>ECDSA</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+<section id="application-information">
+<h2><span class="section-number">44.5. </span>Application Information</h2>
+<p>If a <code class="docutils literal notranslate"><span class="pre">.req</span></code> is used as the input file after the application is finished
+running it will generate a response file or <code class="docutils literal notranslate"><span class="pre">.rsp</span></code>. Differences between the
+two files are, the <code class="docutils literal notranslate"><span class="pre">.req</span></code> file has missing information for instance if doing
+encryption you will not have the cipher text and that will be generated in the
+response file. Also if doing decryption it will not have the plain text until it
+finished the work and in the response file it will be added onto the end of each
+operation.</p>
+<p>The application can be run with a <code class="docutils literal notranslate"><span class="pre">.rsp</span></code> file and what the outcome of that
+will be is it will add a extra line in the generated <code class="docutils literal notranslate"><span class="pre">.rsp</span></code> which should be
+the same as the <code class="docutils literal notranslate"><span class="pre">.rsp</span></code> used to run the application, this is useful for
+validating if the application has done the operation correctly.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">44.6. </span>Compiling the Application</h2>
+<ul>
+<li><p>Compile Application</p>
+<blockquote>
+<div><p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+</div></blockquote>
+</li>
+<li><p>Run <code class="docutils literal notranslate"><span class="pre">dos2unix</span></code> on the request files</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dos2unix AES/req/*</span>
+<span class="go">dos2unix GCM/req/*</span>
+<span class="go">dos2unix CCM/req/*</span>
+<span class="go">dos2unix CMAC/req/*</span>
+<span class="go">dos2unix HMAC/req/*</span>
+<span class="go">dos2unix TDES/req/*</span>
+<span class="go">dos2unix SHA/req/*</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">44.7. </span>Running the Application</h2>
+<p>The application requires a number of command line options:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-fips_validation [EAL options]</span>
+<span class="go">-- --req-file FILE_PATH/FOLDER_PATH</span>
+<span class="go">--rsp-file FILE_PATH/FOLDER_PATH</span>
+<span class="go">[--cryptodev DEVICE_NAME] [--cryptodev-id ID] [--path-is-folder]</span>
+<span class="go">--mbuf-dataroom DATAROOM_SIZE</span>
+</pre></div>
+</div>
+</div></blockquote>
+<dl class="simple">
+<dt>where,</dt><dd><ul class="simple">
+<li><p>req-file: The path of the request file or folder, separated by
+<code class="docutils literal notranslate"><span class="pre">path-is-folder</span></code> option.</p></li>
+<li><p>rsp-file: The path that the response file or folder is stored. separated by
+<code class="docutils literal notranslate"><span class="pre">path-is-folder</span></code> option.</p></li>
+<li><p>cryptodev: The name of the target DPDK Crypto device to be validated.</p></li>
+<li><p>cryptodev-id: The id of the target DPDK Crypto device to be validated.</p></li>
+<li><p>path-is-folder: If presented the application expects req-file and rsp-file
+are folder paths.</p></li>
+<li><p>mbuf-dataroom: By default the application creates mbuf pool with maximum
+possible data room (65535 bytes). If the user wants to test scatter-gather
+list feature of the PMD he or she may set this value to reduce the dataroom
+size so that the input data may be divided into multiple chained mbufs.</p></li>
+</ul>
+</dd>
+</dl>
+<p>To run the application in linux environment to test one AES FIPS test data
+file for crypto_aesni_mb PMD, issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./dpdk-fips_validation --vdev crypto_aesni_mb --
+<span class="go">--req-file /PATH/TO/REQUEST/FILE.req --rsp-file ./PATH/TO/RESPONSE/FILE.rsp</span>
+<span class="go">--cryptodev crypto_aesni_mb</span>
+</pre></div>
+</div>
+<p>To run the application in linux environment to test all AES-GCM FIPS test
+data files in one folder for crypto_aesni_gcm PMD, issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./dpdk-fips_validation --vdev crypto_aesni_gcm0 --
+<span class="go">--req-file /PATH/TO/REQUEST/FILE/FOLDER/</span>
+<span class="go">--rsp-file ./PATH/TO/RESPONSE/FILE/FOLDER/</span>
+<span class="go">--cryptodev-id 0 --path-is-folder</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="ptpclient.html" title="previous chapter"><span class="section-number">43. </span>PTP Client Sample Application</a></li>
+      <li>Next: <a href="ipsec_secgw.html" title="next chapter"><span class="section-number">45. </span>IPsec Security Gateway Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/fips_validation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

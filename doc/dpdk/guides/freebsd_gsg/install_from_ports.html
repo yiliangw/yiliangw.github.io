@@ -1,0 +1,247 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Installing DPDK from the Ports Collection &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. Compiling the DPDK Target from Source" href="build_dpdk.html" />
+    <link rel="prev" title="1. Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="installing-dpdk-from-the-ports-collection">
+<span id="install-from-ports"></span><h1><span class="section-number">2. </span>Installing DPDK from the Ports Collection</h1>
+<p>The easiest way to get up and running with the DPDK on FreeBSD is to
+install it using the FreeBSD <cite>pkg</cite> utility or from the ports collection.
+Details of installing applications from packages or the ports collection are documented in the
+<a class="reference external" href="http://www.freebsd.org/doc/en_US.ISO8859-1/books/handbook/index.html">FreeBSD Handbook</a>,
+chapter <a class="reference external" href="https://www.freebsd.org/doc/handbook/ports.html">Installing Applications: Packages and Ports</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Please ensure that the latest patches are applied to third party libraries
+and software to avoid any known vulnerabilities.</p>
+</div>
+<section id="installing-the-dpdk-package-for-freebsd">
+<h2><span class="section-number">2.1. </span>Installing the DPDK Package for FreeBSD</h2>
+<p>DPDK can be installed on FreeBSD using the command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pkg install dpdk
+</pre></div>
+</div>
+<p>After the installation of the DPDK package, instructions will be printed on
+how to install the kernel modules required to use the DPDK. A more
+complete version of these instructions can be found in the sections
+<a class="reference internal" href="build_dpdk.html#loading-contigmem"><span class="std std-ref">Loading the DPDK contigmem Module</span></a> and <a class="reference internal" href="build_dpdk.html#loading-nic-uio"><span class="std std-ref">Loading the DPDK nic_uio Module</span></a>. Normally, lines like
+those below would be added to the file <code class="docutils literal notranslate"><span class="pre">/boot/loader.conf</span></code>.</p>
+<div class="highlight-shell notranslate"><div class="highlight"><pre><span></span><span class="c1"># Reserve 2 x 1G blocks of contiguous memory using contigmem driver:</span>
+hw.contigmem.num_buffers<span class="o">=</span><span class="m">2</span>
+hw.contigmem.buffer_size<span class="o">=</span><span class="m">1073741824</span>
+<span class="nv">contigmem_load</span><span class="o">=</span><span class="s2">&quot;YES&quot;</span>
+
+<span class="c1"># Identify NIC devices for DPDK apps to use and load nic_uio driver:</span>
+hw.nic_uio.bdfs<span class="o">=</span><span class="s2">&quot;2:0:0,2:0:1&quot;</span>
+<span class="nv">nic_uio_load</span><span class="o">=</span><span class="s2">&quot;YES&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="installing-the-dpdk-freebsd-port">
+<h2><span class="section-number">2.2. </span>Installing the DPDK FreeBSD Port</h2>
+<p>If so desired, the user can install DPDK using the ports collection rather than from
+a pre-compiled binary package.
+On a system with the ports collection installed in <code class="docutils literal notranslate"><span class="pre">/usr/ports</span></code>, the DPDK
+can be installed using the commands:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cd /usr/ports/net/dpdk
+
+make install
+</pre></div>
+</div>
+</section>
+<section id="compiling-and-running-the-example-applications">
+<h2><span class="section-number">2.3. </span>Compiling and Running the Example Applications</h2>
+<p>When the DPDK has been installed from the ports collection it installs
+its example applications in <code class="docutils literal notranslate"><span class="pre">/usr/local/share/dpdk/examples</span></code>.
+These examples can be compiled and run as described in <a class="reference internal" href="build_sample_apps.html#compiling-sample-apps"><span class="std std-ref">Compiling and Running Sample Applications</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>DPDK example applications must be complied using <cite>gmake</cite> rather than
+BSD <cite>make</cite>. To detect the installed DPDK libraries, <cite>pkg-config</cite> should
+also be installed on the system.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To install a copy of the DPDK compiled using gcc, please download the
+official DPDK package from <a class="reference external" href="https://core.dpdk.org/download/">https://core.dpdk.org/download/</a> and install manually using
+the instructions given in the next chapter, <a class="reference internal" href="build_dpdk.html#building-from-source"><span class="std std-ref">Compiling the DPDK Target from Source</span></a></p>
+</div>
+<p>An example application can therefore be copied to a user’s home directory and
+compiled and run as below, where we have 2 memory blocks of size 1G reserved
+via the contigmem module, and 4 NIC ports bound to the nic_uio module:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cp -r /usr/local/share/dpdk/examples/helloworld .
+
+cd helloworld/
+
+gmake
+cc -O3 -I/usr/local/include -include rte_config.h -march=corei7 -D__BSD_VISIBLE  main.c -o build/helloworld-shared  -L/usr/local/lib -lrte_bpf -lrte_pipeline -lrte_table -lrte_port -lrte_fib -lrte_ipsec -lrte_stack -lrte_security -lrte_sched -lrte_reorder -lrte_rib -lrte_rcu -lrte_rawdev -lrte_pdump -lrte_member -lrte_lpm -lrte_latencystats -lrte_jobstats -lrte_ip_frag -lrte_gso -lrte_gro -lrte_eventdev -lrte_efd -lrte_distributor -lrte_cryptodev -lrte_compressdev -lrte_cfgfile -lrte_bitratestats -lrte_bbdev -lrte_acl -lrte_timer -lrte_hash -lrte_metrics -lrte_cmdline -lrte_pci -lrte_ethdev -lrte_meter -lrte_net -lrte_mbuf -lrte_mempool -lrte_ring -lrte_eal -lrte_kvargs
+ln -sf helloworld-shared build/helloworld
+
+sudo ./build/helloworld -l 0-3
+EAL: Sysctl reports 8 cpus
+EAL: Detected 8 lcore(s)
+EAL: Detected 1 NUMA nodes
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode &#39;PA&#39;
+EAL: Contigmem driver has 2 buffers, each of size 1GB
+EAL: Mapped memory segment 0 @ 0x1040000000: physaddr:0x180000000, len 1073741824
+EAL: Mapped memory segment 1 @ 0x1080000000: physaddr:0x1c0000000, len 1073741824
+EAL: PCI device 0000:00:19.0 on NUMA socket 0
+EAL:   probe driver: 8086:153b net_e1000_em
+EAL:   0000:00:19.0 not managed by UIO driver, skipping
+EAL: PCI device 0000:01:00.0 on NUMA socket 0
+EAL:   probe driver: 8086:1572 net_i40e
+EAL: PCI device 0000:01:00.1 on NUMA socket 0
+EAL:   probe driver: 8086:1572 net_i40e
+EAL: PCI device 0000:01:00.2 on NUMA socket 0
+EAL:   probe driver: 8086:1572 net_i40e
+EAL: PCI device 0000:01:00.3 on NUMA socket 0
+EAL:   probe driver: 8086:1572 net_i40e
+hello from core 1
+hello from core 2
+hello from core 3
+hello from core 0
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To run a DPDK process as a non-root user, adjust the permissions on
+the <code class="docutils literal notranslate"><span class="pre">/dev/contigmem</span></code> and <code class="docutils literal notranslate"><span class="pre">/dev/uio</span> <span class="pre">device</span></code> nodes as described in section
+<a class="reference internal" href="build_sample_apps.html#running-non-root"><span class="std std-ref">Running DPDK Applications Without Root Privileges</span></a></p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For an explanation of the command-line parameters that can be passed to an
+DPDK application, see section <a class="reference internal" href="build_sample_apps.html#running-sample-app"><span class="std std-ref">Running a Sample Application</span></a>.</p>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for FreeBSD</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter"><span class="section-number">1. </span>Introduction</a></li>
+      <li>Next: <a href="build_dpdk.html" title="next chapter"><span class="section-number">3. </span>Compiling the DPDK Target from Source</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/freebsd_gsg/install_from_ports.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

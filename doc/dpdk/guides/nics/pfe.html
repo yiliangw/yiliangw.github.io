@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>50. PFE Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="51. QEDE Poll Mode Driver" href="qede.html" />
+    <link rel="prev" title="49. Libpcap and Ring Based Poll Mode Drivers" href="pcap_ring.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="pfe-poll-mode-driver">
+<h1><span class="section-number">50. </span>PFE Poll Mode Driver</h1>
+<p>The PFE NIC PMD (<strong>librte_net_pfe</strong>) provides poll mode driver
+support for the inbuilt NIC found in the <strong>NXP LS1012</strong> SoC.</p>
+<p>More information can be found at <a class="reference external" href="https://nxp.com/ls1012a">NXP Official Website</a>.</p>
+<p>This section provides an overview of the NXP PFE
+and how it is integrated into the DPDK.</p>
+<p>Contents summary</p>
+<ul class="simple">
+<li><p>PFE overview</p></li>
+<li><p>Supported PFE SoCs</p></li>
+<li><p>PFE features</p></li>
+<li><p>Prerequisites</p></li>
+<li><p>Driver compilation and testing</p></li>
+<li><p>Limitations</p></li>
+</ul>
+<section id="pfe-overview">
+<h2><span class="section-number">50.1. </span>PFE Overview</h2>
+<p>PFE is a hardware programmable packet forwarding engine to provide
+high performance Ethernet interfaces. The diagram below shows a
+system level overview of PFE:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">====================================================+===============</span>
+<span class="go">US   +-----------------------------------------+    | Kernel Space</span>
+<span class="go">     |                                         |    |</span>
+<span class="go">     |           PFE Ethernet Driver           |    |</span>
+<span class="go">     +-----------------------------------------+    |</span>
+<span class="go">               ^   |          ^     |               |</span>
+<span class="go">PFE         RXQ|   |TXQ    RXQ|     |TXQ            |</span>
+<span class="go">PMD            |   |          |     |               |</span>
+<span class="go">               |   v          |     v               |   +----------+</span>
+<span class="go">            +---------+     +----------+            |   | pfe.ko   |</span>
+<span class="go">            | net_pfe0|     | net_pfe1 |            |   +----------+</span>
+<span class="go">            +---------+     +----------+            |</span>
+<span class="go">               ^   |          ^     |               |</span>
+<span class="go">            TXQ|   |RXQ    TXQ|     |RXQ            |</span>
+<span class="go">               |   |          |     |               |</span>
+<span class="go">               |   v          |     v               |</span>
+<span class="go">              +------------------------+            |</span>
+<span class="go">              |                        |            |</span>
+<span class="go">              |      PFE HIF driver    |            |</span>
+<span class="go">              +------------------------+            |</span>
+<span class="go">                    ^         |                     |</span>
+<span class="go">                 RX |      TX |                     |</span>
+<span class="go">                RING|     RING|                     |</span>
+<span class="go">                    |         v                     |</span>
+<span class="go">                  +--------------+                  |</span>
+<span class="go">                  |              |                  |</span>
+<span class="go">==================|    HIF       |==================+===============</span>
+<span class="go">      +-----------+              +--------------+</span>
+<span class="go">      |           |              |              |        HW</span>
+<span class="go">      |  PFE      +--------------+              |</span>
+<span class="go">      |       +-----+                +-----+    |</span>
+<span class="go">      |       | MAC |                | MAC |    |</span>
+<span class="go">      |       |     |                |     |    |</span>
+<span class="go">      +-------+-----+----------------+-----+----+</span>
+<span class="go">              | PHY |                | PHY |</span>
+<span class="go">              +-----+                +-----+</span>
+</pre></div>
+</div>
+<p>The HIF, PFE, MAC and PHY are the hardware blocks, the pfe.ko is a kernel
+module, the PFE HIF driver and the PFE ethernet driver combined represent
+as DPDK PFE poll mode driver are running in the userspace.</p>
+<p>The PFE hardware supports one HIF (host interface) RX ring and one TX ring
+to send and receive packets through packet forwarding engine. Both network
+interface traffic is multiplexed and send over HIF queue.</p>
+<p>net_pfe0 and net_pfe1 are logical ethernet interfaces, created by HIF client
+driver. HIF driver is responsible for send and receive packets between
+host interface and these logical interfaces. PFE ethernet driver is a
+hardware independent and register with the HIF client driver to transmit and
+receive packets from HIF via logical interfaces.</p>
+<p>pfe.ko is required for PHY initialisation and also responsible for creating
+the character device “pfe_us_cdev” which will be used for interacting with
+the kernel layer for link status.</p>
+</section>
+<section id="supported-pfe-socs">
+<h2><span class="section-number">50.2. </span>Supported PFE SoCs</h2>
+<ul class="simple">
+<li><p>LS1012</p></li>
+</ul>
+</section>
+<section id="pfe-features">
+<h2><span class="section-number">50.3. </span>PFE Features</h2>
+<ul class="simple">
+<li><p>L3/L4 checksum offload</p></li>
+<li><p>Packet type parsing</p></li>
+<li><p>Basic stats</p></li>
+<li><p>MTU update</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Allmulticast mode</p></li>
+<li><p>Link status</p></li>
+<li><p>ARMv8</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">50.4. </span>Prerequisites</h2>
+<p>Below are some pre-requisites for executing PFE PMD on a PFE
+compatible board:</p>
+<ol class="arabic">
+<li><p><strong>ARM 64 Tool Chain</strong></p>
+<p>For example, the <a class="reference external" href="https://releases.linaro.org/components/toolchain/binaries/7.3-2018.05/aarch64-linux-gnu/gcc-linaro-7.3.1-2018.05-i686_aarch64-linux-gnu.tar.xz">*aarch64* Linaro Toolchain</a>.</p>
+</li>
+<li><p><strong>Linux Kernel</strong></p>
+<p>It can be obtained from <a class="reference external" href="https://source.codeaurora.org/external/qoriq/qoriq-components/linux">NXP’s Github hosting</a>.</p>
+</li>
+<li><p><strong>Rootfile system</strong></p>
+<p>Any <em>aarch64</em> supporting filesystem can be used. For example,
+Ubuntu 16.04 LTS (Xenial) or 18.04 (Bionic) userland which can be obtained
+from <a class="reference external" href="http://cdimage.ubuntu.com/ubuntu-base/releases/18.04/release/ubuntu-base-18.04.1-base-arm64.tar.gz">here</a>.</p>
+</li>
+<li><p>The ethernet device will be registered as virtual device, so pfe has dependency on
+<strong>rte_bus_vdev</strong> library and it is mandatory to use <cite>–vdev</cite> with value <cite>net_pfe</cite> to
+run DPDK application.</p></li>
+</ol>
+<p>The following dependencies are not part of DPDK and must be installed
+separately:</p>
+<ul>
+<li><p><strong>NXP Linux LSDK</strong></p>
+<p>NXP Layerscape software development kit (LSDK) includes support for family
+of QorIQ® ARM-Architecture-based system on chip (SoC) processors
+and corresponding boards.</p>
+<p>It includes the Linux board support packages (BSPs) for NXP SoCs,
+a fully operational tool chain, kernel and board specific modules.</p>
+<p>LSDK and related information can be obtained from:  <a class="reference external" href="https://www.nxp.com/support/developer-resources/run-time-software/linux-software-and-development-tools/layerscape-software-development-kit:LAYERSCAPE-SDK">LSDK</a></p>
+</li>
+<li><p><strong>pfe kernel module</strong></p>
+<p>pfe kernel module can be obtained from NXP Layerscape software development kit at
+location <cite>/lib/modules/&lt;kernel version&gt;/kernel/drivers/staging/fsl_ppfe</cite> in rootfs.
+Module should be loaded using below command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">insmod pfe.ko us=1</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">50.5. </span>Driver compilation and testing</h2>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to launch <strong>testpmd</strong></p>
+<p>Additionally, PFE driver needs <cite>–vdev</cite> as an input with value <cite>net_pfe</cite>
+to execute DPDK application. There is an optional parameter <cite>intf</cite> available
+to specify port ID. PFE driver supports only two interfaces, so valid values
+for <cite>intf</cite> are 0 and 1.
+see the command below:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;dpdk app&gt; &lt;EAL args&gt; --vdev=&quot;net_pfe0,intf=0&quot; --vdev=&quot;net_pfe1,intf=1&quot; -- ...</span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="limitations">
+<h2><span class="section-number">50.6. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Multi buffer pool cannot be supported.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="pcap_ring.html" title="previous chapter"><span class="section-number">49. </span>Libpcap and Ring Based Poll Mode Drivers</a></li>
+      <li>Next: <a href="qede.html" title="next chapter"><span class="section-number">51. </span>QEDE Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/pfe.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

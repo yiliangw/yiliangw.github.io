@@ -1,0 +1,447 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>47. Multi-process Support &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="48. Thread Safety of DPDK Functions" href="thread_safety_dpdk_functions.html" />
+    <link rel="prev" title="46. Packet Capture Library" href="pdump_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="multi-process-support">
+<span id="id1"></span><h1><span class="section-number">47. </span>Multi-process Support</h1>
+<p>In the DPDK, multi-process support is designed to allow a group of DPDK processes
+to work together in a simple transparent manner to perform packet processing,
+or other workloads.
+To support this functionality,
+a number of additions have been made to the core DPDK Environment Abstraction Layer (EAL).</p>
+<p>The EAL has been modified to allow different types of DPDK processes to be spawned,
+each with different permissions on the hugepage memory used by the applications.
+For now, there are two types of process specified:</p>
+<ul class="simple">
+<li><p>primary processes, which can initialize and which have full permissions on shared memory</p></li>
+<li><p>secondary processes, which cannot initialize shared memory,
+but can attach to pre- initialized shared memory and create objects in it.</p></li>
+</ul>
+<p>Standalone DPDK processes are primary processes,
+while secondary processes can only run alongside a primary process or
+after a primary process has already configured the hugepage shared memory for them.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Secondary processes should run alongside primary process with same DPDK version.</p>
+<p>Secondary processes which requires access to physical devices in Primary process, must
+be passed with the same allow and block options.</p>
+</div>
+<p>To support these two process types, and other multi-process setups described later,
+two additional command-line parameters are available to the EAL:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--proc-type:</span></code> for specifying a given process instance as the primary or secondary DPDK instance</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--file-prefix:</span></code> to allow processes that do not want to co-operate to have different memory regions</p></li>
+</ul>
+<p>A number of example applications are provided that demonstrate how multiple DPDK processes can be used together.
+These are more fully documented in the “Multi- process Sample Application” chapter
+in the <em>DPDK Sample Application’s User Guide</em>.</p>
+<section id="memory-sharing">
+<h2><span class="section-number">47.1. </span>Memory Sharing</h2>
+<p>The key element in getting a multi-process application working using the DPDK is to ensure that
+memory resources are properly shared among the processes making up the multi-process application.
+Once there are blocks of shared memory available that can be accessed by multiple processes,
+then issues such as inter-process communication (IPC) becomes much simpler.</p>
+<p>On application start-up in a primary or standalone process,
+the DPDK records to memory-mapped files the details of the memory configuration it is using - hugepages in use,
+the virtual addresses they are mapped at, the number of memory channels present, etc.
+When a secondary process is started, these files are read and the EAL recreates the same memory configuration
+in the secondary process so that all memory zones are shared between processes and all pointers to that memory are valid,
+and point to the same objects, in both processes.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Refer to <a class="reference internal" href="#multi-process-limitations">Multi-process Limitations</a> for details of
+how Linux kernel Address-Space Layout Randomization (ASLR) can affect memory sharing.</p>
+<p>If the primary process was run with <code class="docutils literal notranslate"><span class="pre">--legacy-mem</span></code> or
+<code class="docutils literal notranslate"><span class="pre">--single-file-segments</span></code> switch, secondary processes must be run with the
+same switch specified. Otherwise, memory corruption may occur.</p>
+</div>
+<figure class="align-default" id="id2">
+<span id="figure-multi-process-memory"></span><img alt="../_images/multi_process_memory.svg" src="../_images/multi_process_memory.svg" /><figcaption>
+<p><span class="caption-number">Fig. 47.1 </span><span class="caption-text">Memory Sharing in the DPDK Multi-process Sample Application</span></p>
+</figcaption>
+</figure>
+<p>The EAL also supports an auto-detection mode (set by EAL <code class="docutils literal notranslate"><span class="pre">--proc-type=auto</span></code> flag ),
+whereby a DPDK process is started as a secondary instance if a primary instance is already running.</p>
+</section>
+<section id="deployment-models">
+<h2><span class="section-number">47.2. </span>Deployment Models</h2>
+<section id="symmetric-peer-processes">
+<h3><span class="section-number">47.2.1. </span>Symmetric/Peer Processes</h3>
+<p>DPDK multi-process support can be used to create a set of peer processes where each process performs the same workload.
+This model is equivalent to having multiple threads each running the same main-loop function,
+as is done in most of the supplied DPDK sample applications.
+In this model, the first of the processes spawned should be spawned using the <code class="docutils literal notranslate"><span class="pre">--proc-type=primary</span></code> EAL flag,
+while all subsequent instances should be spawned using the <code class="docutils literal notranslate"><span class="pre">--proc-type=secondary</span></code> flag.</p>
+<p>The simple_mp and symmetric_mp sample applications demonstrate this usage model.
+They are described in the “Multi-process Sample Application” chapter in the <em>DPDK Sample Application’s User Guide</em>.</p>
+</section>
+<section id="asymmetric-non-peer-processes">
+<h3><span class="section-number">47.2.2. </span>Asymmetric/Non-Peer Processes</h3>
+<p>An alternative deployment model that can be used for multi-process applications
+is to have a single primary process instance that acts as a load-balancer or
+server distributing received packets among worker or client threads, which are run as secondary processes.
+In this case, extensive use of rte_ring objects is made, which are located in shared hugepage memory.</p>
+<p>The client_server_mp sample application shows this usage model.
+It is described in the “Multi-process Sample Application” chapter in the <em>DPDK Sample Application’s User Guide</em>.</p>
+</section>
+<section id="running-multiple-independent-dpdk-applications">
+<h3><span class="section-number">47.2.3. </span>Running Multiple Independent DPDK Applications</h3>
+<p>In addition to the above scenarios involving multiple DPDK processes working together,
+it is possible to run multiple DPDK processes concurrently,
+where those processes are all working independently.
+Support for this usage scenario is provided using the <code class="docutils literal notranslate"><span class="pre">--file-prefix</span></code> parameter to the EAL.</p>
+<p>The EAL puts shared runtime files in a directory based on standard conventions.
+If <code class="docutils literal notranslate"><span class="pre">$RUNTIME_DIRECTORY</span></code> is defined in the environment,
+it is used (as <code class="docutils literal notranslate"><span class="pre">$RUNTIME_DIRECTORY/dpdk</span></code>).
+Otherwise, if DPDK is run as root user, it uses <code class="docutils literal notranslate"><span class="pre">/var/run/dpdk</span></code>
+or if run as non-root user then the <code class="docutils literal notranslate"><span class="pre">/tmp/dpdk</span></code> (or <code class="docutils literal notranslate"><span class="pre">$XDG_RUNTIME_DIRECTORY/dpdk</span></code>) is used.
+Hugepage files on each hugetlbfs filesystem use the <code class="docutils literal notranslate"><span class="pre">rtemap_X</span></code> filename,
+where X is in the range 0 to the maximum number of hugepages -1.
+Similarly, it creates shared configuration files, memory mapped in each process,
+using the <code class="docutils literal notranslate"><span class="pre">.rte_config</span></code> filename.
+The rte part of the filenames of each of the above is configurable using the file-prefix parameter.</p>
+<p>In addition to specifying the file-prefix parameter,
+any DPDK applications that are to be run side-by-side must explicitly limit their memory use.
+This is less of a problem on Linux, as by default, applications will not
+allocate more memory than they need. However if <code class="docutils literal notranslate"><span class="pre">--legacy-mem</span></code> is used, DPDK
+will attempt to preallocate all memory it can get to, and memory use must be
+explicitly limited. This is done by passing the <code class="docutils literal notranslate"><span class="pre">-m</span></code> flag to each process to
+specify how much hugepage memory, in megabytes, each process can use (or passing
+<code class="docutils literal notranslate"><span class="pre">--socket-mem</span></code> to specify how much hugepage memory on each socket each process
+can use).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Independent DPDK instances running side-by-side on a single machine cannot share any network ports.
+Any network ports being used by one process should be blocked by every other process.</p>
+</div>
+</section>
+<section id="running-multiple-independent-groups-of-dpdk-applications">
+<h3><span class="section-number">47.2.4. </span>Running Multiple Independent Groups of DPDK Applications</h3>
+<p>In the same way that it is possible to run independent DPDK applications side- by-side on a single system,
+this can be trivially extended to multi-process groups of DPDK applications running side-by-side.
+In this case, the secondary processes must use the same <code class="docutils literal notranslate"><span class="pre">--file-prefix</span></code> parameter
+as the primary process whose shared memory they are connecting to.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>All restrictions and issues with multiple independent DPDK processes running side-by-side
+apply in this usage scenario also.</p>
+</div>
+</section>
+</section>
+<section id="multi-process-limitations">
+<h2><span class="section-number">47.3. </span>Multi-process Limitations</h2>
+<p>There are a number of limitations to what can be done when running DPDK multi-process applications.
+Some of these are documented below:</p>
+<ul class="simple">
+<li><p>The multi-process feature requires that the exact same hugepage memory mappings be present in all applications.
+This makes secondary process startup process generally unreliable. Disabling
+Linux security feature - Address-Space Layout Randomization (ASLR) may
+help getting more consistent mappings, but not necessarily more reliable -
+if the mappings are wrong, they will be consistently wrong!</p></li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Disabling Address-Space Layout Randomization (ASLR) may have security implications,
+so it is recommended that it be disabled only when absolutely necessary,
+and only when the implications of this change have been understood.</p>
+</div>
+<ul class="simple">
+<li><p>All DPDK processes running as a single application and using shared memory must have distinct coremask/corelist arguments.
+It is not possible to have a primary and secondary instance, or two secondary instances,
+using any of the same logical cores.
+Attempting to do so can cause corruption of memory pool caches, among other issues.</p></li>
+<li><p>The delivery of interrupts, such as Ethernet* device link status interrupts, do not work in secondary processes.
+All interrupts are triggered inside the primary process only.
+Any application needing interrupt notification in multiple processes should provide its own mechanism
+to transfer the interrupt information from the primary process to any secondary process that needs the information.</p></li>
+<li><p>The use of function pointers between multiple processes running based of different compiled binaries is not supported,
+since the location of a given function in one process may be different to its location in a second.
+This prevents the librte_hash library from behaving properly as in a multi-process instance,
+since it uses a pointer to the hash function internally.</p></li>
+</ul>
+<p>To work around this issue, it is recommended that multi-process applications perform the hash calculations by directly calling
+the hashing function from the code and then using the rte_hash_add_with_hash()/rte_hash_lookup_with_hash() functions
+instead of the functions which do the hashing internally, such as rte_hash_add()/rte_hash_lookup().</p>
+<ul class="simple">
+<li><p>Depending upon the hardware in use, and the number of DPDK processes used,
+it may not be possible to have HPET timers available in each DPDK instance.
+The minimum number of HPET comparators available to Linux* userspace can be just a single comparator,
+which means that only the first, primary DPDK process instance can open and mmap  /dev/hpet.
+If the number of required DPDK processes exceeds that of the number of available HPET comparators,
+the TSC (which is the default timer in this release) must be used as a time source across all processes instead of the HPET.</p></li>
+</ul>
+</section>
+<section id="communication-between-multiple-processes">
+<h2><span class="section-number">47.4. </span>Communication between multiple processes</h2>
+<p>While there are multiple ways one can approach inter-process communication in
+DPDK, there is also a native DPDK IPC API available. It is not intended to be
+performance-critical, but rather is intended to be a convenient, general
+purpose API to exchange short messages between primary and secondary processes.</p>
+<p>DPDK IPC API supports the following communication modes:</p>
+<ul class="simple">
+<li><p>Unicast message from secondary to primary</p></li>
+<li><p>Broadcast message from primary to all secondaries</p></li>
+</ul>
+<p>In other words, any IPC message sent in a primary process will be delivered to
+all secondaries, while any IPC message sent in a secondary process will only be
+delivered to primary process. Unicast from primary to secondary or from
+secondary to secondary is not supported.</p>
+<p>There are three types of communications that are available within DPDK IPC API:</p>
+<ul class="simple">
+<li><p>Message</p></li>
+<li><p>Synchronous request</p></li>
+<li><p>Asynchronous request</p></li>
+</ul>
+<p>A “message” type does not expect a response and is meant to be a best-effort
+notification mechanism, while the two types of “requests” are meant to be a two
+way communication mechanism, with the requester expecting a response from the
+other side.</p>
+<p>Both messages and requests will trigger a named callback on the receiver side.
+These callbacks will be called from within a dedicated IPC or interrupt thread
+that are not part of EAL lcore threads.</p>
+<section id="registering-for-incoming-messages">
+<h3><span class="section-number">47.4.1. </span>Registering for incoming messages</h3>
+<p>Before any messages can be received, a callback will need to be registered.
+This is accomplished by calling <code class="docutils literal notranslate"><span class="pre">rte_mp_action_register()</span></code> function. This
+function accepts a unique callback name, and a function pointer to a callback
+that will be called when a message or a request matching this callback name
+arrives.</p>
+<p>If the application is no longer willing to receive messages intended for a
+specific callback function, <code class="docutils literal notranslate"><span class="pre">rte_mp_action_unregister()</span></code> function can be
+called to ensure that callback will not be triggered again.</p>
+</section>
+<section id="sending-messages">
+<h3><span class="section-number">47.4.2. </span>Sending messages</h3>
+<p>To send a message, a <code class="docutils literal notranslate"><span class="pre">rte_mp_msg</span></code> descriptor must be populated first. The list
+of fields to be populated are as follows:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">name</span></code> - message name. This name must match receivers’ callback name.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">param</span></code> - message data (up to 256 bytes).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">len_param</span></code> - length of message data.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fds</span></code> - file descriptors to pass long with the data (up to 8 fd’s).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">num_fds</span></code> - number of file descriptors to send.</p></li>
+</ul>
+<p>Once the structure is populated, calling <code class="docutils literal notranslate"><span class="pre">rte_mp_sendmsg()</span></code> will send the
+descriptor either to all secondary processes (if sent from primary process), or
+to primary process (if sent from secondary process). The function will return
+a value indicating whether sending the message succeeded or not.</p>
+</section>
+<section id="sending-requests">
+<h3><span class="section-number">47.4.3. </span>Sending requests</h3>
+<p>Sending requests involves waiting for the other side to reply, so they can block
+for a relatively long time.</p>
+<p>To send a request, a message descriptor <code class="docutils literal notranslate"><span class="pre">rte_mp_msg</span></code> must be populated.
+Additionally, a <code class="docutils literal notranslate"><span class="pre">timespec</span></code> value must be specified as a timeout, after which
+IPC will stop waiting and return.</p>
+<p>For synchronous requests, the <code class="docutils literal notranslate"><span class="pre">rte_mp_reply</span></code> descriptor must also be created.
+This is where the responses will be stored.
+The list of fields that will be populated by IPC are as follows:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">nb_sent</span></code> - number indicating how many requests were sent (i.e. how many
+peer processes were active at the time of the request).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nb_received</span></code> - number indicating how many responses were received (i.e. of
+those peer processes that were active at the time of request, how many have
+replied)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">msgs</span></code> - pointer to where all of the responses are stored. The order in
+which responses appear is undefined. When doing synchronous requests, this
+memory must be freed by the requestor after request completes!</p></li>
+</ul>
+<p>For asynchronous requests, a function pointer to the callback function must be
+provided instead. This callback will be called when the request either has timed
+out, or will have received a response to all the messages that were sent.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>When an asynchronous request times out, the callback will be called not by
+a dedicated IPC thread, but rather from EAL interrupt thread. Because of
+this, it may not be possible for DPDK to trigger another interrupt-based
+event (such as an alarm) while handling asynchronous IPC callback.</p>
+</div>
+<p>When the callback is called, the original request descriptor will be provided
+(so that it would be possible to determine for which sent message this is a
+callback to), along with a response descriptor like the one described above.
+When doing asynchronous requests, there is no need to free the resulting
+<code class="docutils literal notranslate"><span class="pre">rte_mp_reply</span></code> descriptor.</p>
+</section>
+<section id="receiving-and-responding-to-messages">
+<h3><span class="section-number">47.4.4. </span>Receiving and responding to messages</h3>
+<p>To receive a message, a name callback must be registered using the
+<code class="docutils literal notranslate"><span class="pre">rte_mp_action_register()</span></code> function. The name of the callback must match the
+<code class="docutils literal notranslate"><span class="pre">name</span></code> field in sender’s <code class="docutils literal notranslate"><span class="pre">rte_mp_msg</span></code> message descriptor in order for this
+message to be delivered and for the callback to be trigger.</p>
+<p>The callback’s definition is <code class="docutils literal notranslate"><span class="pre">rte_mp_t</span></code>, and consists of the incoming message
+pointer <code class="docutils literal notranslate"><span class="pre">msg</span></code>, and an opaque pointer <code class="docutils literal notranslate"><span class="pre">peer</span></code>. Contents of <code class="docutils literal notranslate"><span class="pre">msg</span></code> will be
+identical to ones sent by the sender.</p>
+<p>If a response is required, a new <code class="docutils literal notranslate"><span class="pre">rte_mp_msg</span></code> message descriptor must be
+constructed and sent via <code class="docutils literal notranslate"><span class="pre">rte_mp_reply()</span></code> function, along with <code class="docutils literal notranslate"><span class="pre">peer</span></code>
+pointer. The resulting response will then be delivered to the correct requestor.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Simply returning a value when processing a request callback will not send a
+response to the request - it must always be explicitly sent even in case
+of errors. Implementation of error signalling rests with the application,
+there is no built-in way to indicate success or error for a request. Failing
+to do so will cause the requestor to time out while waiting on a response.</p>
+</div>
+</section>
+<section id="misc-considerations">
+<h3><span class="section-number">47.4.5. </span>Misc considerations</h3>
+<p>Due to the underlying IPC implementation being single-threaded, recursive
+requests (i.e. sending a request while responding to another request) is not
+supported. However, since sending messages (not requests) does not involve an
+IPC thread, sending messages while processing another message or request is
+supported.</p>
+<p>Since the memory subsystem uses IPC internally, memory allocations and IPC must
+not be mixed: it is not safe to use IPC inside a memory-related callback, nor is
+it safe to allocate/free memory inside IPC callbacks. Attempting to do so may
+lead to a deadlock.</p>
+<p>Asynchronous request callbacks may be triggered either from IPC thread or from
+interrupt thread, depending on whether the request has timed out. It is
+therefore suggested to avoid waiting for interrupt-based events (such as alarms)
+inside asynchronous IPC request callbacks. This limitation does not apply to
+messages or synchronous requests.</p>
+<p>If callbacks spend a long time processing the incoming requests, the requestor
+might time out, so setting the right timeout value on the requestor side is
+imperative.</p>
+<p>If some of the messages timed out, <code class="docutils literal notranslate"><span class="pre">nb_sent</span></code> and <code class="docutils literal notranslate"><span class="pre">nb_received</span></code> fields in the
+<code class="docutils literal notranslate"><span class="pre">rte_mp_reply</span></code> descriptor will not have matching values. This is not treated
+as error by the IPC API, and it is expected that the user will be responsible
+for deciding how to handle such cases.</p>
+<p>If a callback has been registered, IPC will assume that it is safe to call it.
+This is important when registering callbacks during DPDK initialization.
+During initialization, IPC will consider the receiving side as non-existing if
+the callback has not been registered yet. However, once the callback has been
+registered, it is expected that IPC should be safe to trigger it, even if the
+rest of the DPDK initialization hasn’t finished yet.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="pdump_lib.html" title="previous chapter"><span class="section-number">46. </span>Packet Capture Library</a></li>
+      <li>Next: <a href="thread_safety_dpdk_functions.html" title="next chapter"><span class="section-number">48. </span>Thread Safety of DPDK Functions</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/multi_proc_support.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

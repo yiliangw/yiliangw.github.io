@@ -1,0 +1,503 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>32. Elastic Flow Distributor Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="33. Membership Library" href="member_lib.html" />
+    <link rel="prev" title="31. Toeplitz Hash Library" href="toeplitz_hash_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="elastic-flow-distributor-library">
+<span id="efd-library"></span><h1><span class="section-number">32. </span>Elastic Flow Distributor Library</h1>
+<section id="introduction">
+<h2><span class="section-number">32.1. </span>Introduction</h2>
+<p>In Data Centers today, clustering and scheduling of distributed workloads
+is a very common task. Many workloads require a deterministic
+partitioning of a flat key space among a cluster of machines. When a
+packet enters the cluster, the ingress node will direct the packet to
+its handling node. For example, data-centers with disaggregated storage
+use storage metadata tables to forward I/O requests to the correct back end
+storage cluster, stateful packet inspection will use match incoming
+flows to signatures in flow tables to send incoming packets to their
+intended deep packet inspection (DPI) devices, and so on.</p>
+<p>EFD is a distributor library that uses perfect hashing to determine a
+target/value for a given incoming flow key. It has the following
+advantages: first, because it uses perfect hashing it does not store the
+key itself and hence lookup performance is not dependent on the key
+size. Second, the target/value can be any arbitrary value hence the
+system designer and/or operator can better optimize service rates and
+inter-cluster network traffic locating. Third, since the storage
+requirement is much smaller than a hash-based flow table (i.e. better
+fit for CPU cache), EFD can scale to millions of flow keys. Finally,
+with the current optimized library implementation, performance is fully
+scalable with any number of CPU cores.</p>
+</section>
+<section id="flow-based-distribution">
+<h2><span class="section-number">32.2. </span>Flow Based Distribution</h2>
+<section id="computation-based-schemes">
+<h3><span class="section-number">32.2.1. </span>Computation Based Schemes</h3>
+<p>Flow distribution and/or load balancing can be simply done using a
+stateless computation, for instance using round-robin or a simple
+computation based on the flow key as an input. For example, a hash
+function can be used to direct a certain flow to a target based on
+the flow key (e.g. <code class="docutils literal notranslate"><span class="pre">h(key)</span> <span class="pre">mod</span> <span class="pre">n</span></code>) where h(key) is the hash value of the
+flow key and n is the number of possible targets.</p>
+<figure class="align-default" id="id1">
+<span id="figure-efd1"></span><img alt="../_images/efd_i1.svg" src="../_images/efd_i1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.1 </span><span class="caption-text">Load Balancing Using Front End Node</span></p>
+</figcaption>
+</figure>
+<p>In this scheme (<a class="reference internal" href="#figure-efd1"><span class="std std-numref">Fig. 32.1</span></a>), the front end server/distributor/load balancer
+extracts the flow key from the input packet and applies a computation to determine where
+this flow should be directed. Intuitively, this scheme is very simple
+and requires no state to be kept at the front end node, and hence,
+storage requirements are minimum.</p>
+<figure class="align-default" id="id2">
+<span id="figure-efd2"></span><img alt="../_images/efd_i2.svg" src="../_images/efd_i2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.2 </span><span class="caption-text">Consistent Hashing</span></p>
+</figcaption>
+</figure>
+<p>A widely used flow distributor that belongs to the same category of
+computation-based schemes is <code class="docutils literal notranslate"><span class="pre">consistent</span> <span class="pre">hashing</span></code>, shown in <a class="reference internal" href="#figure-efd2"><span class="std std-numref">Fig. 32.2</span></a>.
+Target destinations (shown in red) are hashed into the same space as the flow
+keys (shown in blue), and keys are mapped to the nearest target in a clockwise
+fashion. Dynamically adding and removing targets with consistent hashing
+requires only K/n keys to be remapped on average, where K is the number of
+keys, and n is the number of targets. In contrast, in a traditional hash-based
+scheme, a change in the number of targets causes nearly all keys to be
+remapped.</p>
+<p>Although computation-based schemes are simple and need very little
+storage requirement, they suffer from the drawback that the system
+designer/operator can’t fully control the target to assign a specific
+key, as this is dictated by the hash function.
+Deterministically co-locating of keys together (for example, to minimize
+inter-server traffic or to optimize for network traffic conditions,
+target load, etc.) is simply not possible.</p>
+</section>
+<section id="flow-table-based-schemes">
+<h3><span class="section-number">32.2.2. </span>Flow-Table Based Schemes</h3>
+<p>When using a Flow-Table based scheme to handle flow distribution/load
+balancing, in contrast with computation-based schemes, the system designer
+has the flexibility of assigning a given flow to any given
+target. The flow table (e.g. DPDK RTE Hash Library) will simply store
+both the flow key and the target value.</p>
+<figure class="align-default" id="id3">
+<span id="figure-efd3"></span><img alt="../_images/efd_i3.svg" src="../_images/efd_i3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.3 </span><span class="caption-text">Table Based Flow Distribution</span></p>
+</figcaption>
+</figure>
+<p>As shown in <a class="reference internal" href="#figure-efd3"><span class="std std-numref">Fig. 32.3</span></a>, when doing a lookup, the flow-table
+is indexed with the hash of the flow key and the keys (more than one is possible,
+because of hash collision) stored in this index and corresponding values
+are retrieved. The retrieved key(s) is matched with the input flow key
+and if there is a match the value (target id) is returned.</p>
+<p>The drawback of using a hash table for flow distribution/load balancing
+is the storage requirement, since the flow table need to store keys,
+signatures and target values. This doesn’t allow this scheme to scale to
+millions of flow keys. Large tables will usually not fit in
+the CPU cache, and hence, the lookup performance is degraded because of
+the latency to access the main memory.</p>
+</section>
+<section id="efd-based-scheme">
+<h3><span class="section-number">32.2.3. </span>EFD Based Scheme</h3>
+<p>EFD combines the advantages of both flow-table based and computation-based
+schemes. It doesn’t require the large storage necessary for
+flow-table based schemes (because EFD doesn’t store the key as explained
+below), and it supports any arbitrary value for any given key.</p>
+<figure class="align-default" id="id4">
+<span id="figure-efd4"></span><img alt="../_images/efd_i4.svg" src="../_images/efd_i4.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.4 </span><span class="caption-text">Searching for Perfect Hash Function</span></p>
+</figcaption>
+</figure>
+<p>The basic idea of EFD is when a given key is to be inserted, a family of
+hash functions is searched until the correct hash function that maps the
+input key to the correct value is found, as shown in <a class="reference internal" href="#figure-efd4"><span class="std std-numref">Fig. 32.4</span></a>.
+However, rather than explicitly storing all keys and their associated values,
+EFD stores only indices of hash functions that map keys to values, and
+thereby consumes much less space than conventional flow-based tables.
+The lookup operation is very simple, similar to a computational-based
+scheme: given an input key the lookup operation is reduced to hashing
+that key with the correct hash function.</p>
+<figure class="align-default" id="id5">
+<span id="figure-efd5"></span><img alt="../_images/efd_i5.svg" src="../_images/efd_i5.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.5 </span><span class="caption-text">Divide and Conquer for Millions of Keys</span></p>
+</figcaption>
+</figure>
+<p>Intuitively, finding a hash function that maps each of a large number
+(millions) of input keys to the correct output value is effectively
+impossible, as a result EFD, as shown in <a class="reference internal" href="#figure-efd5"><span class="std std-numref">Fig. 32.5</span></a>,
+breaks the problem into smaller pieces (divide and conquer).
+EFD divides the entire input key set into many small groups.
+Each group consists of approximately 20-28 keys (a configurable parameter
+for the library), then, for each small group, a brute force search to find
+a hash function that produces the correct outputs for each key in the group.</p>
+<p>It should be mentioned that, since the online lookup table for EFD
+doesn’t store the key itself, the size of the EFD table is independent
+of the key size and hence EFD lookup performance which is almost
+constant irrespective of the length of the key which is a highly
+desirable feature especially for longer keys.</p>
+<p>In summary, EFD is a set separation data structure that supports millions of
+keys. It is used to distribute a given key to an intended target. By itself
+EFD is not a FIB data structure with an exact match the input flow key.</p>
+</section>
+</section>
+<section id="example-of-efd-library-usage">
+<span id="efd-example"></span><h2><span class="section-number">32.3. </span>Example of EFD Library Usage</h2>
+<p>EFD can be used along the data path of many network functions and middleboxes.
+As previously mentioned, it can used as an index table for
+&lt;key,value&gt; pairs, meta-data for objects, a flow-level load balancer, etc.
+<a class="reference internal" href="#figure-efd6"><span class="std std-numref">Fig. 32.6</span></a> shows an example of using EFD as a flow-level load
+balancer, where flows are received at a front end server before being forwarded
+to the target back end server for processing. The system designer would
+deterministically co-locate flows together in order to minimize cross-server
+interaction.
+(For example, flows requesting certain webpage objects are co-located
+together, to minimize forwarding of common objects across servers).</p>
+<figure class="align-default" id="id6">
+<span id="figure-efd6"></span><img alt="../_images/efd_i6.svg" src="../_images/efd_i6.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.6 </span><span class="caption-text">EFD as a Flow-Level Load Balancer</span></p>
+</figcaption>
+</figure>
+<p>As shown in <a class="reference internal" href="#figure-efd6"><span class="std std-numref">Fig. 32.6</span></a>, the front end server will have an EFD table that
+stores for each group what is the perfect hash index that satisfies the
+correct output. Because the table size is small and fits in cache (since
+keys are not stored), it sustains a large number of flows (N*X, where N
+is the maximum number of flows served by each back end server of the X
+possible targets).</p>
+<p>With an input flow key, the group id is computed (for example, using
+last few bits of CRC hash) and then the EFD table is indexed with the
+group id to retrieve the corresponding hash index to use. Once the index
+is retrieved the key is hashed using this hash function and the result
+will be the intended correct target where this flow is supposed to be
+processed.</p>
+<p>It should be noted that as a result of EFD not matching the exact key but
+rather distributing the flows to a target back end node based on the
+perfect hash index, a key that has not been inserted before
+will be distributed to a valid target. Hence, a local table which stores
+the flows served at each node is used and is
+exact matched with the input key to rule out new never seen before
+flows.</p>
+</section>
+<section id="library-api-overview">
+<span id="efd-api"></span><h2><span class="section-number">32.4. </span>Library API Overview</h2>
+<p>The EFD library API is created with a very similar semantics of a
+hash-index or a flow table. The application creates an EFD table for a
+given maximum number of flows, a function is called to insert a flow key
+with a specific target value, and another function is used to retrieve
+target values for a given individual flow key or a bulk of keys.</p>
+<section id="efd-table-create">
+<h3><span class="section-number">32.4.1. </span>EFD Table Create</h3>
+<p>The function <code class="docutils literal notranslate"><span class="pre">rte_efd_create()</span></code> is used to create and return a pointer
+to an EFD table that is sized to hold up to num_flows key.
+The online version of the EFD table (the one that does
+not store the keys and is used for lookups) will be allocated and
+created in the last level cache (LLC) of the socket defined by the
+online_socket_bitmask, while the offline EFD table (the one that
+stores the keys and is used for key inserts and for computing the
+perfect hashing) is allocated and created in the LLC of the socket
+defined by offline_socket_bitmask. It should be noted, that for
+highest performance the socket id should match that where the thread is
+running, i.e. the online EFD lookup table should be created on the same
+socket as where the lookup thread is running.</p>
+</section>
+<section id="efd-insert-and-update">
+<h3><span class="section-number">32.4.2. </span>EFD Insert and Update</h3>
+<p>The EFD function to insert a key or update a key to a new value is
+<code class="docutils literal notranslate"><span class="pre">rte_efd_update()</span></code>. This function will update an existing key to
+a new value (target) if the key has already been inserted
+before, or will insert the &lt;key,value&gt; pair if this key has not been inserted
+before. It will return 0 upon success. It will return
+<code class="docutils literal notranslate"><span class="pre">EFD_UPDATE_WARN_GROUP_FULL</span> <span class="pre">(1)</span></code> if the operation is insert, and the
+last available space in the key’s group was just used. It will return
+<code class="docutils literal notranslate"><span class="pre">EFD_UPDATE_FAILED</span> <span class="pre">(2)</span></code> when the insertion or update has failed (either it
+failed to find a suitable perfect hash or the group was full). The function
+will return <code class="docutils literal notranslate"><span class="pre">EFD_UPDATE_NO_CHANGE</span> <span class="pre">(3)</span></code> if there is no change to the EFD
+table (i.e, same value already exists).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function is not multi-thread safe and should only be called
+from one thread.</p>
+</div>
+</section>
+<section id="efd-lookup">
+<h3><span class="section-number">32.4.3. </span>EFD Lookup</h3>
+<p>To lookup a certain key in an EFD table, the function <code class="docutils literal notranslate"><span class="pre">rte_efd_lookup()</span></code>
+is used to return the value associated with single key.
+As previously mentioned, if the key has been inserted, the correct value
+inserted is returned, if the key has not been inserted before,
+a ‘random’ value (based on hashing of the key) is returned.
+For better performance and to decrease the overhead of
+function calls per key, it is always recommended to use a bulk lookup
+function (simultaneous lookup of multiple keys) instead of a single key
+lookup function. <code class="docutils literal notranslate"><span class="pre">rte_efd_lookup_bulk()</span></code> is the bulk lookup function,
+that looks up num_keys simultaneously stored in the key_list and the
+corresponding return values will be returned in the value_list.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function is multi-thread safe, but there should not be other threads
+writing in the EFD table, unless locks are used.</p>
+</div>
+</section>
+<section id="efd-delete">
+<h3><span class="section-number">32.4.4. </span>EFD Delete</h3>
+<p>To delete a certain key in an EFD table, the function
+<code class="docutils literal notranslate"><span class="pre">rte_efd_delete()</span></code> can be used. The function returns zero upon success
+when the key has been found and deleted. Socket_id is the parameter to
+use to lookup the existing value, which is ideally the caller’s socket id.
+The previous value associated with this key will be returned
+in the prev_value argument.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function is not multi-thread safe and should only be called
+from one thread.</p>
+</div>
+</section>
+</section>
+<section id="library-internals">
+<span id="efd-internals"></span><h2><span class="section-number">32.5. </span>Library Internals</h2>
+<p>This section provides the brief high-level idea and an overview
+of the library internals to accompany the RFC. The intent of this
+section is to explain to readers the high-level implementation of
+insert, lookup and group rebalancing in the EFD library.</p>
+<section id="insert-function-internals">
+<h3><span class="section-number">32.5.1. </span>Insert Function Internals</h3>
+<p>As previously mentioned the EFD divides the whole set of keys into
+groups of a manageable size (e.g. 28 keys) and then searches for the
+perfect hash that satisfies the intended target value for each key. EFD
+stores two version of the &lt;key,value&gt; table:</p>
+<ul class="simple">
+<li><p>Offline Version (in memory): Only used for the insertion/update
+operation, which is less frequent than the lookup operation. In the
+offline version the exact keys for each group is stored. When a new
+key is added, the hash function is updated that will satisfy the
+value for the new key together with the all old keys already inserted
+in this group.</p></li>
+<li><p>Online Version (in cache): Used for the frequent lookup operation. In
+the online version, as previously mentioned, the keys are not stored
+but rather only the hash index for each group.</p></li>
+</ul>
+<figure class="align-default" id="id7">
+<span id="figure-efd7"></span><img alt="../_images/efd_i7.svg" src="../_images/efd_i7.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.7 </span><span class="caption-text">Group Assignment</span></p>
+</figcaption>
+</figure>
+<p><a class="reference internal" href="#figure-efd7"><span class="std std-numref">Fig. 32.7</span></a> depicts the group assignment for 7 flow keys as an example.
+Given a flow key, a hash function (in our implementation CRC hash) is
+used to get the group id. As shown in the figure, the groups can be
+unbalanced. (We highlight group rebalancing further below).</p>
+<figure class="align-default" id="id8">
+<span id="figure-efd8"></span><img alt="../_images/efd_i8.svg" src="../_images/efd_i8.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.8 </span><span class="caption-text">Perfect Hash Search - Assigned Keys &amp; Target Value</span></p>
+</figcaption>
+</figure>
+<p>Focusing on one group that has four keys, <a class="reference internal" href="#figure-efd8"><span class="std std-numref">Fig. 32.8</span></a> depicts the search
+algorithm to find the perfect hash function. Assuming that the target
+value bit for the keys is as shown in the figure, then the online EFD
+table will store a 16 bit hash index and 16 bit lookup table per group
+per value bit.</p>
+<figure class="align-default" id="id9">
+<span id="figure-efd9"></span><img alt="../_images/efd_i9.svg" src="../_images/efd_i9.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.9 </span><span class="caption-text">Perfect Hash Search - Satisfy Target Values</span></p>
+</figcaption>
+</figure>
+<p>For a given keyX, a hash function <code class="docutils literal notranslate"><span class="pre">(h(keyX,</span> <span class="pre">seed1)</span> <span class="pre">+</span> <span class="pre">index</span> <span class="pre">*</span> <span class="pre">h(keyX,</span> <span class="pre">seed2))</span></code>
+is used to point to certain bit index in the 16bit lookup_table value,
+as shown in <a class="reference internal" href="#figure-efd9"><span class="std std-numref">Fig. 32.9</span></a>.
+The insert function will brute force search for all possible values for the
+hash index until a non conflicting lookup_table is found.</p>
+<figure class="align-default" id="id10">
+<span id="figure-efd10"></span><img alt="../_images/efd_i10.svg" src="../_images/efd_i10.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.10 </span><span class="caption-text">Finding Hash Index for Conflict Free lookup_table</span></p>
+</figcaption>
+</figure>
+<p>For example, since both key3 and key7 have a target bit value of 1, it
+is okay if the hash function of both keys point to the same bit in the
+lookup table. A conflict will occur if a hash index is used that maps
+both Key4 and Key7 to the same index in the lookup_table,
+as shown in <a class="reference internal" href="#figure-efd10"><span class="std std-numref">Fig. 32.10</span></a>, since their target value bit are not the same.
+Once a hash index is found that produces a lookup_table with no
+contradictions, this index is stored for this group. This procedure is
+repeated for each bit of target value.</p>
+</section>
+<section id="lookup-function-internals">
+<h3><span class="section-number">32.5.2. </span>Lookup Function Internals</h3>
+<p>The design principle of EFD is that lookups are much more frequent than
+inserts, and hence, EFD’s design optimizes for the lookups which are
+faster and much simpler than the slower insert procedure (inserts are
+slow, because of perfect hash search as previously discussed).</p>
+<figure class="align-default" id="id11">
+<span id="figure-efd11"></span><img alt="../_images/efd_i11.svg" src="../_images/efd_i11.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.11 </span><span class="caption-text">EFD Lookup Operation</span></p>
+</figcaption>
+</figure>
+<p><a class="reference internal" href="#figure-efd11"><span class="std std-numref">Fig. 32.11</span></a> depicts the lookup operation for EFD. Given an input key,
+the group id is computed (using CRC hash) and then the hash index for this
+group is retrieved from the EFD table. Using the retrieved hash index,
+the hash function <code class="docutils literal notranslate"><span class="pre">h(key,</span> <span class="pre">seed1)</span> <span class="pre">+</span> <span class="pre">index</span> <span class="pre">*h(key,</span> <span class="pre">seed2)</span></code> is used which will
+result in an index in the lookup_table, the bit corresponding to this
+index will be the target value bit. This procedure is repeated for each
+bit of the target value.</p>
+</section>
+<section id="group-rebalancing-function-internals">
+<h3><span class="section-number">32.5.3. </span>Group Rebalancing Function Internals</h3>
+<p>When discussing EFD inserts and lookups, the discussion is simplified by
+assuming that a group id is simply a result of hash function. However,
+since hashing in general is not perfect and will not always produce a
+uniform output, this simplified assumption will lead to unbalanced
+groups, i.e., some group will have more keys than other groups.
+Typically, and to minimize insert time with an increasing number of keys,
+it is preferable that all groups will have a balanced number of keys, so
+the brute force search for the perfect hash terminates with a valid hash
+index. In order to achieve this target, groups are rebalanced during
+runtime inserts, and keys are moved around from a busy group to a less
+crowded group as the more keys are inserted.</p>
+<figure class="align-default" id="id12">
+<span id="figure-efd12"></span><img alt="../_images/efd_i12.svg" src="../_images/efd_i12.svg" /><figcaption>
+<p><span class="caption-number">Fig. 32.12 </span><span class="caption-text">Runtime Group Rebalancing</span></p>
+</figcaption>
+</figure>
+<p><a class="reference internal" href="#figure-efd12"><span class="std std-numref">Fig. 32.12</span></a> depicts the high level idea of group rebalancing, given an
+input key the hash result is split into two parts a chunk id and 8-bit
+bin id. A chunk contains 64 different groups and 256 bins (i.e. for any
+given bin it can map to 4 distinct groups). When a key is inserted, the
+bin id is computed, for example in <a class="reference internal" href="#figure-efd12"><span class="std std-numref">Fig. 32.12</span></a> bin_id=2,
+and since each bin can be mapped to one of four different groups (2 bit storage),
+the four possible mappings are evaluated and the one that will result in a
+balanced key distribution across these four is selected the mapping result
+is stored in these two bits.</p>
+</section>
+</section>
+<section id="references">
+<span id="efd-references"></span><h2><span class="section-number">32.6. </span>References</h2>
+<p>1- EFD is based on collaborative research work between Intel and
+Carnegie Mellon University (CMU), interested readers can refer to the paper
+“Scaling Up Clustered Network Appliances with ScaleBricks” Dong Zhou et al.
+at SIGCOMM 2015 (<cite>http://conferences.sigcomm.org/sigcomm/2015/pdf/papers/p241.pdf</cite>)
+for more information.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="toeplitz_hash_lib.html" title="previous chapter"><span class="section-number">31. </span>Toeplitz Hash Library</a></li>
+      <li>Next: <a href="member_lib.html" title="next chapter"><span class="section-number">33. </span>Membership Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/efd_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

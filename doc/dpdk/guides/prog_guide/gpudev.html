@@ -1,0 +1,349 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>25. General-Purpose Graphics Processing Unit Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="26. Security Library" href="rte_security.html" />
+    <link rel="prev" title="24. DMA Device Library" href="dmadev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="general-purpose-graphics-processing-unit-library">
+<h1><span class="section-number">25. </span>General-Purpose Graphics Processing Unit Library</h1>
+<p>When mixing networking activity with task processing on a GPU device,
+there may be the need to put in communication the CPU with the device
+in order to manage the memory, synchronize operations, exchange info, etc..</p>
+<p>By means of the generic GPU interface provided by this library,
+it is possible to allocate a chunk of GPU memory and use it
+to create a DPDK mempool with external mbufs having the payload
+on the GPU memory, enabling any network interface card
+supporting this feature
+to directly transmit and receive packets using GPU memory.</p>
+<p>Additionally, this library provides a number of functions
+to enhance the dialog between CPU and GPU.</p>
+<p>Out of scope of this library is to provide a wrapper for GPU specific libraries
+(e.g. CUDA Toolkit or OpenCL), thus it is not possible to launch workload
+on the device or create GPU specific objects
+(e.g. CUDA Driver context or CUDA Streams in case of NVIDIA GPUs).</p>
+<p>This library is optional in DPDK
+and can be disabled with <code class="docutils literal notranslate"><span class="pre">-Ddisable_libs=gpudev</span></code>.</p>
+<section id="features">
+<h2><span class="section-number">25.1. </span>Features</h2>
+<p>This library provides a number of features:</p>
+<ul class="simple">
+<li><p>Interoperability with device-specific library through generic handlers.</p></li>
+<li><p>Allocate and free memory on the device.</p></li>
+<li><p>Register CPU memory to make it visible from the device.</p></li>
+<li><p>Communication between the CPU and the device.</p></li>
+</ul>
+<p>The whole CPU - GPU communication is implemented
+using CPU memory visible from the GPU.</p>
+</section>
+<section id="api-overview">
+<h2><span class="section-number">25.2. </span>API Overview</h2>
+<section id="child-device">
+<h3><span class="section-number">25.2.1. </span>Child Device</h3>
+<p>By default, DPDK PCIe module detects and registers physical GPU devices
+in the system.
+With the gpudev library is also possible to add additional non-physical devices
+through an <code class="docutils literal notranslate"><span class="pre">uint64_t</span></code> generic handler (e.g. CUDA Driver context)
+that will be registered internally by the driver as an additional device (child)
+connected to a physical device (parent).
+Each device (parent or child) is represented through a ID
+required to indicate which device a given operation should be executed on.</p>
+</section>
+<section id="memory-allocation">
+<h3><span class="section-number">25.2.2. </span>Memory Allocation</h3>
+<p>gpudev can allocate on an input given GPU device a memory area
+returning the pointer to that memory.
+Later, it’s also possible to free that memory with gpudev.
+GPU memory allocated outside of the gpudev library
+(e.g. with GPU-specific library) cannot be freed by the gpudev library.</p>
+</section>
+<section id="memory-registration">
+<h3><span class="section-number">25.2.3. </span>Memory Registration</h3>
+<p>gpudev can register a CPU memory area to make it visible from a GPU device.
+Later, it’s also possible to unregister that memory with gpudev.
+CPU memory registered outside of the gpudev library
+(e.g. with GPU specific library) cannot be unregistered by the gpudev library.</p>
+</section>
+<section id="cpu-mapping">
+<h3><span class="section-number">25.2.4. </span>CPU mapping</h3>
+<p>gpudev can map into the CPU address space a GPU memory address allocated with gpudev.
+gpudev returns a pointer the CPU can use to access (ready or write) GPU memory.
+Later, it’s also possible to unmap that memory with gpudev.
+GPU memory CPU mapped outside of the gpudev library (e.g. with GPU specific library)
+cannot be unmapped by the gpudev library.</p>
+</section>
+<section id="memory-barrier">
+<h3><span class="section-number">25.2.5. </span>Memory Barrier</h3>
+<p>Some GPU drivers may need, under certain conditions,
+to enforce the coherency of external devices writes (e.g. NIC receiving packets)
+into the GPU memory.
+gpudev abstracts and exposes this capability.</p>
+</section>
+<section id="communication-flag">
+<h3><span class="section-number">25.2.6. </span>Communication Flag</h3>
+<p>Considering an application with some GPU task
+that’s waiting to receive a signal from the CPU
+to move forward with the execution.
+The communication flag allocates a CPU memory GPU-visible <code class="docutils literal notranslate"><span class="pre">uint32_t</span></code> flag
+that can be used by the CPU to communicate with a GPU task.</p>
+</section>
+<section id="communication-list">
+<h3><span class="section-number">25.2.7. </span>Communication list</h3>
+<p>By default, DPDK pulls free mbufs from a mempool to receive packets.
+Best practice, especially in a multithreaded application,
+is to no make any assumption on which mbufs will be used
+to receive the next bursts of packets.
+Considering an application with a GPU memory mempool
+attached to a receive queue having some task waiting on the GPU
+to receive a new burst of packets to be processed,
+there is the need to communicate from the CPU
+the list of mbuf payload addresses where received packet have been stored.
+The <code class="docutils literal notranslate"><span class="pre">rte_gpu_comm_*()</span></code> functions are responsible to create a list of packets
+that can be populated with receive mbuf payload addresses
+and communicated to the task running on the GPU.</p>
+</section>
+</section>
+<section id="cuda-example">
+<h2><span class="section-number">25.3. </span>CUDA Example</h2>
+<p>In the example below, there is a pseudo-code to give an example
+about how to use functions in this library in case of a CUDA application.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="c1">//////////////////////////////////////////////////////////////////////////</span>
+<span class="c1">///// gpudev library + CUDA functions</span>
+<span class="c1">//////////////////////////////////////////////////////////////////////////</span>
+<span class="cp">#define GPU_PAGE_SHIFT 16</span>
+<span class="cp">#define GPU_PAGE_SIZE (1UL &lt;&lt; GPU_PAGE_SHIFT)</span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_gpu_flag</span><span class="w"> </span><span class="n">quit_flag</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_gpu_comm_list</span><span class="w"> </span><span class="o">*</span><span class="n">comm_list</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">nb_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">comm_list_entry</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">rx_mbufs</span><span class="p">[</span><span class="n">max_rx_mbufs</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="n">cudaStream_t</span><span class="w"> </span><span class="n">cstream</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mpool_payload</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">mpool_header</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_pktmbuf_extmem</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int16_t</span><span class="w"> </span><span class="n">port_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Initialize CUDA objects (cstream, context, etc..). */</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Use gpudev library to register a new CUDA context if any. */</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Let&#39;s assume the application wants to use the default context of the GPU device 0. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">dev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Create an external memory mempool using memory allocated on the GPU. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">elt_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mbufs_headroom_size</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_ALIGN_CEIL</span><span class="p">(</span><span class="n">mbufs_num</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">elt_size</span><span class="p">,</span><span class="w"> </span><span class="n">GPU_PAGE_SIZE</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_iova</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_BAD_IOVA</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_gpu_mem_alloc</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_len</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_extmem_register</span><span class="p">(</span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_ptr</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_len</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_iova</span><span class="p">,</span><span class="w"> </span><span class="n">GPU_PAGE_SIZE</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_dev_dma_map</span><span class="p">(</span><span class="n">rte_eth_devices</span><span class="p">[</span><span class="n">port_id</span><span class="p">].</span><span class="n">device</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_ptr</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_iova</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_len</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">mpool_payload</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_pktmbuf_pool_create_extbuf</span><span class="p">(</span><span class="s">&quot;gpu_mempool&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">mbufs_num</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                                   </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">elt_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                                   </span><span class="n">rte_socket_id</span><span class="p">(),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ext_mem</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Create CPU - device communication flag.</span>
+<span class="cm">     * With this flag, the CPU can tell to the CUDA kernel to exit from the main loop.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_comm_create_flag</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">quit_flag</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_GPU_COMM_FLAG_CPU</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_comm_set_flag</span><span class="p">(</span><span class="o">&amp;</span><span class="n">quit_flag</span><span class="w"> </span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * Create CPU - device communication list.</span>
+<span class="cm">     * Each entry of this list will be populated by the CPU</span>
+<span class="cm">     * with a new set of received mbufs that the CUDA kernel has to process.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">comm_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_gpu_comm_create_list</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">num_entries</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* A very simple CUDA kernel with just 1 CUDA block and RTE_GPU_COMM_LIST_PKTS_MAX CUDA threads. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">cuda_kernel_packet_processing</span><span class="o">&lt;&lt;&lt;</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_GPU_COMM_LIST_PKTS_MAX</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="n">cstream</span><span class="o">&gt;&gt;&gt;</span><span class="p">(</span><span class="n">quit_flag</span><span class="o">-&gt;</span><span class="n">ptr</span><span class="p">,</span><span class="w"> </span><span class="n">comm_list</span><span class="p">,</span><span class="w"> </span><span class="n">num_entries</span><span class="p">,</span><span class="w"> </span><span class="p">...);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * For simplicity, the CPU here receives only 2 bursts of mbufs.</span>
+<span class="cm">     * In a real application, network activity and device processing should overlap.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="n">nb_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_rx_burst</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">(</span><span class="n">rx_mbufs</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="w"> </span><span class="n">max_rx_mbufs</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_comm_populate_list_pkts</span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">rx_mbufs</span><span class="p">,</span><span class="w"> </span><span class="n">nb_rx</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">nb_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_rx_burst</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="n">queue_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="p">(</span><span class="n">rx_mbufs</span><span class="p">[</span><span class="mi">0</span><span class="p">]),</span><span class="w"> </span><span class="n">max_rx_mbufs</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_comm_populate_list_pkts</span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="n">rx_mbufs</span><span class="p">,</span><span class="w"> </span><span class="n">nb_rx</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/*</span>
+<span class="cm">     * CPU waits for the completion of the packets&#39; processing on the CUDA kernel</span>
+<span class="cm">     * and then it does a cleanup of the received mbufs.</span>
+<span class="cm">     */</span><span class="w"></span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rte_gpu_comm_cleanup_list</span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="mi">0</span><span class="p">]));</span><span class="w"></span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rte_gpu_comm_cleanup_list</span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="mi">1</span><span class="p">]));</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* CPU notifies the CUDA kernel that it has to terminate. */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_comm_set_flag</span><span class="p">(</span><span class="o">&amp;</span><span class="n">quit_flag</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* gpudev objects cleanup/destruction */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_gpu_mem_free</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">ext_mem</span><span class="p">.</span><span class="n">buf_len</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="c1">//////////////////////////////////////////////////////////////////////////</span>
+<span class="c1">///// CUDA kernel</span>
+<span class="c1">//////////////////////////////////////////////////////////////////////////</span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">cuda_kernel</span><span class="p">(</span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">quit_flag_ptr</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_gpu_comm_list</span><span class="w"> </span><span class="o">*</span><span class="n">comm_list</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">comm_list_entries</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">comm_list_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_gpu_comm_pkt</span><span class="w"> </span><span class="o">*</span><span class="n">pkt_list</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Do some pre-processing operations. */</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* GPU kernel keeps checking this flag to know if it has to quit or wait for more packets. */</span><span class="w"></span>
+<span class="w">    </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="n">quit_flag_ptr</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="n">comm_list_index</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">status_d</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">RTE_GPU_COMM_LIST_READY</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">threadIdx</span><span class="p">.</span><span class="n">x</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">comm_list</span><span class="p">[</span><span class="n">comm_list_index</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">num_pkts</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="cm">/* Each CUDA thread processes a different packet. */</span><span class="w"></span>
+<span class="w">            </span><span class="n">packet_processing</span><span class="p">(</span><span class="n">comm_list</span><span class="p">[</span><span class="n">comm_list_index</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">addr</span><span class="p">,</span><span class="w"> </span><span class="n">comm_list</span><span class="p">[</span><span class="n">comm_list_index</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">,</span><span class="w"> </span><span class="p">..);</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="n">__threadfence</span><span class="p">();</span><span class="w"></span>
+<span class="w">        </span><span class="n">__syncthreads</span><span class="p">();</span><span class="w"></span>
+
+<span class="w">        </span><span class="cm">/* Wait for new packets on the next communication list entry. */</span><span class="w"></span>
+<span class="w">        </span><span class="n">comm_list_index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">comm_list_index</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">%</span><span class="w"> </span><span class="n">comm_list_entries</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Do some post-processing operations. */</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="dmadev.html" title="previous chapter"><span class="section-number">24. </span>DMA Device Library</a></li>
+      <li>Next: <a href="rte_security.html" title="next chapter"><span class="section-number">26. </span>Security Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/gpudev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

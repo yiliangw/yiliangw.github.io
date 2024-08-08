@@ -1,0 +1,346 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>57. Power Management &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="58. Packet Classification and Access Control" href="packet_classif_access_ctrl.html" />
+    <link rel="prev" title="56. Quality of Service (QoS) Framework" href="qos_framework.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="power-management">
+<h1><span class="section-number">57. </span>Power Management</h1>
+<p>The DPDK Power Management feature allows users space applications to save power
+by dynamically adjusting CPU frequency or entering into different C-States.</p>
+<ul class="simple">
+<li><p>Adjusting the CPU frequency dynamically according to the utilization of RX queue.</p></li>
+<li><p>Entering into different deeper C-States according to the adaptive algorithms to speculate
+brief periods of time suspending the application if no packets are received.</p></li>
+</ul>
+<p>The interfaces for adjusting the operating CPU frequency are in the power management library.
+C-State control is implemented in applications according to the different use cases.</p>
+<section id="cpu-frequency-scaling">
+<h2><span class="section-number">57.1. </span>CPU Frequency Scaling</h2>
+<p>The Linux kernel provides a cpufreq module for CPU frequency scaling for each lcore.
+For example, for cpuX, /sys/devices/system/cpu/cpuX/cpufreq/ has the following sys files for frequency scaling:</p>
+<ul class="simple">
+<li><p>affected_cpus</p></li>
+<li><p>bios_limit</p></li>
+<li><p>cpuinfo_cur_freq</p></li>
+<li><p>cpuinfo_max_freq</p></li>
+<li><p>cpuinfo_min_freq</p></li>
+<li><p>cpuinfo_transition_latency</p></li>
+<li><p>related_cpus</p></li>
+<li><p>scaling_available_frequencies</p></li>
+<li><p>scaling_available_governors</p></li>
+<li><p>scaling_cur_freq</p></li>
+<li><p>scaling_driver</p></li>
+<li><p>scaling_governor</p></li>
+<li><p>scaling_max_freq</p></li>
+<li><p>scaling_min_freq</p></li>
+<li><p>scaling_setspeed</p></li>
+</ul>
+<p>In the DPDK, scaling_governor is configured in user space.
+Then, a user space application can prompt the kernel by writing scaling_setspeed to adjust the CPU frequency
+according to the strategies defined by the user space application.</p>
+</section>
+<section id="core-load-throttling-through-c-states">
+<h2><span class="section-number">57.2. </span>Core-load Throttling through C-States</h2>
+<p>Core state can be altered by speculative sleeps whenever the specified lcore has nothing to do.
+In the DPDK, if no packet is received after polling,
+speculative sleeps can be triggered according the strategies defined by the user space application.</p>
+</section>
+<section id="per-core-turbo-boost">
+<h2><span class="section-number">57.3. </span>Per-core Turbo Boost</h2>
+<p>Individual cores can be allowed to enter a Turbo Boost state on a per-core
+basis. This is achieved by enabling Turbo Boost Technology in the BIOS, then
+looping through the relevant cores and enabling/disabling Turbo Boost on each
+core.</p>
+</section>
+<section id="use-of-power-library-in-a-hyper-threaded-environment">
+<h2><span class="section-number">57.4. </span>Use of Power Library in a Hyper-Threaded Environment</h2>
+<p>In the case where the power library is in use on a system with Hyper-Threading enabled,
+the frequency on the physical core is set to the highest frequency of the Hyper-Thread siblings.
+So even though an application may request a scale down, the core frequency will
+remain at the highest frequency until all Hyper-Threads on that core request a scale down.</p>
+</section>
+<section id="api-overview-of-the-power-library">
+<h2><span class="section-number">57.5. </span>API Overview of the Power Library</h2>
+<p>The main methods exported by power library are for CPU frequency scaling and include the following:</p>
+<ul class="simple">
+<li><p><strong>Freq up</strong>: Prompt the kernel to scale up the frequency of the specific lcore.</p></li>
+<li><p><strong>Freq down</strong>: Prompt the kernel to scale down the frequency of the specific lcore.</p></li>
+<li><p><strong>Freq max</strong>: Prompt the kernel to scale up the frequency of the specific lcore to the maximum.</p></li>
+<li><p><strong>Freq min</strong>: Prompt the kernel to scale down the frequency of the specific lcore to the minimum.</p></li>
+<li><p><strong>Get available freqs</strong>: Read the available frequencies of the specific lcore from the sys file.</p></li>
+<li><p><strong>Freq get</strong>: Get the current frequency of the specific lcore.</p></li>
+<li><p><strong>Freq set</strong>: Prompt the kernel to set the frequency for the specific lcore.</p></li>
+<li><p><strong>Enable turbo</strong>: Prompt the kernel to enable Turbo Boost for the specific lcore.</p></li>
+<li><p><strong>Disable turbo</strong>: Prompt the kernel to disable Turbo Boost for the specific lcore.</p></li>
+</ul>
+</section>
+<section id="user-cases">
+<h2><span class="section-number">57.6. </span>User Cases</h2>
+<p>The power management mechanism is used to save power when performing L3 forwarding.</p>
+</section>
+<section id="ethernet-pmd-power-management-api">
+<h2><span class="section-number">57.7. </span>Ethernet PMD Power Management API</h2>
+<section id="abstract">
+<h3><span class="section-number">57.7.1. </span>Abstract</h3>
+<p>Existing power management mechanisms require developers to change application
+design or change code to make use of it. The PMD power management API provides a
+convenient alternative by utilizing Ethernet PMD RX callbacks, and triggering
+power saving whenever empty poll count reaches a certain number.</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>Monitor</dt><dd><p>This power saving scheme will put the CPU into optimized power state and
+monitor the Ethernet PMD RX descriptor address, waking the CPU up whenever
+there’s new traffic. Support for this scheme may not be available on all
+platforms, and further limitations may apply (see below).</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Pause</dt><dd><p>This power saving scheme will avoid busy polling by either entering
+power-optimized sleep state with <code class="docutils literal notranslate"><span class="pre">rte_power_pause()</span></code> function, or, if it’s
+not supported by the underlying platform, use <code class="docutils literal notranslate"><span class="pre">rte_pause()</span></code>.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Frequency scaling</dt><dd><p>This power saving scheme will use <code class="docutils literal notranslate"><span class="pre">librte_power</span></code> library functionality to
+scale the core frequency up/down depending on traffic volume.
+The reaction time of the frequency scaling mode is longer
+than the pause and monitor mode.</p>
+</dd>
+</dl>
+</li>
+</ul>
+<p>The “monitor” mode is only supported in the following configurations and scenarios:</p>
+<ul class="simple">
+<li><p>On Linux* x86_64, <cite>rte_power_monitor()</cite> requires WAITPKG instruction set being
+supported by the CPU, while <cite>rte_power_monitor_multi()</cite> requires WAITPKG and
+RTM instruction sets being supported by the CPU. RTM instruction set may also
+require booting the Linux with <cite>tsx=on</cite> command line parameter. Please refer
+to your platform documentation for further information.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">rte_cpu_get_intrinsics_support()</span></code> function indicates that
+<code class="docutils literal notranslate"><span class="pre">rte_power_monitor_multi()</span></code> function is supported by the platform, then
+monitoring multiple Ethernet Rx queues for traffic will be supported.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">rte_cpu_get_intrinsics_support()</span></code> function indicates that only
+<code class="docutils literal notranslate"><span class="pre">rte_power_monitor()</span></code> is supported by the platform, then monitoring will be
+limited to a mapping of 1 core 1 queue (thus, each Rx queue will have to be
+monitored from a different lcore).</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">rte_cpu_get_intrinsics_support()</span></code> function indicates that neither of the
+two monitoring functions are supported, then monitor mode will not be supported.</p></li>
+<li><p>Not all Ethernet drivers support monitoring, even if the underlying
+platform may support the necessary CPU instructions. Please refer to
+<a class="reference internal" href="../nics/overview.html"><span class="doc">Overview of Networking Drivers</span></a> for more information.</p></li>
+</ul>
+</section>
+<section id="api-overview-for-ethernet-pmd-power-management">
+<h3><span class="section-number">57.7.2. </span>API Overview for Ethernet PMD Power Management</h3>
+<ul class="simple">
+<li><p><strong>Queue Enable</strong>: Enable specific power scheme for certain queue/port/core.</p></li>
+<li><p><strong>Queue Disable</strong>: Disable power scheme for certain queue/port/core.</p></li>
+<li><p><strong>Get Emptypoll Max</strong>: Get the configured number of empty polls to wait before
+entering sleep state.</p></li>
+<li><p><strong>Set Emptypoll Max</strong>: Set the number of empty polls to wait before entering
+sleep state.</p></li>
+<li><p><strong>Get Pause Duration</strong>: Get the configured duration (microseconds) to be used
+in the Pause callback.</p></li>
+<li><p><strong>Set Pause Duration</strong>: Set the duration of the pause (microseconds) used in
+the Pause mode callback.</p></li>
+<li><p><strong>Get Scaling Min Freq</strong>: Get the configured minimum frequency (kHz) to be used
+in Frequency Scaling mode.</p></li>
+<li><p><strong>Set Scaling Min Freq</strong>: Set the minimum frequency (kHz) to be used in Frequency
+Scaling mode.</p></li>
+<li><p><strong>Get Scaling Max Freq</strong>: Get the configured maximum frequency (kHz) to be used
+in Frequency Scaling mode.</p></li>
+<li><p><strong>Set Scaling Max Freq</strong>: Set the maximum frequency (kHz) to be used in Frequency
+Scaling mode.</p></li>
+</ul>
+</section>
+</section>
+<section id="intel-uncore-api">
+<h2><span class="section-number">57.8. </span>Intel Uncore API</h2>
+<section id="id1">
+<h3><span class="section-number">57.8.1. </span>Abstract</h3>
+<p>Uncore is a term used by Intel to describe the functions of a microprocessor
+that are not in the core, but which must be closely connected to the core
+to achieve high performance: L3 cache, on-die memory controller, etc.
+Significant power savings can be achieved by reducing the uncore frequency
+to its lowest value.</p>
+<p>The Linux kernel provides the driver “intel-uncore-frequency”
+to control the uncore frequency limits for x86 platform.
+The driver is available from kernel version 5.6 and above.
+Also CONFIG_INTEL_UNCORE_FREQ_CONTROL will need to be enabled in the kernel,
+which was added in 5.6.
+This manipulates the context of MSR 0x620,
+which sets min/max of the uncore for the SKU.</p>
+</section>
+<section id="api-overview-for-intel-uncore">
+<h3><span class="section-number">57.8.2. </span>API Overview for Intel Uncore</h3>
+<p>Overview of each function in the Intel Uncore API,
+with explanation of what they do.
+Each function should not be called in the fast path.</p>
+<dl class="simple">
+<dt>Uncore Power Init</dt><dd><p>Initialize uncore power, populate frequency array
+and record original min &amp; max for die on pkg.</p>
+</dd>
+<dt>Uncore Power Exit</dt><dd><p>Exit uncore power, restoring original min &amp; max for die on pkg.</p>
+</dd>
+<dt>Get Uncore Power Freq</dt><dd><p>Get current uncore freq index for die on pkg.</p>
+</dd>
+<dt>Set Uncore Power Freq</dt><dd><p>Set min &amp; max uncore freq index for die on pkg
+to specified index value (min and max will be the same).</p>
+</dd>
+<dt>Uncore Power Max</dt><dd><p>Set min &amp; max uncore freq to maximum frequency index for die on pkg
+(min and max will be the same).</p>
+</dd>
+<dt>Uncore Power Min</dt><dd><p>Set min &amp; max uncore freq to minimum frequency index for die on pkg
+(min and max will be the same).</p>
+</dd>
+<dt>Get Num Freqs</dt><dd><p>Get the number of frequencies in the index array.</p>
+</dd>
+<dt>Get Num Pkgs</dt><dd><p>Get the number of packages (CPU’s) on the system.</p>
+</dd>
+<dt>Get Num Dies</dt><dd><p>Get the number of die’s on a given package.</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="references">
+<h2><span class="section-number">57.9. </span>References</h2>
+<ul class="simple">
+<li><p>The <a class="reference internal" href="../sample_app_ug/l3_forward_power_man.html"><span class="doc">L3 Forwarding with Power Management Sample Application</span></a>
+chapter in the <a class="reference internal" href="../sample_app_ug/index.html"><span class="doc">Sample Applications User Guides</span></a> section.</p></li>
+<li><p>The <a class="reference internal" href="../sample_app_ug/vm_power_management.html"><span class="doc">Virtual Machine Power Management Application</span></a>
+chapter in the <a class="reference internal" href="../sample_app_ug/index.html"><span class="doc">Sample Applications User Guides</span></a> section.</p></li>
+<li><p>The <a class="reference internal" href="../nics/overview.html"><span class="doc">Overview of Networking Drivers</span></a> chapter in the <a class="reference internal" href="../nics/index.html"><span class="doc">Network Interface Controller Drivers</span></a> section</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="qos_framework.html" title="previous chapter"><span class="section-number">56. </span>Quality of Service (QoS) Framework</a></li>
+      <li>Next: <a href="packet_classif_access_ctrl.html" title="next chapter"><span class="section-number">58. </span>Packet Classification and Access Control</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/power_man.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

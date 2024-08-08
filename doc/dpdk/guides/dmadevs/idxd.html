@@ -1,0 +1,340 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. IDXD DMA Device Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. IOAT DMA Device Driver" href="ioat.html" />
+    <link rel="prev" title="4. HISILICON Kunpeng DMA Driver" href="hisilicon.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="idxd-dma-device-driver">
+<h1><span class="section-number">5. </span>IDXD DMA Device Driver</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">idxd</span></code> dmadev driver provides a poll-mode driver (PMD) for Intel®
+Data Streaming Accelerator <a class="reference external" href="https://software.intel.com/content/www/us/en/develop/articles/intel-data-streaming-accelerator-architecture-specification.html">(Intel DSA)</a>.
+This PMD can be used in conjunction with Intel® DSA devices to offload
+data operations, such as data copies, to hardware, freeing up CPU cycles for
+other tasks.</p>
+<section id="hardware-requirements">
+<h2><span class="section-number">5.1. </span>Hardware Requirements</h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script, included with DPDK, can be used to show the
+presence of supported hardware. Running <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span> <span class="pre">--status-dev</span> <span class="pre">dma</span></code>
+will show all the DMA devices on the system, including IDXD supported devices.
+Intel® DSA devices, are currently (at time of writing) appearing
+as devices with type “0b25”, due to the absence of pci-id database entries for
+them at this point.</p>
+</section>
+<section id="compilation">
+<h2><span class="section-number">5.2. </span>Compilation</h2>
+<p>For builds using <code class="docutils literal notranslate"><span class="pre">meson</span></code> and <code class="docutils literal notranslate"><span class="pre">ninja</span></code>, the driver will be built when the
+target platform is x86-based. No additional compilation steps are necessary.</p>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">5.3. </span>Device Setup</h2>
+<p>Intel® DSA devices can use the IDXD kernel driver or DPDK-supported drivers,
+such as <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code>. Both are supported by the IDXD PMD.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To use Intel® DSA devices in DPDK multi-process applications,
+the devices should be bound to the vfio-pci driver.
+Multi-process is not supported when using the kernel IDXD driver.</p>
+</div>
+<section id="intelreg-dsa-devices-using-idxd-kernel-driver">
+<h3><span class="section-number">5.3.1. </span>Intel® DSA devices using IDXD kernel driver</h3>
+<p>To use an Intel® DSA device bound to the IDXD kernel driver, the device must first be configured.
+The <a class="reference external" href="https://github.com/intel/idxd-config">accel-config</a> utility library can be used for configuration.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The device configuration can also be done by directly interacting with the sysfs nodes.
+An example of how this may be done can be seen in the script <code class="docutils literal notranslate"><span class="pre">dpdk_idxd_cfg.py</span></code>
+included in the driver source directory.</p>
+</div>
+<p>There are some mandatory configuration steps before being able to use a device with an application.
+The internal engines, which do the copies or other operations,
+and the work-queues, which are used by applications to assign work to the device,
+need to be assigned to groups, and the various other configuration options,
+such as priority or queue depth, need to be set for each queue.</p>
+<p>To assign an engine to a group:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ accel-config config-engine dsa0/engine0.0 --group-id=0
+</pre></div>
+</div>
+<p>To assign work queues to groups for passing descriptors to the engines a similar accel-config command can be used.
+However, the work queues also need to be configured depending on the use case.
+Some configuration options include:</p>
+<ul class="simple">
+<li><p>mode (Dedicated/Shared): Indicates whether a WQ may accept jobs from multiple queues simultaneously.</p></li>
+<li><p>priority: WQ priority between 1 and 15. Larger value means higher priority.</p></li>
+<li><p>wq-size: the size of the WQ. Sum of all WQ sizes must be less that the total-size defined by the device.</p></li>
+<li><p>type: WQ type (kernel/mdev/user). Determines how the device is presented.</p></li>
+<li><p>name: identifier given to the WQ.</p></li>
+</ul>
+<p>Example configuration for a work queue:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ accel-config config-wq dsa0/wq0.0 --group-id=0 \
+   --mode=dedicated --priority=10 --wq-size=8 \
+   --max-batch-size=512 --type=user --name=dpdk_app1
+</pre></div>
+</div>
+<p>Once the devices have been configured, they need to be enabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ accel-config enable-device dsa0
+$ accel-config enable-wq dsa0/wq0.0
+</pre></div>
+</div>
+<p>Check the device configuration:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ accel-config list
+</pre></div>
+</div>
+<p>Every Intel® DSA instance supports multiple queues and each should be similarly configured.
+As a further example, the following set of commands will configure and enable 4 queues on instance 0,
+giving each an equal share of resources:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># configure 4 groups, each with one engine
+accel-config config-engine dsa0/engine0.0 --group-id=0
+accel-config config-engine dsa0/engine0.1 --group-id=1
+accel-config config-engine dsa0/engine0.2 --group-id=2
+accel-config config-engine dsa0/engine0.3 --group-id=3
+
+# configure 4 queues, putting each in a different group, so each
+# is backed by a single engine
+accel-config config-wq dsa0/wq0.0 --group-id=0 --type=user --wq-size=32 \
+    --priority=10 --max-batch-size=1024 --mode=dedicated --name=dpdk_app1
+accel-config config-wq dsa0/wq0.1 --group-id=1 --type=user --wq-size=32 \
+    --priority=10 --max-batch-size=1024 --mode=dedicated --name=dpdk_app1
+accel-config config-wq dsa0/wq0.2 --group-id=2 --type=user --wq-size=32 \
+    --priority=10 --max-batch-size=1024 --mode=dedicated --name=dpdk_app1
+accel-config config-wq dsa0/wq0.3 --group-id=3 --type=user --wq-size=32 \
+    --priority=10 --max-batch-size=1024 --mode=dedicated --name=dpdk_app1
+
+# enable device and queues
+accel-config enable-device dsa0
+accel-config enable-wq dsa0/wq0.0 dsa0/wq0.1 dsa0/wq0.2 dsa0/wq0.3
+</pre></div>
+</div>
+</section>
+<section id="devices-using-vfio-uio-drivers">
+<h3><span class="section-number">5.3.2. </span>Devices using VFIO/UIO drivers</h3>
+<p>The HW devices to be used will need to be bound to a user-space IO driver for use.
+The <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script can be used to view the state of the devices
+and to bind them to a suitable DPDK-supported driver, such as <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code>.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ dpdk-devbind.py -b vfio-pci 6a:01.0
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Since each individual queue on the HW device is its own separate dmadev instance,
+the internal DMA device name includes the HW queue ID as a suffix on the PCI address.
+The above device when used by a DPDK application will be accessible via dmadevs with names:
+<code class="docutils literal notranslate"><span class="pre">0000:6a:01.0-q0</span></code>, <code class="docutils literal notranslate"><span class="pre">00006a:01.0-q1</span></code>, etc.</p>
+</div>
+</section>
+<section id="device-probing-and-initialization">
+<h3><span class="section-number">5.3.3. </span>Device Probing and Initialization</h3>
+<p>For devices bound to a suitable DPDK-supported VFIO/UIO driver, the HW devices will
+be found as part of the device scan done at application initialization time without
+the need to pass parameters to the application.</p>
+<p>For Intel® DSA devices, DPDK will automatically configure the device with the
+maximum number of workqueues available on it, partitioning all resources equally
+among the queues.
+If fewer workqueues are required, then the <code class="docutils literal notranslate"><span class="pre">max_queues</span></code> parameter may be passed to
+the device driver on the EAL commandline, via the <code class="docutils literal notranslate"><span class="pre">allowlist</span></code> or <code class="docutils literal notranslate"><span class="pre">-a</span></code> flag e.g.:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ dpdk-test -a &lt;b:d:f&gt;,max_queues=4
+</pre></div>
+</div>
+<p>For devices bound to the IDXD kernel driver,
+the DPDK IDXD driver will automatically perform a scan for available workqueues
+to use. Any workqueues found listed in <code class="docutils literal notranslate"><span class="pre">/dev/dsa</span></code> on the system will be checked
+in <code class="docutils literal notranslate"><span class="pre">/sys</span></code>, and any which have <code class="docutils literal notranslate"><span class="pre">dpdk_</span></code> prefix in their name will be automatically
+probed by the driver to make them available to the application.
+Alternatively, to support use by multiple DPDK processes simultaneously,
+the value used as the DPDK <code class="docutils literal notranslate"><span class="pre">--file-prefix</span></code> parameter may be used as a workqueue
+name prefix, instead of <code class="docutils literal notranslate"><span class="pre">dpdk_</span></code>, allowing each DPDK application instance to only
+use a subset of configured queues.</p>
+<p>Additionally, the -a (allowlist) or -b (blocklist) commandline parameters
+are also available to further restrict the device list that will be used.
+If the -a option is used, then any device that passes the <code class="docutils literal notranslate"><span class="pre">dpdk_</span></code>
+or <code class="docutils literal notranslate"><span class="pre">--file-prefix</span></code> prefix condition must also be present in the allow list.
+Similarly, when the block list is used,
+any device that passes the prefix condition must not be in the block list.
+For example, to only use <code class="docutils literal notranslate"><span class="pre">wq0.3</span></code>, assuming the name prefix condition is met:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ dpdk-test -a wq0.3
+</pre></div>
+</div>
+<p>Once probed successfully, irrespective of kernel driver, the device will appear as a <code class="docutils literal notranslate"><span class="pre">dmadev</span></code>,
+that is a “DMA device type” inside DPDK, and can be accessed using APIs from the
+<code class="docutils literal notranslate"><span class="pre">rte_dmadev</span></code> library.</p>
+</section>
+</section>
+<section id="using-idxd-dmadev-devices">
+<h2><span class="section-number">5.4. </span>Using IDXD DMAdev Devices</h2>
+<p>To use the devices from an application, the dmadev API can be used.</p>
+<section id="device-configuration">
+<h3><span class="section-number">5.4.1. </span>Device Configuration</h3>
+<p>IDXD configuration requirements:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_size</span></code> must be a power of two, between 64 and 4096.</p></li>
+<li><p>Only one <code class="docutils literal notranslate"><span class="pre">vchan</span></code> is supported per device (work queue).</p></li>
+<li><p>IDXD devices do not support silent mode.</p></li>
+<li><p>The transfer direction must be set to <code class="docutils literal notranslate"><span class="pre">RTE_DMA_DIR_MEM_TO_MEM</span></code> to copy from memory to memory.</p></li>
+</ul>
+<p>Once configured, the device can then be made ready for use by calling the
+<code class="docutils literal notranslate"><span class="pre">rte_dma_start()</span></code> API.</p>
+</section>
+<section id="performing-data-copies">
+<h3><span class="section-number">5.4.2. </span>Performing Data Copies</h3>
+<p>Refer to the <a class="reference internal" href="../prog_guide/dmadev.html#dmadev-enqueue-dequeue"><span class="std std-ref">Enqueue / Dequeue APIs</span></a> section of the dmadev library
+documentation for details on operation enqueue, submission and completion API usage.</p>
+<p>It is expected that, for efficiency reasons, a burst of operations will be enqueued to the
+device via multiple enqueue calls between calls to the <code class="docutils literal notranslate"><span class="pre">rte_dma_submit()</span></code> function.</p>
+<p>When gathering completions, <code class="docutils literal notranslate"><span class="pre">rte_dma_completed()</span></code> should be used, up until the point an error
+occurs in an operation. If an error was encountered, <code class="docutils literal notranslate"><span class="pre">rte_dma_completed_status()</span></code> must be used
+to kick the device off to continue processing operations and also to gather the status of each
+individual operations which is filled in to the <code class="docutils literal notranslate"><span class="pre">status</span></code> array provided as parameter by the
+application.</p>
+<p>The following status codes are supported by IDXD:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_DMA_STATUS_SUCCESSFUL</span></code>: The operation was successful.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_DMA_STATUS_INVALID_OPCODE</span></code>: The operation failed due to an invalid operation code.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_DMA_STATUS_INVALID_LENGTH</span></code>: The operation failed due to an invalid data length.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_DMA_STATUS_NOT_ATTEMPTED</span></code>: The operation was not attempted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_DMA_STATUS_ERROR_UNKNOWN</span></code>: The operation failed due to an unspecified error.</p></li>
+</ul>
+<p>The following code shows how to retrieve the number of successfully completed
+copies within a burst and then using <code class="docutils literal notranslate"><span class="pre">rte_dma_completed_status()</span></code> to check
+which operation failed and kick off the device to continue processing operations:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="k">enum</span><span class="w"> </span><span class="n">rte_dma_status_code</span><span class="w"> </span><span class="n">status</span><span class="p">[</span><span class="n">COMP_BURST_SZ</span><span class="p">];</span><span class="w"></span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">count</span><span class="p">,</span><span class="w"> </span><span class="n">idx</span><span class="p">,</span><span class="w"> </span><span class="n">status_count</span><span class="p">;</span><span class="w"></span>
+<span class="kt">bool</span><span class="w"> </span><span class="n">error</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_dma_completed</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="n">COMP_BURST_SZ</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">idx</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">error</span><span class="p">){</span><span class="w"></span>
+<span class="w">   </span><span class="n">status_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_dma_completed_status</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">vchan</span><span class="p">,</span><span class="w"> </span><span class="n">COMP_BURST_SZ</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">idx</span><span class="p">,</span><span class="w"> </span><span class="n">status</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DMA Device Drivers</a><ul>
+      <li>Previous: <a href="hisilicon.html" title="previous chapter"><span class="section-number">4. </span>HISILICON Kunpeng DMA Driver</a></li>
+      <li>Next: <a href="ioat.html" title="next chapter"><span class="section-number">6. </span>IOAT DMA Device Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/dmadevs/idxd.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,773 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Marvell cnxk platform guide &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. NXP QorIQ DPAA Board Support Package" href="dpaa.html" />
+    <link rel="prev" title="1. NVIDIA BlueField Board Support Package" href="bluefield.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="marvell-cnxk-platform-guide">
+<h1><span class="section-number">2. </span>Marvell cnxk platform guide</h1>
+<p>This document gives an overview of <strong>Marvell OCTEON CN9K and CN10K</strong> RVU H/W block,
+packet flow and procedure to build DPDK on OCTEON cnxk platform.</p>
+<p>More information about CN9K and CN10K SoC can be found at <a class="reference external" href="https://www.marvell.com/embedded-processors/infrastructure-processors/">Marvell Official Website</a>.</p>
+<section id="supported-octeon-cnxk-socs">
+<h2><span class="section-number">2.1. </span>Supported OCTEON cnxk SoCs</h2>
+<ul class="simple">
+<li><p>CN93xx</p></li>
+<li><p>CN96xx</p></li>
+<li><p>CN98xx</p></li>
+<li><p>CN106xx</p></li>
+<li><p>CNF105xx</p></li>
+<li><p>CN103XX</p></li>
+</ul>
+</section>
+<section id="resource-virtualization-unit-architecture">
+<h2><span class="section-number">2.2. </span>Resource Virtualization Unit architecture</h2>
+<p>The <a class="reference internal" href="#figure-cnxk-resource-virtualization"><span class="std std-numref">Fig. 2.2</span></a> diagram depicts the
+RVU architecture and a resource provisioning example.</p>
+<figure class="align-default" id="id1">
+<span id="figure-cnxk-resource-virtualization"></span><img alt="../_images/cnxk_resource_virtualization.svg" src="../_images/cnxk_resource_virtualization.svg" /><figcaption>
+<p><span class="caption-number">Fig. 2.2 </span><span class="caption-text">cnxk Resource virtualization architecture and provisioning example</span></p>
+</figcaption>
+</figure>
+<p>Resource Virtualization Unit (RVU) on Marvell’s OCTEON CN9K/CN10K SoC maps HW
+resources belonging to the network, crypto and other functional blocks onto
+PCI-compatible physical and virtual functions.</p>
+<p>Each functional block has multiple local functions (LFs) for
+provisioning to different PCIe devices. RVU supports multiple PCIe SRIOV
+physical functions (PFs) and virtual functions (VFs).</p>
+<p>The <a class="reference internal" href="#table-cnxk-rvu-dpdk-mapping"><span class="std std-numref">Table 2.4</span></a> shows the various local
+functions (LFs) provided by the RVU and its functional mapping to
+DPDK subsystem.</p>
+<span id="table-cnxk-rvu-dpdk-mapping"></span><table class="docutils align-default" id="id2">
+<caption><span class="caption-number">Table 2.4 </span><span class="caption-text">RVU managed functional blocks and its mapping to DPDK subsystem</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 7%" />
+<col style="width: 89%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>LF</p></th>
+<th class="head"><p>DPDK subsystem mapping</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>NIX</p></td>
+<td><p>rte_ethdev, rte_tm, rte_event_eth_[rt]x_adapter, rte_security</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>NPA</p></td>
+<td><p>rte_mempool</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>NPC</p></td>
+<td><p>rte_flow</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>CPT</p></td>
+<td><p>rte_cryptodev, rte_event_crypto_adapter</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>SSO</p></td>
+<td><p>rte_eventdev</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>TIM</p></td>
+<td><p>rte_event_timer_adapter</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>LBK</p></td>
+<td><p>rte_ethdev</p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p>DPI</p></td>
+<td><p>rte_dmadev</p></td>
+</tr>
+<tr class="row-even"><td><p>9</p></td>
+<td><p>SDP</p></td>
+<td><p>rte_ethdev</p></td>
+</tr>
+<tr class="row-odd"><td><p>10</p></td>
+<td><p>REE</p></td>
+<td><p>rte_regexdev</p></td>
+</tr>
+<tr class="row-even"><td><p>11</p></td>
+<td><p>BPHY</p></td>
+<td><p>rte_rawdev</p></td>
+</tr>
+<tr class="row-odd"><td><p>12</p></td>
+<td><p>GPIO</p></td>
+<td><p>rte_rawdev</p></td>
+</tr>
+<tr class="row-even"><td><p>13</p></td>
+<td><p>ML</p></td>
+<td><p>rte_mldev</p></td>
+</tr>
+</tbody>
+</table>
+<p>PF0 is called the administrative / admin function (AF) and has exclusive
+privileges to provision RVU functional block’s LFs to each of the PF/VF.</p>
+<p>PF/VFs communicates with AF via a shared memory region (mailbox).Upon receiving
+requests from PF/VF, AF does resource provisioning and other HW configuration.</p>
+<p>AF is always attached to host, but PF/VFs may be used by host kernel itself,
+or attached to VMs or to userspace applications like DPDK, etc. So, AF has to
+handle provisioning/configuration requests sent by any device from any domain.</p>
+<p>The AF driver does not receive or process any data.
+It is only a configuration driver used in control path.</p>
+<p>The <a class="reference internal" href="#figure-cnxk-resource-virtualization"><span class="std std-numref">Fig. 2.2</span></a> diagram also shows a
+resource provisioning example where,</p>
+<ol class="arabic simple">
+<li><p>PFx and PFx-VF0 bound to Linux netdev driver.</p></li>
+<li><p>PFx-VF1 ethdev driver bound to the first DPDK application.</p></li>
+<li><p>PFy ethdev driver, PFy-VF0 ethdev driver, PFz eventdev driver, PFm-VF0 cryptodev driver bound to the second DPDK application.</p></li>
+</ol>
+</section>
+<section id="lbk-hw-access">
+<h2><span class="section-number">2.3. </span>LBK HW Access</h2>
+<p>Loopback HW Unit (LBK) receives packets from NIX-RX and sends packets back to NIX-TX.
+The loopback block has N channels and contains data buffering that is shared across
+all channels. The LBK HW Unit is abstracted using ethdev subsystem, Where PF0’s
+VFs are exposed as ethdev device and odd-even pairs of VFs are tied together,
+that is, packets sent on odd VF end up received on even VF and vice versa.
+This would enable HW accelerated means of communication between two domains
+where even VF bound to the first domain and odd VF bound to the second domain.</p>
+<p>Typical application usage models are,</p>
+<ol class="arabic simple">
+<li><p>Communication between the Linux kernel and DPDK application.</p></li>
+<li><p>Exception path to Linux kernel from DPDK application as SW <code class="docutils literal notranslate"><span class="pre">KNI</span></code> replacement.</p></li>
+<li><p>Communication between two different DPDK applications.</p></li>
+</ol>
+</section>
+<section id="sdp-interface">
+<h2><span class="section-number">2.4. </span>SDP interface</h2>
+<p>System DPI Packet Interface unit(SDP) provides PCIe endpoint support for remote host
+to DMA packets into and out of cnxk SoC. SDP interface comes in to live only when
+cnxk SoC is connected in PCIe endpoint mode. It can be used to send/receive
+packets to/from remote host machine using input/output queue pairs exposed to it.
+SDP interface receives input packets from remote host from NIX-RX and sends packets
+to remote host using NIX-TX. Remote host machine need to use corresponding driver
+(kernel/user mode) to communicate with SDP interface on cnxk SoC. SDP supports
+single PCIe SRIOV physical function(PF) and multiple virtual functions(VF’s). Users
+can bind PF or VF to use SDP interface and it will be enumerated as ethdev ports.</p>
+<p>The primary use case for SDP is to enable the smart NIC use case. Typical usage models are,</p>
+<ol class="arabic simple">
+<li><p>Communication channel between remote host and cnxk SoC over PCIe.</p></li>
+<li><p>Transfer packets received from network interface to remote host over PCIe and
+vice-versa.</p></li>
+</ol>
+</section>
+<section id="cnxk-packet-flow">
+<h2><span class="section-number">2.5. </span>cnxk packet flow</h2>
+<p>The <a class="reference internal" href="#figure-cnxk-packet-flow-hw-accelerators"><span class="std std-numref">Fig. 2.3</span></a> diagram depicts
+the packet flow on cnxk SoC in conjunction with use of various HW accelerators.</p>
+<figure class="align-default" id="id3">
+<span id="figure-cnxk-packet-flow-hw-accelerators"></span><img alt="../_images/cnxk_packet_flow_hw_accelerators.svg" src="../_images/cnxk_packet_flow_hw_accelerators.svg" /><figcaption>
+<p><span class="caption-number">Fig. 2.3 </span><span class="caption-text">cnxk packet flow in conjunction with use of HW accelerators</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="hw-offload-drivers">
+<h2><span class="section-number">2.6. </span>HW Offload Drivers</h2>
+<p>This section lists dataplane H/W block(s) available in cnxk SoC.</p>
+<ol class="arabic simple">
+<li><p><strong>Ethdev Driver</strong>
+See <a class="reference internal" href="../nics/cnxk.html"><span class="doc">CNXK Poll Mode driver</span></a> for NIX Ethdev driver information.</p></li>
+<li><p><strong>Mempool Driver</strong>
+See <a class="reference internal" href="../mempool/cnxk.html"><span class="doc">cnxk NPA Mempool Driver</span></a> for NPA mempool driver information.</p></li>
+<li><p><strong>Baseband PHY Driver</strong>
+See <a class="reference internal" href="../rawdevs/cnxk_bphy.html"><span class="doc">Marvell CNXK BPHY Driver</span></a> for Baseband PHY driver information.</p></li>
+<li><p><strong>Dmadev Driver</strong>
+See <a class="reference internal" href="../dmadevs/cnxk.html"><span class="doc">CNXK DMA Device Driver</span></a> for DPI Dmadev driver information.</p></li>
+<li><p><strong>Regex Device Driver</strong>
+See <a class="reference internal" href="../regexdevs/cn9k.html"><span class="doc">CN9K REE Regexdev Driver</span></a> for REE Regex device driver information.</p></li>
+<li><p><strong>ML Device Driver</strong>
+See <a class="reference internal" href="../mldevs/cnxk.html"><span class="doc">Marvell cnxk Machine Learning Poll Mode Driver</span></a> for Machine Learning device driver information.</p></li>
+</ol>
+</section>
+<section id="procedure-to-setup-platform">
+<h2><span class="section-number">2.7. </span>Procedure to Setup Platform</h2>
+<p>There are three main prerequisites for setting up DPDK on cnxk
+compatible board:</p>
+<ol class="arabic">
+<li><p><strong>RVU AF Linux kernel driver</strong></p>
+<p>The dependent kernel drivers can be obtained from the
+<a class="reference external" href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/net/ethernet/marvell/octeontx2">kernel.org</a>.</p>
+<p>Alternatively, the Marvell SDK also provides the required kernel drivers.</p>
+<p>Linux kernel should be configured with the following features enabled:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>64K pages enabled <span class="k">for</span> better performance
+<span class="go">CONFIG_ARM64_64K_PAGES=y</span>
+<span class="go">CONFIG_ARM64_VA_BITS_48=y</span>
+<span class="gp"># </span>huge pages support enabled
+<span class="go">CONFIG_HUGETLBFS=y</span>
+<span class="go">CONFIG_HUGETLB_PAGE=y</span>
+<span class="gp"># </span>VFIO enabled with TYPE1 IOMMU at minimum
+<span class="go">CONFIG_VFIO_IOMMU_TYPE1=y</span>
+<span class="go">CONFIG_VFIO_VIRQFD=y</span>
+<span class="go">CONFIG_VFIO=y</span>
+<span class="go">CONFIG_VFIO_NOIOMMU=y</span>
+<span class="go">CONFIG_VFIO_PCI=y</span>
+<span class="go">CONFIG_VFIO_PCI_MMAP=y</span>
+<span class="gp"># </span>SMMUv3 driver
+<span class="go">CONFIG_ARM_SMMU_V3=y</span>
+<span class="gp"># </span>ARMv8.1 LSE atomics
+<span class="go">CONFIG_ARM64_LSE_ATOMICS=y</span>
+<span class="gp"># </span>OCTEONTX2 drivers
+<span class="go">CONFIG_OCTEONTX2_MBOX=y</span>
+<span class="go">CONFIG_OCTEONTX2_AF=y</span>
+<span class="gp"># </span>Enable <span class="k">if</span> netdev PF driver required
+<span class="go">CONFIG_OCTEONTX2_PF=y</span>
+<span class="gp"># </span>Enable <span class="k">if</span> netdev VF driver required
+<span class="go">CONFIG_OCTEONTX2_VF=y</span>
+<span class="go">CONFIG_CRYPTO_DEV_OCTEONTX2_CPT=y</span>
+<span class="gp"># </span>Enable <span class="k">if</span> OCTEONTX2 DMA PF driver required
+<span class="go">CONFIG_OCTEONTX2_DPI_PF=n</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>ARM64 Linux Tool Chain</strong></p>
+<p>For example, the <em>aarch64</em> Linaro Toolchain, which can be obtained from
+<a class="reference external" href="https://releases.linaro.org/components/toolchain/binaries/7.4-2019.02/aarch64-linux-gnu/">here</a>.</p>
+<p>Alternatively, the Marvell SDK also provides GNU GCC toolchain, which is
+optimized for cnxk CPU.</p>
+</li>
+<li><p><strong>Rootfile system</strong></p>
+<p>Any <em>aarch64</em> supporting filesystem may be used. For example,
+Ubuntu 15.10 (Wily) or 16.04 LTS (Xenial) userland which can be obtained
+from <a class="reference external" href="http://cdimage.ubuntu.com/ubuntu-base/releases/16.04/release/ubuntu-base-16.04.1-base-arm64.tar.gz">http://cdimage.ubuntu.com/ubuntu-base/releases/16.04/release/ubuntu-base-16.04.1-base-arm64.tar.gz</a>.</p>
+<p>Alternatively, the Marvell SDK provides the buildroot based root filesystem.
+The SDK includes all the above prerequisites necessary to bring up the cnxk board.</p>
+</li>
+</ol>
+<ul class="simple">
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html"><span class="doc">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+</section>
+<section id="debugging-options">
+<h2><span class="section-number">2.8. </span>Debugging Options</h2>
+<span id="table-cnxk-common-debug-options"></span><table class="docutils align-default" id="id4">
+<caption><span class="caption-number">Table 2.5 </span><span class="caption-text">cnxk common debug options</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 17%" />
+<col style="width: 79%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Component</p></th>
+<th class="head"><p>EAL log command</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Common</p></td>
+<td><p>–log-level=’pmd.cnxk.base,8’</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Mailbox</p></td>
+<td><p>–log-level=’pmd.cnxk.mbox,8’</p></td>
+</tr>
+</tbody>
+</table>
+<section id="debugfs-support">
+<h3><span class="section-number">2.8.1. </span>Debugfs support</h3>
+<p>The <strong>RVU AF Linux kernel driver</strong> provides support to dump RVU blocks
+context or stats using debugfs.</p>
+<p>Enable <code class="docutils literal notranslate"><span class="pre">debugfs</span></code> by:</p>
+<ol class="arabic">
+<li><p>Compile kernel with debugfs enabled, i.e <code class="docutils literal notranslate"><span class="pre">CONFIG_DEBUG_FS=y</span></code>.</p></li>
+<li><p>Boot OCTEON CN9K/CN10K with debugfs supported kernel.</p></li>
+<li><p>Verify <code class="docutils literal notranslate"><span class="pre">debugfs</span></code> mounted by default “mount | grep -i debugfs” or mount it manually by using.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>mount -t debugfs none /sys/kernel/debug
+</pre></div>
+</div>
+</li>
+</ol>
+<p>Currently <code class="docutils literal notranslate"><span class="pre">debugfs</span></code> supports the following RVU blocks NIX, NPA, NPC, NDC,
+SSO &amp; RPM.</p>
+<p>The file structure under <code class="docutils literal notranslate"><span class="pre">/sys/kernel/debug</span></code> is as follows</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">octeontx2/</span>
+<span class="go">|</span>
+<span class="go">cn10k/</span>
+<span class="go">|-- rpm</span>
+<span class="go">|   |-- rpm0</span>
+<span class="go">|   |   &#39;-- lmac0</span>
+<span class="go">|   |       &#39;-- stats</span>
+<span class="go">|   |-- rpm1</span>
+<span class="go">|   |   |-- lmac0</span>
+<span class="go">|   |   |   &#39;-- stats</span>
+<span class="go">|   |   &#39;-- lmac1</span>
+<span class="go">|   |       &#39;-- stats</span>
+<span class="go">|   &#39;-- rpm2</span>
+<span class="go">|       &#39;-- lmac0</span>
+<span class="go">|           &#39;-- stats</span>
+<span class="go">|-- cpt</span>
+<span class="go">|   |-- cpt_engines_info</span>
+<span class="go">|   |-- cpt_engines_sts</span>
+<span class="go">|   |-- cpt_err_info</span>
+<span class="go">|   |-- cpt_lfs_info</span>
+<span class="go">|   &#39;-- cpt_pc</span>
+<span class="go">|---- nix</span>
+<span class="go">|   |-- cq_ctx</span>
+<span class="go">|   |-- ndc_rx_cache</span>
+<span class="go">|   |-- ndc_rx_hits_miss</span>
+<span class="go">|   |-- ndc_tx_cache</span>
+<span class="go">|   |-- ndc_tx_hits_miss</span>
+<span class="go">|   |-- qsize</span>
+<span class="go">|   |-- rq_ctx</span>
+<span class="go">|   &#39;-- sq_ctx</span>
+<span class="go">|-- npa</span>
+<span class="go">|   |-- aura_ctx</span>
+<span class="go">|   |-- ndc_cache</span>
+<span class="go">|   |-- ndc_hits_miss</span>
+<span class="go">|   |-- pool_ctx</span>
+<span class="go">|   &#39;-- qsize</span>
+<span class="go">|-- npc</span>
+<span class="go">|    |-- mcam_info</span>
+<span class="go">|    |-- mcam_rules</span>
+<span class="go">|    &#39;-- rx_miss_act_stats</span>
+<span class="go">|-- rsrc_alloc</span>
+<span class="go">&#39;-- sso</span>
+<span class="go">     |-- hws</span>
+<span class="go">     |   &#39;-- sso_hws_info</span>
+<span class="go">     &#39;-- hwgrp</span>
+<span class="go">         |-- sso_hwgrp_aq_thresh</span>
+<span class="go">         |-- sso_hwgrp_iaq_walk</span>
+<span class="go">         |-- sso_hwgrp_pc</span>
+<span class="go">         |-- sso_hwgrp_free_list_walk</span>
+<span class="go">         |-- sso_hwgrp_ient_walk</span>
+<span class="go">         &#39;-- sso_hwgrp_taq_walk</span>
+</pre></div>
+</div>
+<p>RVU block LF allocation:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /sys/kernel/debug/cn10k/rsrc_alloc</span>
+
+<span class="go">pcifunc    NPA    NIX    SSO GROUP    SSOWS    TIM    CPT</span>
+<span class="go">PF1         0       0</span>
+<span class="go">PF4                 1</span>
+<span class="go">PF13                          0, 1     0, 1      0</span>
+</pre></div>
+</div>
+<p>RPM example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /sys/kernel/debug/cn10k/rpm/rpm0/lmac0/stats</span>
+
+<span class="go">=======Link Status======</span>
+
+<span class="go">Link is UP 25000 Mbps</span>
+
+<span class="go">=======NIX RX_STATS(rpm port level)======</span>
+
+<span class="go">rx_ucast_frames: 0</span>
+<span class="go">rx_mcast_frames: 0</span>
+<span class="go">rx_bcast_frames: 0</span>
+<span class="go">rx_frames: 0</span>
+<span class="go">rx_bytes: 0</span>
+<span class="go">rx_drops: 0</span>
+<span class="go">rx_errors: 0</span>
+
+<span class="go">=======NIX TX_STATS(rpm port level)======</span>
+
+<span class="go">tx_ucast_frames: 0</span>
+<span class="go">tx_mcast_frames: 0</span>
+<span class="go">tx_bcast_frames: 0</span>
+<span class="go">tx_frames: 0</span>
+<span class="go">tx_bytes: 0</span>
+<span class="go">tx_drops: 0</span>
+
+<span class="go">=======rpm RX_STATS======</span>
+
+<span class="go">Octets of received packets: 0</span>
+<span class="go">Octets of received packets with out error: 0</span>
+<span class="go">Received packets with alignment errors: 0</span>
+<span class="go">Control/PAUSE packets received: 0</span>
+<span class="go">Packets received with Frame too long Errors: 0</span>
+<span class="go">Packets received with a1nrange length Errors: 0</span>
+<span class="go">Received packets: 0</span>
+<span class="go">Packets received with FrameCheckSequenceErrors: 0</span>
+<span class="go">Packets received with VLAN header: 0</span>
+<span class="go">Error packets: 0</span>
+<span class="go">Packets received with unicast DMAC: 0</span>
+<span class="go">Packets received with multicast DMAC: 0</span>
+<span class="go">Packets received with broadcast DMAC: 0</span>
+<span class="go">Dropped packets: 0</span>
+<span class="go">Total frames received on interface: 0</span>
+<span class="go">Packets received with an octet count &lt; 64: 0</span>
+<span class="go">Packets received with an octet count == 64: 0</span>
+<span class="go">Packets received with an octet count of 65–127: 0</span>
+<span class="go">Packets received with an octet count of 128-255: 0</span>
+<span class="go">Packets received with an octet count of 256-511: 0</span>
+<span class="go">Packets received with an octet count of 512-1023: 0</span>
+<span class="go">Packets received with an octet count of 1024-1518: 0</span>
+<span class="go">Packets received with an octet count of &gt; 1518: 0</span>
+<span class="go">Oversized Packets: 0</span>
+<span class="go">Jabber Packets: 0</span>
+<span class="go">Fragmented Packets: 0</span>
+<span class="go">CBFC(class based flow control) pause frames received for class 0: 0</span>
+<span class="go">CBFC pause frames received for class 1: 0</span>
+<span class="go">CBFC pause frames received for class 2: 0</span>
+<span class="go">CBFC pause frames received for class 3: 0</span>
+<span class="go">CBFC pause frames received for class 4: 0</span>
+<span class="go">CBFC pause frames received for class 5: 0</span>
+<span class="go">CBFC pause frames received for class 6: 0</span>
+<span class="go">CBFC pause frames received for class 7: 0</span>
+<span class="go">CBFC pause frames received for class 8: 0</span>
+<span class="go">CBFC pause frames received for class 9: 0</span>
+<span class="go">CBFC pause frames received for class 10: 0</span>
+<span class="go">CBFC pause frames received for class 11: 0</span>
+<span class="go">CBFC pause frames received for class 12: 0</span>
+<span class="go">CBFC pause frames received for class 13: 0</span>
+<span class="go">CBFC pause frames received for class 14: 0</span>
+<span class="go">CBFC pause frames received for class 15: 0</span>
+<span class="go">MAC control packets received: 0</span>
+
+<span class="go">=======rpm TX_STATS======</span>
+
+<span class="go">Total octets sent on the interface: 0</span>
+<span class="go">Total octets transmitted OK: 0</span>
+<span class="go">Control/Pause frames sent: 0</span>
+<span class="go">Total frames transmitted OK: 0</span>
+<span class="go">Total frames sent with VLAN header: 0</span>
+<span class="go">Error Packets: 0</span>
+<span class="go">Packets sent to unicast DMAC: 0</span>
+<span class="go">Packets sent to the multicast DMAC: 0</span>
+<span class="go">Packets sent to a broadcast DMAC: 0</span>
+<span class="go">Packets sent with an octet count == 64: 0</span>
+<span class="go">Packets sent with an octet count of 65–127: 0</span>
+<span class="go">Packets sent with an octet count of 128-255: 0</span>
+<span class="go">Packets sent with an octet count of 256-511: 0</span>
+<span class="go">Packets sent with an octet count of 512-1023: 0</span>
+<span class="go">Packets sent with an octet count of 1024-1518: 0</span>
+<span class="go">Packets sent with an octet count of &gt; 1518: 0</span>
+<span class="go">CBFC(class based flow control) pause frames transmitted for class 0: 0</span>
+<span class="go">CBFC pause frames transmitted for class 1: 0</span>
+<span class="go">CBFC pause frames transmitted for class 2: 0</span>
+<span class="go">CBFC pause frames transmitted for class 3: 0</span>
+<span class="go">CBFC pause frames transmitted for class 4: 0</span>
+<span class="go">CBFC pause frames transmitted for class 5: 0</span>
+<span class="go">CBFC pause frames transmitted for class 6: 0</span>
+<span class="go">CBFC pause frames transmitted for class 7: 0</span>
+<span class="go">CBFC pause frames transmitted for class 8: 0</span>
+<span class="go">CBFC pause frames transmitted for class 9: 0</span>
+<span class="go">CBFC pause frames transmitted for class 10: 0</span>
+<span class="go">CBFC pause frames transmitted for class 11: 0</span>
+<span class="go">CBFC pause frames transmitted for class 12: 0</span>
+<span class="go">CBFC pause frames transmitted for class 13: 0</span>
+<span class="go">CBFC pause frames transmitted for class 14: 0</span>
+<span class="go">CBFC pause frames transmitted for class 15: 0</span>
+<span class="go">MAC control packets sent: 0</span>
+<span class="go">Total frames sent on the interface: 0</span>
+</pre></div>
+</div>
+<p>CPT example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /sys/kernel/debug/cn10k/cpt/cpt_pc</span>
+
+<span class="go">CPT instruction requests   0</span>
+<span class="go">CPT instruction latency    0</span>
+<span class="go">CPT NCB read requests      0</span>
+<span class="go">CPT NCB read latency       0</span>
+<span class="go">CPT read requests caused by UC fills   0</span>
+<span class="go">CPT active cycles pc       1395642</span>
+<span class="go">CPT clock count pc         5579867595493</span>
+</pre></div>
+</div>
+<p>NIX example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Usage: echo &lt;nixlf&gt; [cq number/all] &gt; /sys/kernel/debug/cn10k/nix/cq_ctx</span>
+<span class="go">       cat /sys/kernel/debug/cn10k/nix/cq_ctx</span>
+<span class="go">echo 0 0 &gt; /sys/kernel/debug/cn10k/nix/cq_ctx</span>
+<span class="go">cat /sys/kernel/debug/cn10k/nix/cq_ctx</span>
+
+<span class="go">=====cq_ctx for nixlf:0 and qidx:0 is=====</span>
+<span class="go">W0: base                        158ef1a00</span>
+
+<span class="go">W1: wrptr                       0</span>
+<span class="go">W1: avg_con                     0</span>
+<span class="go">W1: cint_idx                    0</span>
+<span class="go">W1: cq_err                      0</span>
+<span class="go">W1: qint_idx                    0</span>
+<span class="go">W1: bpid                        0</span>
+<span class="go">W1: bp_ena                      0</span>
+
+<span class="go">W2: update_time                 31043</span>
+<span class="go">W2:avg_level                    255</span>
+<span class="go">W2: head                        0</span>
+<span class="go">W2:tail                         0</span>
+
+<span class="go">W3: cq_err_int_ena              5</span>
+<span class="go">W3:cq_err_int                   0</span>
+<span class="go">W3: qsize                       4</span>
+<span class="go">W3:caching                      1</span>
+<span class="go">W3: substream                   0x000</span>
+<span class="go">W3: ena                                 1</span>
+<span class="go">W3: drop_ena                    1</span>
+<span class="go">W3: drop                        64</span>
+<span class="go">W3: bp                          0</span>
+</pre></div>
+</div>
+<p>NPA example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Usage: echo &lt;npalf&gt; [pool number/all] &gt; /sys/kernel/debug/cn10k/npa/pool_ctx</span>
+<span class="go">       cat /sys/kernel/debug/cn10k/npa/pool_ctx</span>
+<span class="go">echo 0 0 &gt; /sys/kernel/debug/cn10k/npa/pool_ctx</span>
+<span class="go">cat /sys/kernel/debug/cn10k/npa/pool_ctx</span>
+
+<span class="go">======POOL : 0=======</span>
+<span class="go">W0: Stack base          1375bff00</span>
+<span class="go">W1: ena                 1</span>
+<span class="go">W1: nat_align           1</span>
+<span class="go">W1: stack_caching       1</span>
+<span class="go">W1: stack_way_mask      0</span>
+<span class="go">W1: buf_offset          1</span>
+<span class="go">W1: buf_size            19</span>
+<span class="go">W2: stack_max_pages     24315</span>
+<span class="go">W2: stack_pages         24314</span>
+<span class="go">W3: op_pc               267456</span>
+<span class="go">W4: stack_offset        2</span>
+<span class="go">W4: shift               5</span>
+<span class="go">W4: avg_level           255</span>
+<span class="go">W4: avg_con             0</span>
+<span class="go">W4: fc_ena              0</span>
+<span class="go">W4: fc_stype            0</span>
+<span class="go">W4: fc_hyst_bits        0</span>
+<span class="go">W4: fc_up_crossing      0</span>
+<span class="go">W4: update_time         62993</span>
+<span class="go">W5: fc_addr             0</span>
+<span class="go">W6: ptr_start           1593adf00</span>
+<span class="go">W7: ptr_end             180000000</span>
+<span class="go">W8: err_int             0</span>
+<span class="go">W8: err_int_ena         7</span>
+<span class="go">W8: thresh_int          0</span>
+<span class="go">W8: thresh_int_ena      0</span>
+<span class="go">W8: thresh_up           0</span>
+<span class="go">W8: thresh_qint_idx     0</span>
+<span class="go">W8: err_qint_idx        0</span>
+</pre></div>
+</div>
+<p>NPC example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cat /sys/kernel/debug/cn10k/npc/mcam_info</span>
+
+<span class="go">NPC MCAM info:</span>
+<span class="go">RX keywidth    : 224bits</span>
+<span class="go">TX keywidth    : 224bits</span>
+
+<span class="go">MCAM entries   : 2048</span>
+<span class="go">Reserved       : 158</span>
+<span class="go">Available      : 1890</span>
+
+<span class="go">MCAM counters  : 512</span>
+<span class="go">Reserved       : 1</span>
+<span class="go">Available      : 511</span>
+</pre></div>
+</div>
+<p>SSO example usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Usage: echo [&lt;hws&gt;/all] &gt; /sys/kernel/debug/cn10k/sso/hws/sso_hws_info</span>
+<span class="go">echo 0 &gt; /sys/kernel/debug/cn10k/sso/hws/sso_hws_info</span>
+
+<span class="go">==================================================</span>
+<span class="go">SSOW HWS[0] Arbitration State      0x0</span>
+<span class="go">SSOW HWS[0] Guest Machine Control  0x0</span>
+<span class="go">SSOW HWS[0] SET[0] Group Mask[0] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[0] Group Mask[1] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[0] Group Mask[2] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[0] Group Mask[3] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[1] Group Mask[0] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[1] Group Mask[1] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[1] Group Mask[2] 0xffffffffffffffff</span>
+<span class="go">SSOW HWS[0] SET[1] Group Mask[3] 0xffffffffffffffff</span>
+<span class="go">==================================================</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="compile-dpdk">
+<h2><span class="section-number">2.9. </span>Compile DPDK</h2>
+<p>DPDK may be compiled either natively on OCTEON CN9K/CN10K platform or cross-compiled on
+an x86 based platform.
+Meson build option <code class="docutils literal notranslate"><span class="pre">enable_iova_as_pa</span></code> is disabled on CNXK platforms.
+So only PMDs supporting this option are enabled on CNXK platform builds.</p>
+<section id="native-compilation">
+<h3><span class="section-number">2.9.1. </span>Native Compilation</h3>
+<p>Refer to <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">Compiling the DPDK Target from Source</span></a> for generic native builds.</p>
+<p>CN9K:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup -Dplatform=cn9k build</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<p>CN10K:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup -Dplatform=cn10k build</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-compilation">
+<h3><span class="section-number">2.9.2. </span>Cross Compilation</h3>
+<p>Refer to <a class="reference internal" href="../linux_gsg/cross_build_dpdk_for_arm64.html"><span class="doc">Cross compiling DPDK for aarch64 and aarch32</span></a> for generic arm64 details.</p>
+<p>CN9K:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup build --cross-file config/arm/arm64_cn9k_linux_gcc</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<p>CN10K:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup build --cross-file config/arm/arm64_cn10k_linux_gcc</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, meson cross compilation uses <code class="docutils literal notranslate"><span class="pre">aarch64-linux-gnu-gcc</span></code> toolchain,
+if Marvell toolchain is available then it can be used by overriding the
+c, cpp, ar, strip <code class="docutils literal notranslate"><span class="pre">binaries</span></code> attributes to respective Marvell
+toolchain binaries in <code class="docutils literal notranslate"><span class="pre">config/arm/arm64_cn10k_linux_gcc</span></code> file.</p>
+</div>
+</section>
+<section id="environment-variables">
+<h3><span class="section-number">2.9.3. </span>Environment Variables</h3>
+<ul class="simple">
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">BPHY_INTR_MLOCK_DISABLE</span></code></dt><dd><p>When defined disables memory locking in
+BPHY environment.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ROC_CN10K_MBOX_TIMEOUT</span></code>, <code class="docutils literal notranslate"><span class="pre">ROC_MBOX_TIMEOUT</span></code></dt><dd><p>When set, overrides MBOX timeout by value in milli seconds.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">ETH_SEC_IV_OVR</span></code></dt><dd><p>When set, overrides outbound inline SA IV. By default IV is generated
+by HW. Format of variable is string of comma separated one byte values as
+for ex: “0x0, 0x10, 0x20, …”</p>
+</dd>
+</dl>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Platform Specific Guides</a><ul>
+      <li>Previous: <a href="bluefield.html" title="previous chapter"><span class="section-number">1. </span>NVIDIA BlueField Board Support Package</a></li>
+      <li>Next: <a href="dpaa.html" title="next chapter"><span class="section-number">3. </span>NXP QorIQ DPAA Board Support Package</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/platform/cnxk.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

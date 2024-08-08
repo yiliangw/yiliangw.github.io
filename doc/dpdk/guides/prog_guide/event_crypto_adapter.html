@@ -1,0 +1,453 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>53. Event Crypto Adapter Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="54. Event DMA Adapter Library" href="event_dma_adapter.html" />
+    <link rel="prev" title="52. Event Timer Adapter Library" href="event_timer_adapter.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="event-crypto-adapter-library">
+<h1><span class="section-number">53. </span>Event Crypto Adapter Library</h1>
+<p>The DPDK <a class="reference internal" href="eventdev.html"><span class="doc">Eventdev library</span></a> provides event driven
+programming model with features to schedule events.
+The <a class="reference internal" href="cryptodev_lib.html"><span class="doc">Cryptodev library</span></a> provides an interface to
+the crypto poll mode drivers which supports different crypto operations.
+The Event Crypto Adapter is one of the adapter which is intended to
+bridge between the event device and the crypto device.</p>
+<p>The packet flow from crypto device to the event device can be accomplished
+using SW and HW based transfer mechanism.
+The Adapter queries an eventdev PMD to determine which mechanism to be used.
+The adapter uses an EAL service core function for SW based packet transfer
+and uses the eventdev PMD functions to configure HW based packet transfer
+between the crypto device and the event device. The crypto adapter uses a new
+event type called <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TYPE_CRYPTODEV</span></code> to indicate the event source.</p>
+<p>The application can choose to submit a crypto operation directly to
+crypto device or send it to the crypto adapter via eventdev based on
+RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_OP_FWD capability.
+The first mode is known as the event new(RTE_EVENT_CRYPTO_ADAPTER_OP_NEW)
+mode and the second as the event forward(RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD)
+mode. The choice of mode can be specified while creating the adapter.
+In the former mode, it is an application responsibility to enable ingress
+packet ordering. In the latter mode, it is the adapter responsibility to
+enable the ingress packet ordering.</p>
+<section id="adapter-mode">
+<h2><span class="section-number">53.1. </span>Adapter Mode</h2>
+<section id="rte-event-crypto-adapter-op-new-mode">
+<h3><span class="section-number">53.1.1. </span>RTE_EVENT_CRYPTO_ADAPTER_OP_NEW mode</h3>
+<p>In the RTE_EVENT_CRYPTO_ADAPTER_OP_NEW mode, application submits crypto
+operations directly to crypto device. The adapter then dequeues crypto
+completions from crypto device and enqueues them as events to the event device.
+This mode does not ensure ingress ordering, if the application directly
+enqueues to the cryptodev without going through crypto/atomic stage.
+In this mode, events dequeued from the adapter will be treated as new events.
+The application needs to specify event information (response information)
+which is needed to enqueue an event after the crypto operation is completed.</p>
+<figure class="align-default" id="id1">
+<span id="figure-event-crypto-adapter-op-new"></span><img alt="../_images/event_crypto_adapter_op_new.svg" src="../_images/event_crypto_adapter_op_new.svg" /><figcaption>
+<p><span class="caption-number">Fig. 53.1 </span><span class="caption-text">Working model of <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_NEW</span></code> mode</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="rte-event-crypto-adapter-op-forward-mode">
+<h3><span class="section-number">53.1.2. </span>RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD mode</h3>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD</span></code> mode, if the event PMD and crypto
+PMD supports internal event port
+(<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span></code>), the application should
+use <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_enqueue()</span></code> API to enqueue crypto operations as
+events to crypto adapter. If not, application retrieves crypto adapter’s event
+port using <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_event_port_get()</span></code> API, links its event
+queue to this port and starts enqueuing crypto operations as events to eventdev
+using <code class="docutils literal notranslate"><span class="pre">rte_event_enqueue_burst()</span></code>. The adapter then dequeues the events and
+submits the crypto operations to the cryptodev. After the crypto operation is
+complete, the adapter enqueues events to the event device. The application can
+use this mode when ingress packet ordering is needed. In this mode, events
+dequeued from the adapter will be treated as forwarded events. The application
+needs to specify the cryptodev ID and queue pair ID (request information) needed
+to enqueue a crypto operation in addition to the event information (response
+information) needed to enqueue an event after the crypto operation has
+completed.</p>
+<figure class="align-default" id="id2">
+<span id="figure-event-crypto-adapter-op-forward"></span><img alt="../_images/event_crypto_adapter_op_forward.svg" src="../_images/event_crypto_adapter_op_forward.svg" /><figcaption>
+<p><span class="caption-number">Fig. 53.2 </span><span class="caption-text">Working model of <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD</span></code> mode</span></p>
+</figcaption>
+</figure>
+</section>
+</section>
+<section id="api-overview">
+<h2><span class="section-number">53.2. </span>API Overview</h2>
+<p>This section has a brief introduction to the event crypto adapter APIs.
+The application is expected to create an adapter which is associated with
+a single eventdev, then add cryptodev and queue pair to the adapter instance.</p>
+<section id="create-an-adapter-instance">
+<h3><span class="section-number">53.2.1. </span>Create an adapter instance</h3>
+<p>An adapter instance is created using <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_create()</span></code>. This
+function is called with event device to be associated with the adapter and port
+configuration for the adapter to setup an event port(if the adapter needs to use
+a service function).</p>
+<p>Adapter can be started in <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_NEW</span></code> or
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD</span></code> mode.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">err</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">id</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_dev_info</span><span class="w"> </span><span class="n">dev_info</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_port_conf</span><span class="w"> </span><span class="n">conf</span><span class="p">;</span><span class="w"></span>
+<span class="k">enum</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_mode</span><span class="w"> </span><span class="n">mode</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dev_info_get</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">dev_info</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">conf</span><span class="p">.</span><span class="n">new_event_threshold</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_num_events</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">dequeue_depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_event_port_dequeue_depth</span><span class="p">;</span><span class="w"></span>
+<span class="n">conf</span><span class="p">.</span><span class="n">enqueue_depth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">dev_info</span><span class="p">.</span><span class="n">max_event_port_enqueue_depth</span><span class="p">;</span><span class="w"></span>
+<span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD</span><span class="p">;</span><span class="w"></span>
+<span class="n">err</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_create</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">,</span><span class="w"> </span><span class="n">mode</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>If the application desires to have finer control of eventdev port allocation
+and setup, it can use the <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_create_ext()</span></code> function.
+The <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_create_ext()</span></code> function is passed as a callback
+function. The callback function is invoked if the adapter needs to use a
+service function and needs to create an event port for it. The callback is
+expected to fill the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_crypto_adapter_conf</span></code> structure
+passed to it.</p>
+<p>In the <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD</span></code> mode, if the event PMD and crypto
+PMD supports internal event port
+(<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span></code>), events with crypto
+operations should be enqueued to the crypto adapter using
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_enqueue()</span></code> API. If not, the event port created by
+the adapter can be retrieved using <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_event_port_get()</span></code>
+API. An application can use this event port to link with an event queue, on
+which it enqueues events towards the crypto adapter using
+<code class="docutils literal notranslate"><span class="pre">rte_event_enqueue_burst()</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">crypto_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_qid</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="n">ev</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w"> </span><span class="n">cap</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="c1">// Fill in event info and update event_ptr with rte_crypto_op</span>
+<span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">ev</span><span class="p">));</span><span class="w"></span>
+<span class="p">.</span><span class="w"></span>
+<span class="p">.</span><span class="w"></span>
+<span class="n">ev</span><span class="p">.</span><span class="n">event_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">op</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_caps_get</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_OP_FWD</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_enqueue</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_ev_port_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                               </span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="n">nb_events</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_event_port_get</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                                </span><span class="o">&amp;</span><span class="n">crypto_ev_port_id</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_queue_setup</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_qid</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_port_link</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">crypto_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">app_qid</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">ev</span><span class="p">.</span><span class="n">queue_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">app_qid</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_enqueue_burst</span><span class="p">(</span><span class="n">evdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">app_ev_port_id</span><span class="p">,</span><span class="w"> </span><span class="n">ev</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                      </span><span class="n">nb_events</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="event-device-configuration-for-service-based-adapter">
+<h3><span class="section-number">53.2.2. </span>Event device configuration for service based adapter</h3>
+<p>When <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_create()</span></code> is used for creating
+adapter instance, <code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> is
+automatically incremented, and event device is reconfigured
+with additional event port during service initialization.
+This event device reconfigure logic also increments the
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code>
+parameter if the adapter event port config is of type
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_PORT_CFG_SINGLE_LINK</span></code>.</p>
+<p>Application no longer needs to configure the
+event device with <code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_event_ports</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_config::nb_single_link_event_port_queues</span></code>
+parameters required for crypto adapter when the adapter is created
+using the above-mentioned API.</p>
+</section>
+<section id="querying-adapter-capabilities">
+<h3><span class="section-number">53.2.3. </span>Querying adapter capabilities</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_caps_get()</span></code> function allows
+the application to query the adapter capabilities for an eventdev and cryptodev
+combination. This API provides whether cryptodev and eventdev are connected using
+internal HW port or not.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_event_crypto_adapter_caps_get</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="adding-queue-pair-to-the-adapter-instance">
+<h3><span class="section-number">53.2.4. </span>Adding queue pair to the adapter instance</h3>
+<p>Cryptodev device id and queue pair are created using cryptodev APIs.
+For more information see <a class="reference internal" href="cryptodev_lib.html"><span class="doc">here</span></a>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_config</span><span class="w"> </span><span class="n">conf</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_qp_conf</span><span class="w"> </span><span class="n">qp_conf</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">rte_cryptodev_configure</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">);</span><span class="w"></span>
+<span class="n">rte_cryptodev_queue_pair_setup</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">qp_conf</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>These cryptodev id and queue pair are added to the instance using the
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_queue_pair_add()</span></code> API.
+The same is removed using <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_queue_pair_del()</span></code> API.
+If HW supports RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_QP_EV_BIND
+capability, event information must be passed to the add API.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">cap</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_crypto_adapter_caps_get</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">evdev</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cap</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">cap</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_EVENT_CRYPTO_ADAPTER_CAP_INTERNAL_PORT_QP_EV_BIND</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event_crypto_adapter_queue_conf</span><span class="w"> </span><span class="n">conf</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="c1">// Fill in conf.event information &amp; pass it to add API</span>
+<span class="w">        </span><span class="n">rte_event_crypto_adapter_queue_pair_add</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_event_crypto_adapter_queue_pair_add</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="configure-the-service-function">
+<h3><span class="section-number">53.2.5. </span>Configure the service function</h3>
+<p>If the adapter uses a service function, the application is required to assign
+a service core to the service function as show below.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">service_id</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_event_crypto_adapter_service_id_get</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">service_id</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_service_map_lcore_set</span><span class="p">(</span><span class="n">service_id</span><span class="p">,</span><span class="w"> </span><span class="n">CORE_ID</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="set-event-request-response-information">
+<h3><span class="section-number">53.2.6. </span>Set event request/response information</h3>
+<p>In the RTE_EVENT_CRYPTO_ADAPTER_OP_FORWARD mode, the application needs
+to specify the cryptodev ID and queue pair ID (request information) in
+addition to the event information (response information) needed to enqueue
+an event after the crypto operation has completed. The request and response
+information are specified in the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_op</span></code> private data or
+session’s private data.</p>
+<p>In the RTE_EVENT_CRYPTO_ADAPTER_OP_NEW mode, the application is required
+to provide only the response information.</p>
+<p>The SW adapter or HW PMD uses <code class="docutils literal notranslate"><span class="pre">rte_crypto_op::sess_type</span></code> to
+decide whether request/response data is located in the crypto session/
+crypto security session or at an offset in the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_op</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">rte_crypto_op::private_data_offset</span></code> is used to locate the request/
+response in the <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code>.</p>
+<p>For crypto session, <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_session_set_user_data()</span></code> API
+will be used to set request/response data. The same data will be obtained
+by <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_session_get_user_data()</span></code> API.  The
+RTE_EVENT_CRYPTO_ADAPTER_CAP_SESSION_PRIVATE_DATA capability indicates
+whether HW or SW supports this feature.</p>
+<p>For security session, <code class="docutils literal notranslate"><span class="pre">rte_security_session_set_private_data()</span></code> API
+will be used to set request/response data. The same data will be obtained
+by <code class="docutils literal notranslate"><span class="pre">rte_security_session_get_private_data()</span></code> API.</p>
+<p>For session-less it is mandatory to place the request/response data with
+the <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">union</span><span class="w"> </span><span class="nc">rte_event_crypto_metadata</span><span class="w"> </span><span class="n">m_data</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="n">ev</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">op</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* Allocate &amp; fill op structure */</span><span class="w"></span>
+<span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_crypto_op_alloc</span><span class="p">();</span><span class="w"></span>
+
+<span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">m_data</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">m_data</span><span class="p">));</span><span class="w"></span>
+<span class="n">memset</span><span class="p">(</span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">ev</span><span class="p">));</span><span class="w"></span>
+<span class="cm">/* Fill event information and update event_ptr to rte_crypto_op */</span><span class="w"></span>
+<span class="n">ev</span><span class="p">.</span><span class="n">event_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">op</span><span class="p">;</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">op</span><span class="o">-&gt;</span><span class="n">sess_type</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_WITH_SESSION</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Copy response information */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_memcpy</span><span class="p">(</span><span class="o">&amp;</span><span class="n">m_data</span><span class="p">.</span><span class="n">response_info</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">ev</span><span class="p">));</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Copy request information */</span><span class="w"></span>
+<span class="w">        </span><span class="n">m_data</span><span class="p">.</span><span class="n">request_info</span><span class="p">.</span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">m_data</span><span class="p">.</span><span class="n">request_info</span><span class="p">.</span><span class="n">queue_pair_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qp_id</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Call set API to store private data information */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_cryptodev_sym_session_set_user_data</span><span class="p">(</span><span class="w"></span>
+<span class="w">                </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">sym</span><span class="o">-&gt;</span><span class="n">session</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="o">&amp;</span><span class="n">m_data</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="k">sizeof</span><span class="p">(</span><span class="n">m_data</span><span class="p">));</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">op</span><span class="o">-&gt;</span><span class="n">sess_type</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_SESSIONLESS</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IV_OFFSET</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">MAXIMUM_IV_LENGTH</span><span class="w"> </span><span class="o">+</span><span class="w"></span>
+<span class="w">                       </span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_xform</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="p">);</span><span class="w"></span>
+<span class="w">        </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">private_data_offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">len</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Copy response information */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_memcpy</span><span class="p">(</span><span class="o">&amp;</span><span class="n">m_data</span><span class="p">.</span><span class="n">response_info</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ev</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">ev</span><span class="p">));</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Copy request information */</span><span class="w"></span>
+<span class="w">        </span><span class="n">m_data</span><span class="p">.</span><span class="n">request_info</span><span class="p">.</span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="n">m_data</span><span class="p">.</span><span class="n">request_info</span><span class="p">.</span><span class="n">queue_pair_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">qp_id</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="cm">/* Store private data information along with rte_crypto_op */</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_memcpy</span><span class="p">(</span><span class="n">op</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">len</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">m_data</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">m_data</span><span class="p">));</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="enable-event-vectorization">
+<h3><span class="section-number">53.2.7. </span>Enable event vectorization</h3>
+<p>The event crypto adapter can aggregate outcoming crypto operations based on
+provided response information of <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_metadata::response_info</span></code>
+and generate a <code class="docutils literal notranslate"><span class="pre">rte_event</span></code> containing <code class="docutils literal notranslate"><span class="pre">rte_event_vector</span></code> whose event type
+is <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_TYPE_CRYPTODEV_VECTOR</span></code>.
+To enable vectorization application should set
+RTE_EVENT_CRYPTO_ADAPTER_EVENT_VECTOR in
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_queue_conf::flag</span></code> and provide vector
+configuration(size, mempool, etc.) with respect of
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_vector_limits</span></code>, which could be obtained by calling
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_vector_limits_get()</span></code>.</p>
+<p>The RTE_EVENT_CRYPTO_ADAPTER_CAP_EVENT_VECTOR capability indicates whether
+PMD supports this feature.</p>
+</section>
+<section id="start-the-adapter-instance">
+<h3><span class="section-number">53.2.8. </span>Start the adapter instance</h3>
+<p>The application calls <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_start()</span></code> to start the adapter.
+This function calls the start callbacks of the eventdev PMDs for hardware based
+eventdev-cryptodev connections and <code class="docutils literal notranslate"><span class="pre">rte_service_run_state_set()</span></code> to enable the
+service function if one exists.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_event_crypto_adapter_start</span><span class="p">(</span><span class="n">id</span><span class="p">,</span><span class="w"> </span><span class="n">mode</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The eventdev to which the event_crypto_adapter is connected needs to
+be started before calling rte_event_crypto_adapter_start().</p>
+</div>
+</section>
+<section id="get-adapter-statistics">
+<h3><span class="section-number">53.2.9. </span>Get adapter statistics</h3>
+<p>The  <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_stats_get()</span></code> function reports counters defined
+in struct <code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_stats</span></code>. The received packet and
+enqueued event counts are a sum of the counts from the eventdev PMD callbacks
+if the callback is supported, and the counts maintained by the service function,
+if one exists.</p>
+</section>
+<section id="set-get-adapter-runtime-configuration-parameters">
+<h3><span class="section-number">53.2.10. </span>Set/Get adapter runtime configuration parameters</h3>
+<p>The runtime configuration parameters of adapter can be set/get using
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_runtime_params_set()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_event_crypto_adapter_runtime_params_get()</span></code> respectively.
+The parameters that can be set/get are defined in
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_event_crypto_adapter_runtime_params</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="event_timer_adapter.html" title="previous chapter"><span class="section-number">52. </span>Event Timer Adapter Library</a></li>
+      <li>Next: <a href="event_dma_adapter.html" title="next chapter"><span class="section-number">54. </span>Event DMA Adapter Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/event_crypto_adapter.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,218 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>31. IGC Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="32. Intel Virtual Function Driver" href="intel_vf.html" />
+    <link rel="prev" title="30. IGB Poll Mode Driver" href="igb.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="igc-poll-mode-driver">
+<h1><span class="section-number">31. </span>IGC Poll Mode Driver</h1>
+<p>The IGC PMD (<strong>librte_net_igc</strong>) provides poll mode driver support for Foxville
+I225 and I226 Series Network Adapters.</p>
+<ul class="simple">
+<li><p>For information about I225, please refer to: <a class="reference external" href="https://ark.intel.com/content/www/us/en/ark/products/series/184686/intel-ethernet-controller-i225-series.html">Intel® Ethernet Controller I225 Series</a>.</p></li>
+<li><p>For information about I226, please refer to: <a class="reference external" href="https://ark.intel.com/content/www/us/en/ark/products/series/210588/intel-ethernet-controller-i226-series.html">Intel® Ethernet Controller I226 Series</a>.</p></li>
+</ul>
+<section id="supported-chipsets-and-nics">
+<h2><span class="section-number">31.1. </span>Supported Chipsets and NICs</h2>
+<ul class="simple">
+<li><p>Foxville LM (I225 LM, I226 LM): Client 2.5G LAN vPro Corporate</p></li>
+<li><p>Foxville V (I225 V, I226 V): Client 2.5G LAN Consumer</p></li>
+<li><p>Foxville I (I225 I, I226 IM): Client 2.5G Industrial Temp</p></li>
+<li><p>Foxville V (I225 K, I226 K): Client 2.5G LAN Consumer</p></li>
+</ul>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">31.2. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="sample-application-notes">
+<h2><span class="section-number">31.3. </span>Sample Application Notes</h2>
+<section id="vlan-filter">
+<h3><span class="section-number">31.3.1. </span>Vlan filter</h3>
+<p>VLAN stripping off only works with inner vlan.
+Only the outer VLAN TPID can be set to a vlan other than 0x8100.</p>
+<p>If extend VLAN is enabled:</p>
+<ul class="simple">
+<li><p>The VLAN header in a packet that carries a single VLAN header is treated as the external VLAN.</p></li>
+<li><p>Foxville expects that any transmitted packet to have at least the external VLAN added by the
+software. For those packets where an external VLAN is not present, any offload that relates to
+inner fields to the EtherType might not be provided.</p></li>
+<li><p>If VLAN TX-OFFLOAD is enabled and the packet does not contain an external VLAN, the packet is
+dropped, and if configured, the queue from which the packet was sent is disabled.</p></li>
+</ul>
+<p>To start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>, add vlan 10 to port, set vlan stripping off on, set extend on, set TPID of
+outer VLAN to 0x9100:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./app/dpdk-testpmd -l 4-8 -- -i</span>
+<span class="go">...</span>
+
+<span class="go">testpmd&gt; vlan set filter on 0</span>
+<span class="go">testpmd&gt; rx_vlan add 10 0</span>
+<span class="go">testpmd&gt; vlan set strip off 0</span>
+<span class="go">testpmd&gt; vlan set extend on 0</span>
+<span class="go">testpmd&gt; vlan set outer tpid 0x9100 0</span>
+</pre></div>
+</div>
+</section>
+<section id="flow-director">
+<h3><span class="section-number">31.3.2. </span>Flow Director</h3>
+<p>The Flow Director works in receive mode to identify specific flows or sets of flows and route
+them to specific queues.</p>
+<p>The Flow Director filters includes the following types:</p>
+<ul class="simple">
+<li><p>ether-type filter</p></li>
+<li><p>2-tuple filter(destination L4 protocol and destination L4 port)</p></li>
+<li><p>TCP SYN filter</p></li>
+<li><p>RSS filter</p></li>
+</ul>
+<p>Start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd -l 4-8 -- i --rxq=4 --txq=4 --pkt-filter-mode=perfect --disable-rss</span>
+</pre></div>
+</div>
+<p>Add a rule to direct packet whose <code class="docutils literal notranslate"><span class="pre">ether-type=0x801</span></code> to queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth type is 0x801 / end actions queue index 1 / end</span>
+</pre></div>
+</div>
+<p>Add a rule to direct packet whose <code class="docutils literal notranslate"><span class="pre">ip-protocol=0x6(TCP),</span> <span class="pre">tcp_port=0x80</span></code> to queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth / ipv4 proto is 6 / tcp dst is 0x80 / end actions queue index 1 / end</span>
+</pre></div>
+</div>
+<p>Add a rule to direct packet whose <code class="docutils literal notranslate"><span class="pre">ip-protocol=0x6(TCP),</span> <span class="pre">SYN</span> <span class="pre">flag</span> <span class="pre">is</span> <span class="pre">set</span></code> to queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow validate 0 ingress pattern tcp flags spec 0x02 flags mask 0x02 / end actions queue index 1 / end</span>
+</pre></div>
+</div>
+<p>Add a rule to enable ipv4-udp RSS:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern end actions rss types ipv4-udp end / end</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="igb.html" title="previous chapter"><span class="section-number">30. </span>IGB Poll Mode Driver</a></li>
+      <li>Next: <a href="intel_vf.html" title="next chapter"><span class="section-number">32. </span>Intel Virtual Function Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/igc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

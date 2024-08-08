@@ -1,0 +1,289 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>11. IP Reassembly Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="12. Keep Alive Sample Application" href="keep_alive.html" />
+    <link rel="prev" title="10. IPv4 Multicast Sample Application" href="ipv4_multicast.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ip-reassembly-sample-application">
+<h1><span class="section-number">11. </span>IP Reassembly Sample Application</h1>
+<p>The L3 Forwarding application is a simple example of packet processing using the DPDK.
+The application performs L3 forwarding with reassembly for fragmented IPv4 and IPv6 packets.</p>
+<section id="overview">
+<h2><span class="section-number">11.1. </span>Overview</h2>
+<p>The application demonstrates the use of the DPDK libraries to implement packet forwarding
+with reassembly for IPv4 and IPv6 fragmented packets.
+The initialization and run- time paths are very similar to those of the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a>.
+The main difference from the L2 Forwarding sample application is that
+it reassembles fragmented IPv4 and IPv6 packets before forwarding.
+The maximum allowed size of reassembled packet is 9.5 KB.</p>
+<p>There are two key differences from the L2 Forwarding sample application:</p>
+<ul class="simple">
+<li><p>The first difference is that the forwarding decision is taken based on information read from the input packet’s IP header.</p></li>
+<li><p>The second difference is that the application differentiates between IP and non-IP traffic by means of offload flags.</p></li>
+</ul>
+<p>The Longest Prefix Match (LPM for IPv4, LPM6 for IPv6) table is used to store/lookup an outgoing port number,
+associated with that IPv4 address. Any unmatched packets are forwarded to the originating port.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">11.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">ip_reassembly</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">11.3. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_reassembly [EAL options] -- -p PORTMASK [-q NQ] [--maxflows=FLOWS&gt;] [--flowttl=TTL[(s|ms)]]</span>
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p>-p PORTMASK: Hexadecimal bitmask of ports to configure</p></li>
+<li><p>-q NQ: Number of RX queues per lcore</p></li>
+<li><p>–maxflows=FLOWS: determines maximum number of active fragmented flows (1-65535). Default value: 4096.</p></li>
+<li><p>–flowttl=TTL[(s|ms)]: determines maximum Time To Live for fragmented packet.
+If all fragments of the packet wouldn’t appear within given time-out,
+then they are considered as invalid and will be dropped.
+Valid range is 1ms - 3600s. Default value: 1s.</p></li>
+</ul>
+<p>To run the example in linux environment with 2 lcores (2,4) over 2 ports(0,2) with 1 RX queue per lcore:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_reassembly -l 2,4 -n 3 -- -p 5</span>
+<span class="go">EAL: coremask set to 14</span>
+<span class="go">EAL: Detected lcore 0 on socket 0</span>
+<span class="go">EAL: Detected lcore 1 on socket 1</span>
+<span class="go">EAL: Detected lcore 2 on socket 0</span>
+<span class="go">EAL: Detected lcore 3 on socket 1</span>
+<span class="go">EAL: Detected lcore 4 on socket 0</span>
+<span class="go">...</span>
+
+<span class="go">Initializing port 0 on lcore 2... Address:00:1B:21:76:FA:2C, rxq=0 txq=2,0 txq=4,1</span>
+<span class="go">done: Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Skipping disabled port 1</span>
+<span class="go">Initializing port 2 on lcore 4... Address:00:1B:21:5C:FF:54, rxq=0 txq=2,0 txq=4,1</span>
+<span class="go">done: Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Skipping disabled port 3IP_FRAG: Socket 0: adding route 100.10.0.0/16 (port 0)</span>
+<span class="go">IP_RSMBL: Socket 0: adding route 100.20.0.0/16 (port 1)</span>
+<span class="go">...</span>
+
+<span class="go">IP_RSMBL: Socket 0: adding route 0101:0101:0101:0101:0101:0101:0101:0101/48 (port 0)</span>
+<span class="go">IP_RSMBL: Socket 0: adding route 0201:0101:0101:0101:0101:0101:0101:0101/48 (port 1)</span>
+<span class="go">...</span>
+
+<span class="go">IP_RSMBL: entering main loop on lcore 4</span>
+<span class="go">IP_RSMBL: -- lcoreid=4 portid=2</span>
+<span class="go">IP_RSMBL: entering main loop on lcore 2</span>
+<span class="go">IP_RSMBL: -- lcoreid=2 portid=0</span>
+</pre></div>
+</div>
+<p>To run the example in linux environment with 1 lcore (4) over 2 ports(0,2) with 2 RX queues per lcore:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_reassembly -l 4 -n 3 -- -p 5 -q 2</span>
+</pre></div>
+</div>
+<p>To test the application, flows should be set up in the flow generator that match the values in the
+l3fwd_ipv4_route_array and/or l3fwd_ipv6_route_array table.</p>
+<p>Please note that in order to test this application,
+the traffic generator should be generating valid fragmented IP packets.
+For IPv6, the only supported case is when no other extension headers other than
+fragment extension header are present in the packet.</p>
+<p>The default l3fwd_ipv4_route_array table is:</p>
+<p>The default l3fwd_ipv6_route_array table is:</p>
+<p>For example, for the fragmented input IPv4 packet with destination address: 100.10.1.1,
+a reassembled IPv4 packet be sent out from port #0 to the destination address 100.10.1.1
+once all the fragments are collected.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">11.4. </span>Explanation</h2>
+<p>The following sections provide some explanation of the sample application code.
+As mentioned in the overview section, the initialization and run-time paths are very similar to those of the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a>.
+The following sections describe aspects that are specific to the IP reassemble sample application.</p>
+<section id="ipv4-fragment-table-initialization">
+<h3><span class="section-number">11.4.1. </span>IPv4 Fragment Table Initialization</h3>
+<p>This application uses the rte_ip_frag library. Please refer to Programmer’s Guide for more detailed explanation of how to use this library.
+Fragment table maintains information about already received fragments of the packet.
+Each IP packet is uniquely identified by triple &lt;Source IP address&gt;, &lt;Destination IP address&gt;, &lt;ID&gt;.
+To avoid lock contention, each RX queue has its own Fragment Table,
+e.g. the application can’t handle the situation when different fragments of the same packet arrive through different RX queues.
+Each table entry can hold information about packet consisting of up to RTE_LIBRTE_IP_FRAG_MAX_FRAGS fragments.</p>
+</section>
+<section id="mempools-initialization">
+<h3><span class="section-number">11.4.2. </span>Mempools Initialization</h3>
+<p>The reassembly application demands a lot of mbuf’s to be allocated.
+At any given time up to (2 * max_flow_num * RTE_LIBRTE_IP_FRAG_MAX_FRAGS * &lt;maximum number of mbufs per packet&gt;)
+can be stored inside Fragment Table waiting for remaining fragments.
+To keep mempool size under reasonable limits and to avoid situation when one RX queue can starve other queues,
+each RX queue uses its own mempool.</p>
+</section>
+<section id="packet-reassembly-and-forwarding">
+<h3><span class="section-number">11.4.3. </span>Packet Reassembly and Forwarding</h3>
+<p>For each input packet, the packet forwarding operation is done by the l3fwd_simple_forward() function.
+If the packet is an IPv4 or IPv6 fragment, then it calls rte_ipv4_reassemble_packet() for IPv4 packets,
+or rte_ipv6_reassemble_packet() for IPv6 packets.
+These functions either return a pointer to valid mbuf that contains reassembled packet,
+or NULL (if the packet can’t be reassembled for some reason).
+Then l3fwd_simple_forward() continues with the code for the packet forwarding decision
+(that is, the identification of the output interface for the packet) and
+actual transmit of the packet.</p>
+<p>The rte_ipv4_reassemble_packet() or rte_ipv6_reassemble_packet() are responsible for:</p>
+<ol class="arabic simple">
+<li><p>Searching the Fragment Table for entry with packet’s &lt;IP Source Address, IP Destination Address, Packet ID&gt;</p></li>
+<li><p>If the entry is found, then check if that entry already timed-out.
+If yes, then free all previously received fragments,
+and remove information about them from the entry.</p></li>
+<li><p>If no entry with such key is found, then try to create a new one by one of two ways:</p>
+<ol class="arabic simple">
+<li><p>Use as empty entry</p></li>
+<li><p>Delete a timed-out entry, free mbufs associated with it mbufs and store a new entry with specified key in it.</p></li>
+</ol>
+</li>
+<li><p>Update the entry with new fragment information and check
+if a packet can be reassembled (the packet’s entry contains all fragments).</p>
+<ol class="arabic simple">
+<li><p>If yes, then, reassemble the packet, mark table’s entry as empty and return the reassembled mbuf to the caller.</p></li>
+<li><p>If no, then just return a NULL to the caller.</p></li>
+</ol>
+</li>
+</ol>
+<p>If at any stage of packet processing a reassembly function encounters an error
+(can’t insert new entry into the Fragment table, or invalid/timed-out fragment),
+then it will free all associated with the packet fragments,
+mark the table entry as invalid and return NULL to the caller.</p>
+</section>
+<section id="debug-logging-and-statistics-collection">
+<h3><span class="section-number">11.4.4. </span>Debug logging and Statistics Collection</h3>
+<p>The RTE_LIBRTE_IP_FRAG_TBL_STAT controls statistics collection for the IP Fragment Table.
+This macro is disabled by default, but it can be enabled by modifying the appropriate line
+in <code class="docutils literal notranslate"><span class="pre">config/rte_config.h</span></code>.
+To make ip_reassembly print the statistics to the standard output,
+the user must send either an USR1, INT or TERM signal to the process.
+For all of these signals, the ip_reassembly process prints Fragment table statistics for each RX queue,
+plus the INT and TERM will cause process termination as usual.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="ipv4_multicast.html" title="previous chapter"><span class="section-number">10. </span>IPv4 Multicast Sample Application</a></li>
+      <li>Next: <a href="keep_alive.html" title="next chapter"><span class="section-number">12. </span>Keep Alive Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/ip_reassembly.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,252 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Compiling and testing a PMD for a NIC &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. AF_PACKET Poll Mode Driver" href="af_packet.html" />
+    <link rel="prev" title="2. Features Overview" href="features.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="compiling-and-testing-a-pmd-for-a-nic">
+<span id="pmd-build-and-test"></span><h1><span class="section-number">3. </span>Compiling and testing a PMD for a NIC</h1>
+<p>This section demonstrates how to compile and run a Poll Mode Driver (PMD) for
+the available Network Interface Cards in DPDK using TestPMD.</p>
+<p>TestPMD is one of the reference applications distributed with the DPDK. Its main
+purpose is to forward packets between Ethernet ports on a network interface and
+as such is the best way to test a PMD.</p>
+<p>Refer to the <a class="reference internal" href="../testpmd_app_ug/index.html#testpmd-ug"><span class="std std-ref">testpmd application user guide</span></a> for detailed
+information on how to build and run testpmd.</p>
+<section id="driver-compilation">
+<h2><span class="section-number">3.1. </span>Driver Compilation</h2>
+<p>To compile a PMD for a platform, build DPDK
+as described in the “Getting Started Guide” for your platform.
+This will also build testpmd.</p>
+<p>Detailed instructions are available
+in the <a class="reference internal" href="../prog_guide/build-sdk-meson.html"><span class="doc">meson build guide</span></a>.</p>
+<p>The ethdev layer supports below build options for debug purpose:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_ETHDEV_DEBUG_RX</span></code> (default <strong>disabled</strong>)</p>
+<p>Build with debug code on Rx path.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_ETHDEV_DEBUG_TX</span></code> (default <strong>disabled</strong>)</p>
+<p>Build with debug code on Tx path.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The ethdev library use above options to wrap debug code to trace invalid parameters
+on data path APIs, so performance downgrade is expected when enabling those options.
+Each PMD can decide to reuse them to wrap their own debug code in the Rx/Tx path.</p>
+</div>
+</section>
+<section id="running-testpmd-in-linux">
+<h2><span class="section-number">3.2. </span>Running testpmd in Linux</h2>
+<p>This section demonstrates how to setup and run <code class="docutils literal notranslate"><span class="pre">testpmd</span></code> in Linux.</p>
+<ol class="arabic">
+<li><p>Mount huge pages:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mkdir /mnt/huge</span>
+<span class="go">mount -t hugetlbfs nodev /mnt/huge</span>
+</pre></div>
+</div>
+</li>
+<li><p>Request huge pages:</p>
+<p>Hugepage memory should be reserved as per application requirement. Check
+hugepage size configured in the system and calculate the number of pages
+required.</p>
+<p>To reserve 1024 pages of 2MB:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 1024 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Check <code class="docutils literal notranslate"><span class="pre">/proc/meminfo</span></code> to find system hugepage size:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">grep &quot;Hugepagesize:&quot; /proc/meminfo</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Hugepagesize:       2048 kB</span>
+</pre></div>
+</div>
+</div>
+<p>Mount and request above can be achieved simply with this tool:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-hugepages.py --setup 2G</span>
+</pre></div>
+</div>
+</li>
+<li><p>Load <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> or <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> driver:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe uio</span>
+<span class="go">insmod igb_uio.ko</span>
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe vfio-pci</span>
+</pre></div>
+</div>
+</li>
+<li><p>Setup VFIO permissions for regular users before binding to <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo chmod a+x /dev/vfio</span>
+
+<span class="go">sudo chmod 0666 /dev/vfio/*</span>
+</pre></div>
+</div>
+</li>
+<li><p>Bind the adapters to <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> or <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> loaded in the previous step:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./usertools/dpdk-devbind.py --bind igb_uio DEVICE1 DEVICE2 ...</span>
+</pre></div>
+</div>
+<p>Or setup VFIO permissions for regular users and then bind to <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./usertools/dpdk-devbind.py --bind vfio-pci DEVICE1 DEVICE2 ...</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>DEVICE1, DEVICE2 are specified via PCI “domain:bus:slot.func” syntax or
+“bus:slot.func” syntax.</p>
+</div>
+</li>
+<li><p>Start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code> with basic parameters:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 -- -i</span>
+</pre></div>
+</div>
+<p>Successful execution will show initialization messages from EAL, PMD and
+testpmd application. A prompt will be displayed at the end for user commands
+as interactive mode (<code class="docutils literal notranslate"><span class="pre">-i</span></code>) is on.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+<p>Refer to the <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html#testpmd-runtime"><span class="std std-ref">testpmd runtime functions</span></a> for a list
+of available commands.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">testpmd</span></code> is built with shared library, use option <code class="docutils literal notranslate"><span class="pre">-d</span></code> to load
+the dynamic PMD for <code class="docutils literal notranslate"><span class="pre">rte_eal_init</span></code>.</p>
+</div>
+</li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="features.html" title="previous chapter"><span class="section-number">2. </span>Features Overview</a></li>
+      <li>Next: <a href="af_packet.html" title="next chapter"><span class="section-number">4. </span>AF_PACKET Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/build_and_test.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

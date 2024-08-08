@@ -1,0 +1,263 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>35. ABI and API Deprecation &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="FAQ" href="../faq/index.html" />
+    <link rel="prev" title="34. Known Issues and Limitations in Legacy Releases" href="known_issues.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="abi-and-api-deprecation">
+<h1><span class="section-number">35. </span>ABI and API Deprecation</h1>
+<p>See the guidelines document for details of the <a class="reference internal" href="../contributing/abi_policy.html"><span class="doc">ABI policy</span></a>.</p>
+<p>With DPDK 23.11, there will be a new major ABI version: 24.
+This means that during the development of 23.11,
+new items may be added to structs or enums,
+even if those additions involve an ABI compatibility breakage.</p>
+<p>Other API and ABI deprecation notices are to be posted below.</p>
+<section id="deprecation-notices">
+<h2><span class="section-number">35.1. </span>Deprecation Notices</h2>
+<ul>
+<li><p>build: The <code class="docutils literal notranslate"><span class="pre">enable_kmods</span></code> option is deprecated and will be removed in a future release.
+Setting/clearing the option has no impact on the build.
+Instead, kernel modules will be always built for OS’s where out-of-tree kernel modules
+are required for DPDK operation.
+Currently, this means that modules will only be built for FreeBSD.
+No modules are shipped with DPDK for either Linux or Windows.</p></li>
+<li><p>kvargs: The function <code class="docutils literal notranslate"><span class="pre">rte_kvargs_process</span></code> will get a new parameter
+for returning key match count. It will ease handling of no-match case.</p></li>
+<li><p>cmdline: The function <code class="docutils literal notranslate"><span class="pre">cmdline_poll</span></code> does not work correctly on either
+Linux or Windows and is unused by any part of DPDK.
+This function is now deprecated and will be removed in DPDK 23.11.</p></li>
+<li><p>telemetry: The functions <code class="docutils literal notranslate"><span class="pre">rte_tel_data_add_array_u64</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_tel_data_add_dict_u64</span></code>,
+used by telemetry callbacks for adding unsigned integer values to be returned to the user,
+are renamed to <code class="docutils literal notranslate"><span class="pre">rte_tel_data_add_array_uint</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_tel_data_add_dict_uint</span></code> respectively.
+As such, the old function names are deprecated and will be removed in a future release.</p></li>
+<li><p>rte_atomicNN_xxx: These APIs do not take memory order parameter. This does
+not allow for writing optimized code for all the CPU architectures supported
+in DPDK. DPDK has adopted the atomic operations from
+<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html">https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html</a>. These
+operations must be used for patches that need to be merged in 20.08 onwards.
+This change will not introduce any performance degradation.</p></li>
+<li><p>rte_smp_*mb: These APIs provide full barrier functionality. However, many
+use cases do not require full barriers. To support such use cases, DPDK has
+adopted atomic operations from
+<a class="reference external" href="https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html">https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html</a>. These
+operations and a new wrapper <code class="docutils literal notranslate"><span class="pre">rte_atomic_thread_fence</span></code> instead of
+<code class="docutils literal notranslate"><span class="pre">__atomic_thread_fence</span></code> must be used for patches that need to be merged in
+20.08 onwards. This change will not introduce any performance degradation.</p></li>
+<li><p>lib: will fix extending some enum/define breaking the ABI. There are multiple
+samples in DPDK that enum/define terminated with a <code class="docutils literal notranslate"><span class="pre">.*MAX.*</span></code> value which is
+used by iterators, and arrays holding these values are sized with this
+<code class="docutils literal notranslate"><span class="pre">.*MAX.*</span></code> value. So extending this enum/define increases the <code class="docutils literal notranslate"><span class="pre">.*MAX.*</span></code>
+value which increases the size of the array and depending on how/where the
+array is used this may break the ABI.
+<code class="docutils literal notranslate"><span class="pre">RTE_ETH_FLOW_MAX</span></code> is one sample of the mentioned case, adding a new flow
+type will break the ABI because of <code class="docutils literal notranslate"><span class="pre">flex_mask[RTE_ETH_FLOW_MAX]</span></code> array
+usage in following public struct hierarchy:
+<code class="docutils literal notranslate"><span class="pre">rte_eth_fdir_flex_conf</span> <span class="pre">-&gt;</span> <span class="pre">rte_eth_fdir_conf</span> <span class="pre">-&gt;</span> <span class="pre">rte_eth_conf</span> <span class="pre">(in</span> <span class="pre">the</span> <span class="pre">middle)</span></code>.
+Need to identify this kind of usages and fix in 20.11, otherwise this blocks
+us extending existing enum/define.
+One solution can be using a fixed size array instead of <code class="docutils literal notranslate"><span class="pre">.*MAX.*</span></code> value.</p></li>
+<li><p>ethdev: The flow API matching pattern structures, <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_flow_item_*</span></code>,
+should start with relevant protocol header structure from lib/net/.
+The individual protocol header fields and the protocol header struct
+may be kept together in a union as a first migration step.
+In future (target is DPDK 23.11), the protocol header fields will be cleaned
+and only protocol header struct will remain.</p>
+<p>These items are not compliant (not including struct from lib/net/):</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_ah</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_e_tag</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_geneve</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_geneve_opt</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_gre</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6_nd_na</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6_nd_ns</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6_nd_opt</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6_nd_opt_sla_eth</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_icmp6_nd_opt_tla_eth</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_igmp</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_ipv6_ext</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_l2tpv3oip</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_mpls</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_nsh</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_nvgre</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_pfcp</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_pppoe</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_flow_item_pppoe_proto_id</span></code></p></li>
+</ul>
+</li>
+<li><p>ethdev: Queue specific stats fields will be removed from <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_stats</span></code>.
+Mentioned fields are: <code class="docutils literal notranslate"><span class="pre">q_ipackets</span></code>, <code class="docutils literal notranslate"><span class="pre">q_opackets</span></code>, <code class="docutils literal notranslate"><span class="pre">q_ibytes</span></code>, <code class="docutils literal notranslate"><span class="pre">q_obytes</span></code>,
+<code class="docutils literal notranslate"><span class="pre">q_errors</span></code>.
+Instead queue stats will be received via xstats API. Current method support
+will be limited to maximum 256 queues.
+Also compile time flag <code class="docutils literal notranslate"><span class="pre">RTE_ETHDEV_QUEUE_STAT_CNTRS</span></code> will be removed.</p></li>
+<li><p>ethdev: Flow actions <code class="docutils literal notranslate"><span class="pre">PF</span></code> and <code class="docutils literal notranslate"><span class="pre">VF</span></code> have been deprecated since DPDK 21.11
+and are yet to be removed. That still has not happened because there are net
+drivers which support combined use of either action <code class="docutils literal notranslate"><span class="pre">PF</span></code> or action <code class="docutils literal notranslate"><span class="pre">VF</span></code>
+with action <code class="docutils literal notranslate"><span class="pre">QUEUE</span></code>, namely, i40e, ixgbe and txgbe (L2 tunnel rule).
+It is unclear whether it is acceptable to just drop support for
+such a complex use case, so maintainers of the said drivers
+should take a closer look at this and provide assistance.</p></li>
+<li><p>ethdev: Actions <code class="docutils literal notranslate"><span class="pre">OF_DEC_NW_TTL</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_IPV4_SRC</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_IPV4_DST</span></code>,
+<code class="docutils literal notranslate"><span class="pre">SET_IPV6_SRC</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_IPV6_DST</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_TP_SRC</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_TP_DST</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DEC_TTL</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_TTL</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_MAC_SRC</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_MAC_DST</span></code>, <code class="docutils literal notranslate"><span class="pre">INC_TCP_SEQ</span></code>,
+<code class="docutils literal notranslate"><span class="pre">DEC_TCP_SEQ</span></code>, <code class="docutils literal notranslate"><span class="pre">INC_TCP_ACK</span></code>, <code class="docutils literal notranslate"><span class="pre">DEC_TCP_ACK</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_IPV4_DSCP</span></code>,
+<code class="docutils literal notranslate"><span class="pre">SET_IPV6_DSCP</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_TAG</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_META</span></code> are marked as legacy and
+superseded by the generic <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_MODIFY_FIELD</span></code>.
+The legacy actions should be removed
+once <code class="docutils literal notranslate"><span class="pre">MODIFY_FIELD</span></code> alternative is implemented in drivers.</p></li>
+<li><p>cryptodev: The function <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_cb_fn</span></code> will be updated
+to have another parameter <code class="docutils literal notranslate"><span class="pre">qp_id</span></code> to return the queue pair ID
+which got error interrupt to the application,
+so that application can reset that particular queue pair.</p></li>
+<li><p>eventdev: The single-event (non-burst) enqueue and dequeue operations,
+used by static inline burst enqueue and dequeue functions in <code class="docutils literal notranslate"><span class="pre">rte_eventdev.h</span></code>,
+will be removed in DPDK 23.11.
+This simplification includes changing the layout and potentially also
+the size of the public <code class="docutils literal notranslate"><span class="pre">rte_event_fp_ops</span></code> struct, breaking the ABI.
+Since these functions are not called directly by the application,
+the API remains unaffected.</p></li>
+<li><p>pipeline: The pipeline library legacy API (functions rte_pipeline_*)
+will be deprecated and subsequently removed in DPDK 24.11 release.
+Before this, the new pipeline library API (functions rte_swx_pipeline_*)
+will gradually transition from experimental to stable status.</p></li>
+<li><p>table: The table library legacy API (functions rte_table_*)
+will be deprecated and subsequently removed in DPDK 24.11 release.
+Before this, the new table library API (functions rte_swx_table_*)
+will gradually transition from experimental to stable status.</p></li>
+<li><p>port: The port library legacy API (functions rte_port_*)
+will be deprecated and subsequently removed in DPDK 24.11 release.
+Before this, the new port library API (functions rte_swx_port_*)
+will gradually transition from experimental to stable status.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Release Notes</a><ul>
+      <li>Previous: <a href="known_issues.html" title="previous chapter"><span class="section-number">34. </span>Known Issues and Limitations in Legacy Releases</a></li>
+      <li>Next: <a href="../faq/index.html" title="next chapter">FAQ</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rel_notes/deprecation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

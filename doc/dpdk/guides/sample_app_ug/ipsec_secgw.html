@@ -1,0 +1,1238 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>45. IPsec Security Gateway Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="46. Loop-back Sample Application using Baseband Device (bbdev)" href="bbdev_app.html" />
+    <link rel="prev" title="44. Federal Information Processing Standards (FIPS) CryptoDev Validation" href="fips_validation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ipsec-security-gateway-sample-application">
+<h1><span class="section-number">45. </span>IPsec Security Gateway Sample Application</h1>
+<p>The IPsec Security Gateway application is an example of a “real world”
+application using DPDK cryptodev framework.</p>
+<section id="overview">
+<h2><span class="section-number">45.1. </span>Overview</h2>
+<p>The application demonstrates the implementation of a Security Gateway
+(not IPsec compliant, see the Constraints section below) using DPDK based on RFC4301,
+RFC4303, RFC3602 and RFC2404.</p>
+<p>Internet Key Exchange (IKE) is not implemented, so only manual setting of
+Security Policies and Security Associations is supported.</p>
+<p>The Security Policies (SP) are implemented as ACL rules, the Security
+Associations (SA) are stored in a table and the routing is implemented
+using LPM.</p>
+<p>The application classifies the ports as <em>Protected</em> and <em>Unprotected</em>.
+Thus, traffic received on an Unprotected or Protected port is consider
+Inbound or Outbound respectively.</p>
+<p>The application also supports complete IPsec protocol offload to hardware
+(Look aside crypto accelerator or using ethernet device). It also support
+inline ipsec processing by the supported ethernet device during transmission.
+These modes can be selected during the SA creation configuration.</p>
+<p>In case of complete protocol offload, the processing of headers(ESP and outer
+IP header) is done by the hardware and the application does not need to
+add/remove them during outbound/inbound processing.</p>
+<p>For inline offloaded outbound traffic, the application will not do the LPM
+lookup for routing, as the port on which the packet has to be forwarded will be
+part of the SA. Security parameters will be configured on that port only, and
+sending the packet on other ports could result in unencrypted packets being
+sent out.</p>
+<p>The Path for IPsec Inbound traffic is:</p>
+<ul class="simple">
+<li><p>Read packets from the port.</p></li>
+<li><p>Classify packets between IPv4 and ESP.</p></li>
+<li><p>Perform Inbound SA lookup for ESP packets based on their SPI.</p></li>
+<li><p>Perform Verification/Decryption (Not needed in case of inline ipsec).</p></li>
+<li><p>Remove ESP and outer IP header (Not needed in case of protocol offload).</p></li>
+<li><p>Inbound SP check using ACL of decrypted packets and any other IPv4 packets.</p></li>
+<li><p>Routing.</p></li>
+<li><p>Write packet to port.</p></li>
+</ul>
+<p>The Path for the IPsec Outbound traffic is:</p>
+<ul class="simple">
+<li><p>Read packets from the port.</p></li>
+<li><p>Perform Outbound SP check using ACL of all IPv4 traffic.</p></li>
+<li><p>Perform Outbound SA lookup for packets that need IPsec protection.</p></li>
+<li><p>Add ESP and outer IP header (Not needed in case protocol offload).</p></li>
+<li><p>Perform Encryption/Digest (Not needed in case of inline ipsec).</p></li>
+<li><p>Routing.</p></li>
+<li><p>Write packet to port.</p></li>
+</ul>
+<p>The application supports two modes of operation: poll mode and event mode.</p>
+<ul>
+<li><p>In the poll mode a core receives packets from statically configured list
+of eth ports and eth ports’ queues.</p></li>
+<li><p>In the event mode a core receives packets as events. After packet processing
+is done core submits them back as events to an event device. This enables
+multicore scaling and HW assisted scheduling by making use of the event device
+capabilities. The event mode configuration is predefined. All packets reaching
+given eth port will arrive at the same event queue. All event queues are mapped
+to all event ports. This allows all cores to receive traffic from all ports.
+Since the underlying event device might have varying capabilities, the worker
+threads can be drafted differently to maximize performance. For example, if an
+event device - eth device pair has Tx internal port, then application can call
+rte_event_eth_tx_adapter_enqueue() instead of regular rte_event_enqueue_burst().
+So a thread which assumes that the device pair has internal port will not be the
+right solution for another pair. The infrastructure added for the event mode aims
+to help application to have multiple worker threads by maximizing performance from
+every type of event device without affecting existing paths/use cases. The worker
+to be used will be determined by the operating conditions and the underlying device
+capabilities.
+<strong>Currently the application provides non-burst, internal port worker threads.</strong>
+It also provides infrastructure for non-internal port
+however does not define any worker threads.</p>
+<p>Event mode also supports event vectorization. The event devices, ethernet device
+pairs which support the capability <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_ETH_RX_ADAPTER_CAP_EVENT_VECTOR</span></code> can
+aggregate packets based on flow characteristics and generate a <code class="docutils literal notranslate"><span class="pre">rte_event</span></code>
+containing <code class="docutils literal notranslate"><span class="pre">rte_event_vector</span></code>.
+The aggregation size and timeout can be given using command line options vector-size
+(default vector-size is 16) and vector-tmo (default vector-tmo is 102400ns).
+By default event vectorization is disabled and it can be enabled using event-vector
+option.
+For the event devices, crypto device pairs which support the capability
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_CRYPTO_ADAPTER_CAP_EVENT_VECTOR</span></code> vector aggregation
+could also be enable using event-vector option.</p>
+</li>
+</ul>
+<p>Additionally the event mode introduces two submodes of processing packets:</p>
+<ul class="simple">
+<li><p>Driver submode: This submode has bare minimum changes in the application to support
+IPsec. There are no lookups, no routing done in the application. And for inline
+protocol use case, the worker thread resembles l2fwd worker thread as the IPsec
+processing is done entirely in HW. This mode can be used to benchmark the raw
+performance of the HW. The driver submode is selected with –single-sa option
+(used also by poll mode). When –single-sa option is used in conjunction with event
+mode then index passed to –single-sa is ignored.</p></li>
+<li><p>App submode: This submode has all the features currently implemented with the
+application (non librte_ipsec path). All the lookups, routing follows existing
+methods and report numbers that can be compared against regular poll mode
+benchmark numbers.</p></li>
+</ul>
+</section>
+<section id="constraints">
+<h2><span class="section-number">45.2. </span>Constraints</h2>
+<ul class="simple">
+<li><p>No IPv6 options headers.</p></li>
+<li><p>No AH mode.</p></li>
+<li><p>Supported algorithms: AES-CBC, AES-CTR, AES-GCM, 3DES-CBC, DES-CBC,
+HMAC-SHA1, HMAC-SHA256, AES-GMAC, AES_CTR, AES_XCBC_MAC, AES_CCM,
+CHACHA20_POLY1305 and NULL.</p></li>
+<li><p>Each SA must be handle by a unique lcore (<em>1 RX queue per port</em>).</p></li>
+</ul>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">45.3. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">ipsec-secgw</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">45.4. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./&lt;build_dir&gt;/examples/dpdk-ipsec-secgw [EAL options] --
+                     -p PORTMASK -P -u PORTMASK -j FRAMESIZE
+                     -l -w REPLAY_WINDOW_SIZE -e -a
+                     -c SAD_CACHE_SIZE
+                     -t STATISTICS_INTERVAL
+                     -s NUMBER_OF_MBUFS_IN_PACKET_POOL
+                     -f CONFIG_FILE_PATH
+                     --config (port,queue,lcore)[,(port,queue,lcore)]
+                     --single-sa SAIDX
+                     --cryptodev_mask MASK
+                     --transfer-mode MODE
+                     --event-schedule-type TYPE
+                     --rxoffload MASK
+                     --txoffload MASK
+                     --reassemble NUM
+                     --mtu MTU
+                     --frag-ttl FRAG_TTL_NS
+                     --desc-nb NUMBER_OF_DESC
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-p</span> <span class="pre">PORTMASK</span></code>: Hexadecimal bitmask of ports to configure.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-P</span></code>: <em>optional</em>. Sets all ports to promiscuous mode so that packets are
+accepted regardless of the packet’s Ethernet MAC destination address.
+Without this option, only packets with the Ethernet MAC destination address
+set to the Ethernet address of the port are accepted (default is enabled).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-u</span> <span class="pre">PORTMASK</span></code>: hexadecimal bitmask of unprotected ports</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-j</span> <span class="pre">FRAMESIZE</span></code>: <em>optional</em>. data buffer size (in bytes),
+in other words maximum data size for one segment.
+Packets with length bigger then FRAMESIZE still can be received,
+but will be segmented.
+Default value: RTE_MBUF_DEFAULT_BUF_SIZE (2176)
+Minimum value: RTE_MBUF_DEFAULT_BUF_SIZE (2176)
+Maximum value: UINT16_MAX (65535).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-l</span></code>: enables code-path that uses librte_ipsec.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-w</span> <span class="pre">REPLAY_WINDOW_SIZE</span></code>: specifies the IPsec sequence number replay window
+size for each Security Association (available only with librte_ipsec
+code path).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-e</span></code>: enables Security Association extended sequence number processing
+(available only with librte_ipsec code path).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-a</span></code>: enables Security Association sequence number atomic behavior
+(available only with librte_ipsec code path).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c</span></code>: specifies the SAD cache size. Stores the most recent SA in a per
+lcore cache. Cache represents flat array containing SA’s indexed by SPI.
+Zero value disables cache.
+Default value: 128.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-t</span></code>: specifies the statistics screen update interval in seconds. If set
+to zero or omitted statistics screen is disabled.
+Default value: 0.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-s</span></code>: sets number of mbufs in packet pool, if not provided number of mbufs
+will be calculated based on number of cores, eth ports and crypto queues.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">CONFIG_FILE_PATH</span></code>: the full path of text-based file containing all
+configuration items for running the application (See Configuration file
+syntax section below). <code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">CONFIG_FILE_PATH</span></code> <strong>must</strong> be specified.
+<strong>ONLY</strong> the UNIX format configuration file is accepted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--config</span> <span class="pre">(port,queue,lcore)[,(port,queue,lcore)]</span></code>: in poll mode determines
+which queues from which ports are mapped to which cores. In event mode this
+option is not used as packets are dynamically scheduled to cores by HW.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--single-sa</span> <span class="pre">SAIDX</span></code>: in poll mode use a single SA for outbound traffic,
+bypassing the SP on both Inbound and Outbound. This option is meant for
+debugging/performance purposes. In event mode selects driver submode, SA index
+value is ignored.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--cryptodev_mask</span> <span class="pre">MASK</span></code>: hexadecimal bitmask of the crypto devices
+to configure.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--transfer-mode</span> <span class="pre">MODE</span></code>: sets operating mode of the application
+“poll”  : packet transfer via polling (default)
+“event” : Packet transfer via event device</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--event-schedule-type</span> <span class="pre">TYPE</span></code>: queue schedule type, applies only when
+–transfer-mode is set to event.
+“ordered”  : Ordered (default)
+“atomic”   : Atomic
+“parallel” : Parallel
+When –event-schedule-type is set as RTE_SCHED_TYPE_ORDERED/ATOMIC, event
+device will ensure the ordering. Ordering will be lost when tried in PARALLEL.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxoffload</span> <span class="pre">MASK</span></code>: RX HW offload capabilities to enable/use on this port
+(bitmask of RTE_ETH_RX_OFFLOAD_* values). It is an optional parameter and
+allows user to disable some of the RX HW offload capabilities.
+By default all HW RX offloads are enabled.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txoffload</span> <span class="pre">MASK</span></code>: TX HW offload capabilities to enable/use on this port
+(bitmask of RTE_ETH_TX_OFFLOAD_* values). It is an optional parameter and
+allows user to disable some of the TX HW offload capabilities.
+By default all HW TX offloads are enabled.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--reassemble</span> <span class="pre">NUM</span></code>: max number of entries in reassemble fragment table.
+Zero value disables reassembly functionality.
+Default value: 0.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mtu</span> <span class="pre">MTU</span></code>: MTU value (in bytes) on all attached ethernet ports.
+Outgoing packets with length bigger then MTU will be fragmented.
+Incoming packets with length bigger then MTU will be discarded.
+Default value: 1500.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--frag-ttl</span> <span class="pre">FRAG_TTL_NS</span></code>: fragment lifetime (in nanoseconds).
+If packet is not reassembled within this time, received fragments
+will be discarded. Fragment lifetime should be decreased when
+there is a high fragmented traffic loss in high bandwidth networks.
+Should be lower for low number of reassembly buckets.
+Valid values: from 1 ns to 10 s. Default value: 10000000 (10 s).</p></li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--per-port-pool</span></code>: Enable per ethdev port pktmbuf pool.</dt><dd><p>By default one packet mbuf pool per socket is created and configured
+via Rx queue setup.</p>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vector-pool-sz</span></code>: Number of buffers in vector pool.
+By default, vector pool size depeneds on packet pool size
+and size of each vector.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--desc-nb</span> <span class="pre">NUMBER_OF_DESC</span></code>: Number of descriptors per queue pair.
+Default value: 2048.</p></li>
+</ul>
+<p>The mapping of lcores to port/queues is similar to other l3fwd applications.</p>
+<p>For example, given the following command line to run application in poll mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./&lt;build_dir&gt;/examples/dpdk-ipsec-secgw -l 20,21 -n 4 --socket-mem 0,2048       \
+       --vdev &quot;crypto_null&quot; -- -p 0xf -P -u 0x3             \
+       --config=&quot;(0,0,20),(1,0,20),(2,0,21),(3,0,21)&quot;       \
+       -f /path/to/config_file --transfer-mode poll         \
+</pre></div>
+</div>
+<p>where each option means:</p>
+<ul>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-l</span></code> option enables cores 20 and 21.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-n</span></code> option sets memory 4 channels.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--socket-mem</span></code> to use 2GB on socket 1.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--vdev</span> <span class="pre">&quot;crypto_null&quot;</span></code> option creates virtual NULL cryptodev PMD.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-p</span></code> option enables ports (detected) 0, 1, 2 and 3.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-P</span></code> option enables promiscuous mode.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-u</span></code> option sets ports 0 and 1 as unprotected, leaving 2 and 3 as protected.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--config</span></code> option enables one queue per port with the following mapping:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 15%" />
+<col style="width: 15%" />
+<col style="width: 55%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>Port</strong></p></td>
+<td><p><strong>Queue</strong></p></td>
+<td><p><strong>lcore</strong></p></td>
+<td><p><strong>Description</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>20</p></td>
+<td><p>Map queue 0 from port 0 to lcore 20.</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>20</p></td>
+<td><p>Map queue 0 from port 1 to lcore 20.</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>0</p></td>
+<td><p>21</p></td>
+<td><p>Map queue 0 from port 2 to lcore 21.</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>0</p></td>
+<td><p>21</p></td>
+<td><p>Map queue 0 from port 3 to lcore 21.</p></td>
+</tr>
+</tbody>
+</table>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">/path/to/config_file</span></code> option enables the application read and
+parse the configuration file specified, and configures the application
+with a given set of SP, SA and Routing entries accordingly. The syntax of
+the configuration file will be explained below in more detail. Please
+<strong>note</strong> the parser only accepts UNIX format text file. Other formats
+such as DOS/MAC format will cause a parse error.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--transfer-mode</span></code> option selects poll mode for processing packets.</p></li>
+</ul>
+<p>Similarly for example, given the following command line to run application in
+event app mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./&lt;build_dir&gt;/examples/dpdk-ipsec-secgw -c 0x3 -- -P -p 0x3 -u 0x1       \
+       -f /path/to/config_file --transfer-mode event \
+       --event-schedule-type parallel --event-vector --vector-size 32    \
+       --vector-tmo 102400                           \
+</pre></div>
+</div>
+<p>where each option means:</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-c</span></code> option selects cores 0 and 1 to run on.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-P</span></code> option enables promiscuous mode.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-p</span></code> option enables ports (detected) 0 and 1.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-u</span></code> option sets ports 0 as unprotected, leaving 1 as protected.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">-f</span> <span class="pre">/path/to/config_file</span></code> option has the same behavior as in poll
+mode example.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--transfer-mode</span></code> option selects event mode for processing packets.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--event-schedule-type</span></code> option selects parallel ordering of event queues.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--event-vector</span></code> option enables event vectorization.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--vector-size</span></code> option specifies max vector size.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--vector-tmo</span></code> option specifies max timeout in nanoseconds for vectorization.</p></li>
+</ul>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running
+applications and the Environment Abstraction Layer (EAL) options.</p>
+<p>The application would do a best effort to “map” crypto devices to cores, with
+hardware devices having priority. Basically, hardware devices if present would
+be assigned to a core before software ones.
+This means that if the application is using a single core and both hardware
+and software crypto devices are detected, hardware devices will be used.</p>
+<p>A way to achieve the case where you want to force the use of virtual crypto
+devices is to only use the Ethernet devices needed (via the allow flag)
+and therefore implicitly blocking all hardware crypto devices.</p>
+<p>For example, something like the following command line:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ipsec-secgw -l 20,21 -n 4 --socket-mem 0,2048 \</span>
+<span class="go">        -a 81:00.0 -a 81:00.1 -a 81:00.2 -a 81:00.3 \</span>
+<span class="go">        --vdev &quot;crypto_aesni_mb&quot; --vdev &quot;crypto_null&quot; \</span>
+<span class="go">        -- \</span>
+<span class="go">        -p 0xf -P -u 0x3 --config=&quot;(0,0,20),(1,0,20),(2,0,21),(3,0,21)&quot; \</span>
+<span class="go">        -f sample.cfg</span>
+</pre></div>
+</div>
+</section>
+<section id="configurations">
+<h2><span class="section-number">45.5. </span>Configurations</h2>
+<p>The following sections provide the syntax of configurations to initialize
+your SP, SA, Routing, Flow and Neighbour tables.
+Configurations shall be specified in the configuration file to be passed to
+the application. The file is then parsed by the application. The successful
+parsing will result in the appropriate rules being applied to the tables
+accordingly.</p>
+<section id="configuration-file-syntax">
+<h3><span class="section-number">45.5.1. </span>Configuration File Syntax</h3>
+<p>As mention in the overview, the Security Policies are ACL rules.
+The application parsers the rules specified in the configuration file and
+passes them to the ACL table, and replicates them per socket in use.</p>
+<p>Following are the configuration file syntax.</p>
+<section id="general-rule-syntax">
+<h4><span class="section-number">45.5.1.1. </span>General rule syntax</h4>
+<p>The parse treats one line in the configuration file as one configuration
+item (unless the line concatenation symbol exists). Every configuration
+item shall follow the syntax of either SP, SA, Routing, Flow or Neighbour
+rules specified below.</p>
+<p>The configuration parser supports the following special symbols:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Comment symbol <strong>#</strong>. Any character from this symbol to the end of
+line is treated as comment and will not be parsed.</p></li>
+<li><p>Line concatenation symbol <strong>\</strong>. This symbol shall be placed in the end
+of the line to be concatenated to the line below. Multiple lines’
+concatenation is supported.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="sp-rule-syntax">
+<h4><span class="section-number">45.5.1.2. </span>SP rule syntax</h4>
+<p>The SP rule syntax is shown as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sp &lt;ip_ver&gt; &lt;dir&gt; esp &lt;action&gt; &lt;priority&gt; &lt;src_ip&gt; &lt;dst_ip&gt;</span>
+<span class="go">&lt;proto&gt; &lt;sport&gt; &lt;dport&gt;</span>
+</pre></div>
+</div>
+<p>where each options means:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;ip_ver&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>IP protocol version</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>ipv4</em>: IP protocol version 4</p></li>
+<li><p><em>ipv6</em>: IP protocol version 6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dir&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The traffic direction</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>in</em>: inbound traffic</p></li>
+<li><p><em>out</em>: outbound traffic</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;action&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>IPsec action</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>protect &lt;SA_idx&gt;</em>: the specified traffic is protected by SA rule
+with id SA_idx</p></li>
+<li><p><em>bypass</em>: the specified traffic is bypassed</p></li>
+<li><p><em>discard</em>: the specified traffic is discarded</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;priority&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Rule priority</p></li>
+<li><p>Optional: Yes, default priority 0 will be used</p></li>
+<li><p>Syntax: <em>pri &lt;id&gt;</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;src_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The source IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>src X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>src XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dst_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>dst X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>dst XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;proto&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The protocol start and end range</p></li>
+<li><p>Optional: yes, default range of 0 to 0 will be used</p></li>
+<li><p>Syntax: <em>proto X:Y</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;sport&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The source port start and end range</p></li>
+<li><p>Optional: yes, default range of 0 to 0 will be used</p></li>
+<li><p>Syntax: <em>sport X:Y</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dport&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination port start and end range</p></li>
+<li><p>Optional: yes, default range of 0 to 0 will be used</p></li>
+<li><p>Syntax: <em>dport X:Y</em></p></li>
+</ul>
+</div></blockquote>
+<p>Example SP rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sp ipv4 out esp protect 105 pri 1 dst 192.168.115.0/24 sport 0:65535 \</span>
+<span class="go">dport 0:65535</span>
+
+<span class="go">sp ipv6 in esp bypass pri 1 dst 0000:0000:0000:0000:5555:5555:\</span>
+<span class="go">0000:0000/96 sport 0:65535 dport 0:65535</span>
+</pre></div>
+</div>
+</section>
+<section id="sa-rule-syntax">
+<h4><span class="section-number">45.5.1.3. </span>SA rule syntax</h4>
+<p>The successfully parsed SA rules will be stored in an array table.</p>
+<p>The SA rule syntax is shown as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sa &lt;dir&gt; &lt;spi&gt; &lt;cipher_algo&gt; &lt;cipher_key&gt; &lt;auth_algo&gt; &lt;auth_key&gt;</span>
+<span class="go">&lt;mode&gt; &lt;src_ip&gt; &lt;dst_ip&gt; &lt;action_type&gt; &lt;port_id&gt; &lt;fallback&gt;</span>
+<span class="go">&lt;flow-direction&gt; &lt;port_id&gt; &lt;queue_id&gt; &lt;udp-encap&gt; &lt;reassembly_en&gt;</span>
+</pre></div>
+</div>
+<p>where each options means:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dir&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The traffic direction</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>in</em>: inbound traffic</p></li>
+<li><p><em>out</em>: outbound traffic</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;spi&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The SPI number</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Syntax: unsigned integer number</p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;cipher_algo&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Cipher algorithm</p></li>
+<li><p>Optional: Yes, unless &lt;aead_algo&gt; is not used</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>null</em>: NULL algorithm</p></li>
+<li><p><em>aes-128-cbc</em>: AES-CBC 128-bit algorithm</p></li>
+<li><p><em>aes-192-cbc</em>: AES-CBC 192-bit algorithm</p></li>
+<li><p><em>aes-256-cbc</em>: AES-CBC 256-bit algorithm</p></li>
+<li><p><em>aes-128-ctr</em>: AES-CTR 128-bit algorithm</p></li>
+<li><p><em>3des-cbc</em>: 3DES-CBC 192-bit algorithm</p></li>
+<li><p><em>des-cbc</em>: DES-CBC 64-bit algorithm</p></li>
+</ul>
+</li>
+<li><p>Syntax: <em>cipher_algo &lt;your algorithm&gt;</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;cipher_key&gt;</span></code></p>
+<blockquote>
+<div><ul>
+<li><p>Cipher key, NOT available when ‘null’ algorithm is used</p></li>
+<li><p>Optional: Yes, unless &lt;aead_algo&gt; is not used.
+Must be followed by &lt;cipher_algo&gt; option</p></li>
+<li><p>Syntax: Hexadecimal bytes (0x0-0xFF) concatenate by colon symbol ‘:’.
+The number of bytes should be as same as the specified cipher algorithm
+key size.</p>
+<p>For example: <em>cipher_key A1:B2:C3:D4:A1:B2:C3:D4:A1:B2:C3:D4:
+A1:B2:C3:D4</em></p>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;auth_algo&gt;</span></code></p>
+<blockquote>
+<div><ul>
+<li><p>Authentication algorithm</p></li>
+<li><p>Optional: Yes, unless &lt;aead_algo&gt; is not used</p></li>
+<li><p>Available options:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><em>null</em>: NULL algorithm</p></li>
+<li><p><em>sha1-hmac</em>: HMAC SHA1 algorithm</p></li>
+<li><p><em>sha256-hmac</em>: HMAC SHA256 algorithm</p></li>
+<li><p><em>aes-xcbc-mac</em>: AES XCBC MAC algorithm</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;auth_key&gt;</span></code></p>
+<blockquote>
+<div><ul>
+<li><p>Authentication key, NOT available when ‘null’ or ‘aes-128-gcm’ algorithm
+is used.</p></li>
+<li><p>Optional: Yes, unless &lt;aead_algo&gt; is not used.
+Must be followed by &lt;auth_algo&gt; option</p></li>
+<li><p>Syntax: Hexadecimal bytes (0x0-0xFF) concatenate by colon symbol ‘:’.
+The number of bytes should be as same as the specified authentication
+algorithm key size.</p>
+<p>For example: <em>auth_key A1:B2:C3:D4:A1:B2:C3:D4:A1:B2:C3:D4:A1:B2:C3:D4:
+A1:B2:C3:D4</em></p>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;aead_algo&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>AEAD algorithm</p></li>
+<li><p>Optional: Yes, unless &lt;cipher_algo&gt; and &lt;auth_algo&gt; are not used</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>aes-128-gcm</em>: AES-GCM 128-bit algorithm</p></li>
+<li><p><em>aes-192-gcm</em>: AES-GCM 192-bit algorithm</p></li>
+<li><p><em>aes-256-gcm</em>: AES-GCM 256-bit algorithm</p></li>
+</ul>
+</li>
+<li><p>Syntax: <em>cipher_algo &lt;your algorithm&gt;</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;aead_key&gt;</span></code></p>
+<blockquote>
+<div><ul>
+<li><p>Cipher key, NOT available when ‘null’ algorithm is used</p></li>
+<li><p>Optional: Yes, unless &lt;cipher_algo&gt; and &lt;auth_algo&gt; are not used.
+Must be followed by &lt;aead_algo&gt; option</p></li>
+<li><p>Syntax: Hexadecimal bytes (0x0-0xFF) concatenate by colon symbol ‘:’.
+Last 4 bytes of the provided key will be used as ‘salt’ and so, the
+number of bytes should be same as the sum of specified AEAD algorithm
+key size and salt size (4 bytes).</p>
+<p>For example: <em>aead_key A1:B2:C3:D4:A1:B2:C3:D4:A1:B2:C3:D4:
+A1:B2:C3:D4:A1:B2:C3:D4</em></p>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;mode&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The operation mode</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>ipv4-tunnel</em>: Tunnel mode for IPv4 packets</p></li>
+<li><p><em>ipv6-tunnel</em>: Tunnel mode for IPv6 packets</p></li>
+<li><p><em>transport</em>: transport mode</p></li>
+</ul>
+</li>
+<li><p>Syntax: mode XXX</p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;src_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The source IP address. This option is not available when
+transport mode is used</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>src X.X.X.X</em> for IPv4</p></li>
+<li><p><em>src XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dst_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination IP address. This option is not available when
+transport mode is used</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>dst X.X.X.X</em> for IPv4</p></li>
+<li><p><em>dst XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;type&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Action type to specify the security action. This option specify
+the SA to be performed with look aside protocol offload to HW
+accelerator or protocol offload on ethernet device or inline
+crypto processing on the ethernet device during transmission.</p></li>
+<li><p>Optional: Yes, default type <em>no-offload</em></p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>lookaside-protocol-offload</em>: look aside protocol offload to HW accelerator</p></li>
+<li><p><em>inline-protocol-offload</em>: inline protocol offload on ethernet device</p></li>
+<li><p><em>inline-crypto-offload</em>: inline crypto processing on ethernet device</p></li>
+<li><p><em>no-offload</em>: no offloading to hardware</p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;port_id&gt;</span></code></p>
+<ul class="simple">
+<li><p>Port/device ID of the ethernet/crypto accelerator for which the SA is
+configured. For <em>inline-crypto-offload</em> and <em>inline-protocol-offload</em>, this
+port will be used for routing. The routing table will not be referred in
+this case.</p></li>
+<li><p>Optional: No, if <em>type</em> is not <em>no-offload</em></p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>port_id X</em> X is a valid device number in decimal</p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;fallback&gt;</span></code></p>
+<ul>
+<li><p>Action type for ingress IPsec packets that inline processor failed to
+process. Only a combination of <em>inline-crypto-offload</em> as a primary
+session and <em>lookaside-none</em> as a fall-back session is supported at the
+moment.</p>
+<p>If used in conjunction with IPsec window, its width needs be increased
+due to different processing times of inline and lookaside modes which
+results in packet reordering.</p>
+</li>
+<li><p>Optional: Yes.</p></li>
+<li><p>Available options:</p>
+<ul class="simple">
+<li><p><em>lookaside-none</em>: use automatically chosen cryptodev to process packets</p></li>
+</ul>
+</li>
+<li><p>Syntax:</p>
+<ul class="simple">
+<li><p><em>fallback lookaside-none</em></p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;flow-direction&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Option for redirecting a specific inbound ipsec flow of a port to a specific
+queue of that port.</p></li>
+<li><p>Optional: Yes.</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>port_id</em>: Port ID of the NIC for which the SA is configured.</p></li>
+<li><p><em>queue_id</em>: Queue ID to which traffic should be redirected.</p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;udp-encap&gt;</span></code></p>
+<ul class="simple">
+<li><p>Option to enable IPsec UDP encapsulation for NAT Traversal.
+Only <em>lookaside-protocol-offload</em> and <em>inline-crypto-offload</em> modes are
+supported at the moment.</p></li>
+<li><p>Optional: Yes, it is disabled by default</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>udp-encap</em></p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;mss&gt;</span></code></p>
+<ul class="simple">
+<li><p>Maximum segment size for TSO offload, available for egress SAs only.</p></li>
+<li><p>Optional: Yes, TSO offload not set by default</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>mss N</em> N is the segment size in bytes</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;telemetry&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Option to enable per SA telemetry.
+Currently only supported with IPsec library path.</p></li>
+<li><p>Optional: Yes, it is disabled by default</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>telemetry</em></p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;esn&gt;</span></code></p>
+<ul class="simple">
+<li><p>Enable ESN and set the initial ESN value.</p></li>
+<li><p>Optional: Yes, ESN not enabled by default</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>esn N</em> N is the initial ESN value</p></li>
+</ul>
+</li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;reassembly_en&gt;</span></code></p>
+<ul class="simple">
+<li><p>Option to enable HW reassembly per SA.</p></li>
+<li><p>Optional: Yes, it is disabled by default</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>reassembly_en</em></p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p>Example SA rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sa out 5 cipher_algo null auth_algo null mode ipv4-tunnel \</span>
+<span class="go">src 172.16.1.5 dst 172.16.2.5</span>
+
+<span class="go">sa out 25 cipher_algo aes-128-cbc \</span>
+<span class="go">cipher_key c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3 \</span>
+<span class="go">auth_algo sha1-hmac \</span>
+<span class="go">auth_key c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3:c3 \</span>
+<span class="go">mode ipv6-tunnel \</span>
+<span class="go">src 1111:1111:1111:1111:1111:1111:1111:5555 \</span>
+<span class="go">dst 2222:2222:2222:2222:2222:2222:2222:5555</span>
+
+<span class="go">sa in 105 aead_algo aes-128-gcm \</span>
+<span class="go">aead_key de:ad:be:ef:de:ad:be:ef:de:ad:be:ef:de:ad:be:ef:de:ad:be:ef \</span>
+<span class="go">mode ipv4-tunnel src 172.16.2.5 dst 172.16.1.5</span>
+
+<span class="go">sa out 5 cipher_algo aes-128-cbc cipher_key 0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0 \</span>
+<span class="go">auth_algo sha1-hmac auth_key 0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0:0 \</span>
+<span class="go">mode ipv4-tunnel src 172.16.1.5 dst 172.16.2.5 \</span>
+<span class="go">type lookaside-protocol-offload port_id 4</span>
+
+<span class="go">sa in 35 aead_algo aes-128-gcm \</span>
+<span class="go">aead_key de:ad:be:ef:de:ad:be:ef:de:ad:be:ef:de:ad:be:ef:de:ad:be:ef \</span>
+<span class="go">mode ipv4-tunnel src 172.16.2.5 dst 172.16.1.5 \</span>
+<span class="go">type inline-crypto-offload port_id 0</span>
+
+<span class="go">sa in 117 cipher_algo null auth_algo null mode ipv4-tunnel src 172.16.2.7 \</span>
+<span class="go">dst 172.16.1.7 flow-direction 0 2</span>
+</pre></div>
+</div>
+</section>
+<section id="routing-rule-syntax">
+<h4><span class="section-number">45.5.1.4. </span>Routing rule syntax</h4>
+<p>The Routing rule syntax is shown as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">rt &lt;ip_ver&gt; &lt;src_ip&gt; &lt;dst_ip&gt; &lt;port&gt;</span>
+</pre></div>
+</div>
+<p>where each options means:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;ip_ver&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>IP protocol version</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>ipv4</em>: IP protocol version 4</p></li>
+<li><p><em>ipv6</em>: IP protocol version 6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;src_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The source IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>src X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>src XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dst_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>dst X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>dst XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;port&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The traffic output port id</p></li>
+<li><p>Optional: yes, default output port 0 will be used</p></li>
+<li><p>Syntax: <em>port X</em></p></li>
+</ul>
+</div></blockquote>
+<p>Example SP rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">rt ipv4 dst 172.16.1.5/32 port 0</span>
+
+<span class="go">rt ipv6 dst 1111:1111:1111:1111:1111:1111:1111:5555/116 port 0</span>
+</pre></div>
+</div>
+</section>
+<section id="flow-rule-syntax">
+<h4><span class="section-number">45.5.1.5. </span>Flow rule syntax</h4>
+<p>Flow rule enables the usage of hardware classification capabilities to match specific
+ingress traffic and redirect the packets to the specified queue. This feature is
+optional and relies on hardware <code class="docutils literal notranslate"><span class="pre">rte_flow</span></code> support.</p>
+<p>The flow rule syntax is shown as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">flow &lt;mark&gt; &lt;eth&gt; &lt;ip_ver&gt; &lt;src_ip&gt; &lt;dst_ip&gt; &lt;port&gt; &lt;queue&gt; \</span>
+<span class="go">     &lt;count&gt; &lt;security&gt; &lt;set_mark&gt;</span>
+</pre></div>
+</div>
+<p>where each options means:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;mark&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set RTE_FLOW_ITEM_TYPE_MARK pattern item in the flow rule with the given
+mark value. This option can be used to match an arbitrary integer value
+which was set using the RTE_FLOW_ACTION_TYPE_MARK action (see <code class="docutils literal notranslate"><span class="pre">&lt;set_mark&gt;</span></code>)
+in a previously matched rule.</p></li>
+<li><p>Optional: Yes, this pattern is not set by default.</p></li>
+<li><p>Syntax: <em>mark X</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;eth&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set RTE_FLOW_ITEM_TYPE_ETH pattern item. This matches all ethernet packets.</p></li>
+<li><p>Optional: Yes, this pattern is not set by default.</p></li>
+<li><p>Syntax: <em>eth</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;ip_ver&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>IP protocol version</p></li>
+<li><p>Optional: Yes, this pattern is not set by default.</p></li>
+<li><p>Available options:</p>
+<ul>
+<li><p><em>ipv4</em>: IP protocol version 4</p></li>
+<li><p><em>ipv6</em>: IP protocol version 6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;src_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The source IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>src X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>src XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dst_ip&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination IP address and mask</p></li>
+<li><p>Optional: Yes, default address 0.0.0.0 and mask of 0 will be used</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p><em>dst X.X.X.X/Y</em> for IPv4</p></li>
+<li><p><em>dst XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX:XXXX/Y</em> for IPv6</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;port&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The traffic input port id</p></li>
+<li><p>Optional: yes, default input port 0 will be used</p></li>
+<li><p>Syntax: <em>port X</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;queue&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The traffic input queue id</p></li>
+<li><p>Optional: yes, default input queue 0 will be used</p></li>
+<li><p>Syntax: <em>queue X</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;count&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set RTE_FLOW_ACTION_TYPE_COUNT action.</p></li>
+<li><p>Optional: yes, this action is not set by default.</p></li>
+<li><p>Syntax: <em>count</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;security&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set RTE_FLOW_ITEM_TYPE_ESP pattern and RTE_FLOW_ACTION_TYPE_SECURITY action.</p></li>
+<li><p>Optional: yes, this pattern and action are not set by default.</p></li>
+<li><p>Syntax: <em>security</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;set_mark&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Set RTE_FLOW_ACTION_TYPE_MARK action in the flow rule with the given mark
+value. This option can be used to set the given integer value(mark) to
+packets and set RTE_MBUF_F_RX_FDIR and RTE_MBUF_F_RX_FDIR_ID mbuf flags.</p></li>
+<li><p>Optional: yes, this action is not set by default.</p></li>
+<li><p>Syntax: <em>set_mark X</em></p></li>
+</ul>
+</div></blockquote>
+<p>Example flow rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">flow ipv4 dst 172.16.1.5/32 port 0 queue 0</span>
+
+<span class="go">flow ipv6 dst 1111:1111:1111:1111:1111:1111:1111:5555/116 port 1 queue 0</span>
+
+<span class="go">flow mark 123 ipv4 dst 192.168.0.0/16 port 0 queue 0 count</span>
+
+<span class="go">flow eth ipv4 dst 192.168.0.0/16 port 0 queue 0 count</span>
+
+<span class="go">flow ipv4 dst 192.168.0.0/16 port 0 queue 0 count</span>
+
+<span class="go">flow ipv4 dst 192.168.0.0/16 port 0 queue 0</span>
+
+<span class="go">flow port 0 security set_mark 123</span>
+
+<span class="go">flow ipv4 dst 1.1.0.0/16 port 0 count set_mark 123 security</span>
+</pre></div>
+</div>
+</section>
+<section id="neighbour-rule-syntax">
+<h4><span class="section-number">45.5.1.6. </span>Neighbour rule syntax</h4>
+<p>The Neighbour rule syntax is shown as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">neigh &lt;port&gt; &lt;dst_mac&gt;</span>
+</pre></div>
+</div>
+<p>where each options means:</p>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;port&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The output port id</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Syntax: <em>port X</em></p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">&lt;dst_mac&gt;</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The destination ethernet address to use for that port</p></li>
+<li><p>Optional: No</p></li>
+<li><p>Syntax:</p>
+<ul>
+<li><p>XX:XX:XX:XX:XX:XX</p></li>
+</ul>
+</li>
+</ul>
+</div></blockquote>
+<p>Example Neighbour rules:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">neigh port 0 DE:AD:BE:EF:01:02</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="test-directory">
+<h2><span class="section-number">45.6. </span>Test directory</h2>
+<p>The test directory contains scripts for testing the various encryption
+algorithms.</p>
+<p>The purpose of the scripts is to automate ipsec-secgw testing
+using another system running linux as a DUT.</p>
+<p>The user must setup the following environment variables:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SGW_PATH</span></code>: path to the ipsec-secgw binary to test.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">REMOTE_HOST</span></code>: IP address/hostname of the DUT.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">REMOTE_IFACE</span></code>: interface name for the test-port on the DUT.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ETH_DEV</span></code>: ethernet device to be used on the SUT by DPDK (‘-a &lt;pci-id&gt;’)</p></li>
+</ul>
+<p>Also the user can optionally setup:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">SGW_LCORE</span></code>: lcore to run ipsec-secgw on (default value is 0)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CRYPTO_DEV</span></code>: crypto device to be used (‘-a &lt;pci-id&gt;’). If none specified
+appropriate vdevs will be created by the script</p></li>
+</ul>
+<p>Scripts can be used for multiple test scenarios. To check all available
+options run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/bin/bash run_test.sh -h</span>
+</pre></div>
+</div>
+<p>Note that most of the tests require the appropriate crypto PMD/device to be
+available.</p>
+<section id="server-configuration">
+<h3><span class="section-number">45.6.1. </span>Server configuration</h3>
+<p>Two servers are required for the tests, SUT and DUT.</p>
+<p>Make sure the user from the SUT can ssh to the DUT without entering the password.
+To enable this feature keys must be setup on the DUT.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ssh-keygen</span></code> will make a private &amp; public key pair on the SUT.</p>
+<p><code class="docutils literal notranslate"><span class="pre">ssh-copy-id</span></code> &lt;user name&gt;&#64;&lt;target host name&gt; on the SUT will copy the public
+key to the DUT. It will ask for credentials so that it can upload the public key.</p>
+<p>The SUT and DUT are connected through at least 2 NIC ports.</p>
+<p>One NIC port is expected to be managed by linux on both machines and will be
+used as a control path.</p>
+<p>The second NIC port (test-port) should be bound to DPDK on the SUT, and should
+be managed by linux on the DUT.</p>
+<p>The script starts <code class="docutils literal notranslate"><span class="pre">ipsec-secgw</span></code> with 2 NIC devices: <code class="docutils literal notranslate"><span class="pre">test-port</span></code> and
+<code class="docutils literal notranslate"><span class="pre">tap</span> <span class="pre">vdev</span></code>.</p>
+<p>It then configures the local tap interface and the remote interface and IPsec
+policies in the following way:</p>
+<p>Traffic going over the test-port in both directions has to be protected by IPsec.</p>
+<p>Traffic going over the TAP port in both directions does not have to be protected.</p>
+<p>i.e:</p>
+<p>DUT OS(NIC1)–(IPsec)–&gt;(NIC1)ipsec-secgw(TAP)–(plain)–&gt;(TAP)SUT OS</p>
+<p>SUT OS(TAP)–(plain)–&gt;(TAP)psec-secgw(NIC1)–(IPsec)–&gt;(NIC1)DUT OS</p>
+<p>It then tries to perform some data transfer using the scheme described above.</p>
+</section>
+<section id="usage">
+<h3><span class="section-number">45.6.2. </span>Usage</h3>
+<p>In the ipsec-secgw/test directory run</p>
+<p>/bin/bash run_test.sh &lt;options&gt; &lt;ipsec_mode&gt;</p>
+<p>Available options:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-4</span></code> Perform tests with use of IPv4. One or both [-46] options needs to be
+selected.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-6</span></code> Perform tests with use of IPv6. One or both [-46] options needs to be
+selected.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-m</span></code> Add IPSec tunnel mixed IP version tests - outer IP version different
+than inner. Inner IP version will match selected option [-46].</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-i</span></code> Run tests in inline mode. Regular tests will not be invoked.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-f</span></code> Run tests for fallback mechanism. Regular tests will not be invoked.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-l</span></code> Run tests in legacy mode only. It cannot be used with options [-fsc].
+On default library mode is used.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-s</span></code> Run all tests with reassembly support. On default only tests for
+fallback mechanism use reassembly support.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c</span></code> Run tests with use of cpu-crypto. For inline tests it will not be
+applied. On default lookaside-none is used.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-p</span></code> Perform packet validation tests. Option [-46] is not required.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-h</span></code> Show usage.</p></li>
+</ul>
+<p>If &lt;ipsec_mode&gt; is specified, only tests for that mode will be invoked. For the
+list of available modes please refer to run_test.sh.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="fips_validation.html" title="previous chapter"><span class="section-number">44. </span>Federal Information Processing Standards (FIPS) CryptoDev Validation</a></li>
+      <li>Next: <a href="bbdev_app.html" title="next chapter"><span class="section-number">46. </span>Loop-back Sample Application using Baseband Device (bbdev)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/ipsec_secgw.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

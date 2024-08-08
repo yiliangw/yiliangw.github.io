@@ -1,0 +1,308 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>73. Glossary &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="HowTo Guides" href="../howto/index.html" />
+    <link rel="prev" title="72. Running AddressSanitizer" href="asan.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="glossary">
+<h1><span class="section-number">73. </span>Glossary</h1>
+<dl class="simple">
+<dt>ACL</dt><dd><p>Access Control List</p>
+</dd>
+<dt>API</dt><dd><p>Application Programming Interface</p>
+</dd>
+<dt>ASLR</dt><dd><p>Linux* kernel Address-Space Layout Randomization</p>
+</dd>
+<dt>BSD</dt><dd><p>Berkeley Software Distribution</p>
+</dd>
+<dt>Clr</dt><dd><p>Clear</p>
+</dd>
+<dt>CIDR</dt><dd><p>Classless Inter-Domain Routing</p>
+</dd>
+<dt>Control Plane</dt><dd><p>The control plane is concerned with the routing of packets and with
+providing a start or end point.</p>
+</dd>
+<dt>Core</dt><dd><p>A core may include several lcores or threads if the processor supports
+hyperthreading.</p>
+</dd>
+<dt>Core Components</dt><dd><p>A set of libraries provided by the DPDK, including eal, ring, mempool,
+mbuf, timers, and so on.</p>
+</dd>
+<dt>CPU</dt><dd><p>Central Processing Unit</p>
+</dd>
+<dt>CRC</dt><dd><p>Cyclic Redundancy Check</p>
+</dd>
+<dt>Data Plane</dt><dd><p>In contrast to the control plane, the data plane in a network architecture
+are the layers involved when forwarding packets.  These layers must be
+highly optimized to achieve good performance.</p>
+</dd>
+<dt>DIMM</dt><dd><p>Dual In-line Memory Module</p>
+</dd>
+<dt>Doxygen</dt><dd><p>A documentation generator used in the DPDK to generate the API reference.</p>
+</dd>
+<dt>DPDK</dt><dd><p>Data Plane Development Kit</p>
+</dd>
+<dt>DRAM</dt><dd><p>Dynamic Random Access Memory</p>
+</dd>
+<dt>EAL</dt><dd><p>The Environment Abstraction Layer (EAL) provides a generic interface that
+hides the environment specifics from the applications and libraries.  The
+services expected from the EAL are: development kit loading and launching,
+core affinity/ assignment procedures, system memory allocation/description,
+PCI bus access, inter-partition communication.</p>
+</dd>
+<dt>FIFO</dt><dd><p>First In First Out</p>
+</dd>
+<dt>FPGA</dt><dd><p>Field Programmable Gate Array</p>
+</dd>
+<dt>GbE</dt><dd><p>Gigabit Ethernet</p>
+</dd>
+<dt>HW</dt><dd><p>Hardware</p>
+</dd>
+<dt>HPET</dt><dd><p>High Precision Event Timer; a hardware timer that provides a precise time
+reference on x86 platforms.</p>
+</dd>
+<dt>ID</dt><dd><p>Identifier</p>
+</dd>
+<dt>IOCTL</dt><dd><p>Input/Output Control</p>
+</dd>
+<dt>I/O</dt><dd><p>Input/Output</p>
+</dd>
+<dt>IP</dt><dd><p>Internet Protocol</p>
+</dd>
+<dt>IPv4</dt><dd><p>Internet Protocol version 4</p>
+</dd>
+<dt>IPv6</dt><dd><p>Internet Protocol version 6</p>
+</dd>
+<dt>lcore</dt><dd><p>A logical execution unit of the processor, sometimes called a <em>hardware
+thread</em>.</p>
+</dd>
+<dt>L1</dt><dd><p>Layer 1</p>
+</dd>
+<dt>L2</dt><dd><p>Layer 2</p>
+</dd>
+<dt>L3</dt><dd><p>Layer 3</p>
+</dd>
+<dt>L4</dt><dd><p>Layer 4</p>
+</dd>
+<dt>LAN</dt><dd><p>Local Area Network</p>
+</dd>
+<dt>LPM</dt><dd><p>Longest Prefix Match</p>
+</dd>
+<dt>main lcore</dt><dd><p>The execution unit that executes the main() function and that launches
+other lcores.</p>
+</dd>
+<dt>master lcore</dt><dd><p>Deprecated name for <em>main lcore</em>. No longer used.</p>
+</dd>
+<dt>mbuf</dt><dd><p>An mbuf is a data structure used internally to carry messages (mainly
+network packets).  The name is derived from BSD stacks.  To understand the
+concepts of packet buffers or mbuf, refer to <em>TCP/IP Illustrated, Volume 2:
+The Implementation</em>.</p>
+</dd>
+<dt>MESI</dt><dd><p>Modified Exclusive Shared Invalid (CPU cache coherency protocol)</p>
+</dd>
+<dt>MTU</dt><dd><p>Maximum Transfer Unit</p>
+</dd>
+<dt>NIC</dt><dd><p>Network Interface Card</p>
+</dd>
+<dt>OOO</dt><dd><p>Out Of Order (execution of instructions within the CPU pipeline)</p>
+</dd>
+<dt>NUMA</dt><dd><p>Non-uniform Memory Access</p>
+</dd>
+<dt>PCI</dt><dd><p>Peripheral Connect Interface</p>
+</dd>
+<dt>PHY</dt><dd><p>An abbreviation for the physical layer of the OSI model.</p>
+</dd>
+<dt>PIE</dt><dd><p>Proportional Integral Controller Enhanced (RFC8033)</p>
+</dd>
+<dt>pktmbuf</dt><dd><p>An <em>mbuf</em> carrying a network packet.</p>
+</dd>
+<dt>PMD</dt><dd><p>Poll Mode Driver</p>
+</dd>
+<dt>QoS</dt><dd><p>Quality of Service</p>
+</dd>
+<dt>RCU</dt><dd><p>Read-Copy-Update algorithm, an alternative to simple rwlocks.</p>
+</dd>
+<dt>Rd</dt><dd><p>Read</p>
+</dd>
+<dt>RED</dt><dd><p>Random Early Detection</p>
+</dd>
+<dt>RSS</dt><dd><p>Receive Side Scaling</p>
+</dd>
+<dt>RTE</dt><dd><p>Run Time Environment. Provides a fast and simple framework for fast packet
+processing, in a lightweight environment as a Linux* application and using
+Poll Mode Drivers (PMDs) to increase speed.</p>
+</dd>
+<dt>Rx</dt><dd><p>Reception</p>
+</dd>
+<dt>Slave lcore</dt><dd><p>Deprecated name for <em>worker lcore</em>. No longer used.</p>
+</dd>
+<dt>Socket</dt><dd><p>A physical CPU, that includes several <em>cores</em>.</p>
+</dd>
+<dt>SLA</dt><dd><p>Service Level Agreement</p>
+</dd>
+<dt>srTCM</dt><dd><p>Single Rate Three Color Marking</p>
+</dd>
+<dt>SRTD</dt><dd><p>Scheduler Round Trip Delay</p>
+</dd>
+<dt>SW</dt><dd><p>Software</p>
+</dd>
+<dt>Target</dt><dd><p>In the DPDK, the target is a combination of architecture, machine,
+executive environment and toolchain.  For example:
+i686-native-linux-gcc.</p>
+</dd>
+<dt>TCP</dt><dd><p>Transmission Control Protocol</p>
+</dd>
+<dt>TC</dt><dd><p>Traffic Class</p>
+</dd>
+<dt>TLB</dt><dd><p>Translation Lookaside Buffer</p>
+</dd>
+<dt>TLS</dt><dd><p>Thread Local Storage</p>
+</dd>
+<dt>trTCM</dt><dd><p>Two Rate Three Color Marking</p>
+</dd>
+<dt>TSC</dt><dd><p>Time Stamp Counter</p>
+</dd>
+<dt>Tx</dt><dd><p>Transmission</p>
+</dd>
+<dt>TUN/TAP</dt><dd><p>TUN and TAP are virtual network kernel devices.</p>
+</dd>
+<dt>VLAN</dt><dd><p>Virtual Local Area Network</p>
+</dd>
+<dt>Wr</dt><dd><p>Write</p>
+</dd>
+<dt>Worker lcore</dt><dd><p>Any <em>lcore</em> that is not the <em>main lcore</em>.</p>
+</dd>
+<dt>WRED</dt><dd><p>Weighted Random Early Detection</p>
+</dd>
+<dt>WRR</dt><dd><p>Weighted Round Robin</p>
+</dd>
+</dl>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="asan.html" title="previous chapter"><span class="section-number">72. </span>Running AddressSanitizer</a></li>
+      <li>Next: <a href="../howto/index.html" title="next chapter">HowTo Guides</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/glossary.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,272 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>11. DPDK Telemetry User Guide &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="12. Debug &amp; Troubleshoot guide" href="debug_troubleshoot.html" />
+    <link rel="prev" title="10. DPDK packet capture libraries and tools" href="packet_capture_framework.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-telemetry-user-guide">
+<h1><span class="section-number">11. </span>DPDK Telemetry User Guide</h1>
+<p>The Telemetry library provides users with the ability to query DPDK for
+telemetry information, currently including information such as ethdev stats,
+ethdev port list, and eal parameters.</p>
+<section id="telemetry-interface">
+<h2><span class="section-number">11.1. </span>Telemetry Interface</h2>
+<p>The <a class="reference internal" href="../prog_guide/telemetry_lib.html"><span class="doc">Telemetry Library</span></a> opens a socket with path
+<em>&lt;runtime_directory&gt;/dpdk_telemetry.&lt;version&gt;</em>. The version represents the
+telemetry version, the latest is v2. For example, a client would connect to a
+socket with path  <em>/var/run/dpdk/*/dpdk_telemetry.v2</em> (when the primary process
+is run by a root user).</p>
+</section>
+<section id="telemetry-initialization">
+<h2><span class="section-number">11.2. </span>Telemetry Initialization</h2>
+<p>The library is enabled by default, however an EAL flag to enable the library
+exists, to provide backward compatibility for the previous telemetry library
+interface:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--telemetry
+</pre></div>
+</div>
+<p>A flag exists to disable Telemetry also:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--no-telemetry
+</pre></div>
+</div>
+</section>
+<section id="running-telemetry">
+<h2><span class="section-number">11.3. </span>Running Telemetry</h2>
+<p>The following steps show how to run an application with telemetry support,
+and query information using the telemetry client python script.</p>
+<ol class="arabic">
+<li><p>Launch testpmd as the primary application with telemetry:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./app/dpdk-testpmd
+</pre></div>
+</div>
+</li>
+<li><p>Launch the telemetry client script:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./usertools/dpdk-telemetry.py
+</pre></div>
+</div>
+</li>
+<li><p>When connected, the script displays the following, waiting for user input:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Connecting to /var/run/dpdk/rte/dpdk_telemetry.v2
+{&quot;version&quot;: &quot;DPDK 20.05.0-rc2&quot;, &quot;pid&quot;: 60285, &quot;max_output_len&quot;: 16384}
+--&gt;
+</pre></div>
+</div>
+</li>
+<li><p>The user can now input commands to send across the socket, and receive the
+response. Some available commands are shown below.</p>
+<ul>
+<li><p>List all commands:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /
+{&quot;/&quot;: [&quot;/&quot;, &quot;/eal/app_params&quot;, &quot;/eal/params&quot;, &quot;/ethdev/list&quot;,
+&quot;/ethdev/link_status&quot;, &quot;/ethdev/xstats&quot;, &quot;/help&quot;, &quot;/info&quot;]}
+</pre></div>
+</div>
+</li>
+<li><p>Get the list of ethdev ports:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /ethdev/list
+{&quot;/ethdev/list&quot;: [0, 1]}
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For commands that expect a parameter, use “,” to separate the command
+and parameter. See examples below.</p>
+</div>
+<ul>
+<li><p>Get extended statistics for an ethdev port:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /ethdev/xstats,0
+{&quot;/ethdev/xstats&quot;: {&quot;rx_good_packets&quot;: 0, &quot;tx_good_packets&quot;: 0,
+&quot;rx_good_bytes&quot;: 0, &quot;tx_good_bytes&quot;: 0, &quot;rx_missed_errors&quot;: 0,
+...
+&quot;tx_priority7_xon_to_xoff_packets&quot;: 0}}
+</pre></div>
+</div>
+</li>
+<li><p>Get the help text for a command. This will indicate what parameters are
+required. Pass the command as a parameter:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /help,/ethdev/xstats
+{&quot;/help&quot;: {&quot;/ethdev/xstats&quot;: &quot;Returns the extended stats for a port.
+Parameters: int port_id&quot;}}
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="connecting-to-different-dpdk-processes">
+<h2><span class="section-number">11.4. </span>Connecting to Different DPDK Processes</h2>
+<p>When multiple DPDK process instances are running on a system, the user will
+naturally wish to be able to select the instance to which the connection is
+being made. The method to select the instance depends on how the individual
+instances are run:</p>
+<ul>
+<li><p>For DPDK processes run using a non-default file-prefix,
+i.e. using the <cite>–file-prefix</cite> EAL option flag,
+the file-prefix for the process should be passed via the <cite>-f</cite> or <cite>–file-prefix</cite> script flag.</p>
+<p>For example, to connect to testpmd run as:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./build/app/dpdk-testpmd -l 2,3 --file-prefix=&quot;tpmd&quot;
+</pre></div>
+</div>
+<p>One would use the telemetry script command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./usertools/dpdk-telemetry -f &quot;tpmd&quot;
+</pre></div>
+</div>
+<p>To list all running telemetry-enabled file-prefixes, the <code class="docutils literal notranslate"><span class="pre">-l</span></code> or <code class="docutils literal notranslate"><span class="pre">--list</span></code> flags can be used:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./usertools/dpdk-telemetry -l
+</pre></div>
+</div>
+</li>
+<li><p>For the case where multiple processes are run using the <cite>–in-memory</cite> EAL flag,
+but no <cite>–file-prefix</cite> flag, or the same <cite>–file-prefix</cite> flag,
+those processes will all share the same runtime directory.
+In this case,
+each process after the first will add an increasing count suffix to the telemetry socket name,
+with each one taking the first available free socket name.
+This suffix count can be passed to the telemetry script using the <cite>-i</cite> or <cite>–instance</cite> flag.</p>
+<p>For example, if the following two applications are run in separate terminals:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./build/app/dpdk-testpmd -l 2,3 --in-memory    # will use socket &quot;dpdk_telemetry.v2&quot;
+
+$ ./build/app/test/dpdk-test -l 4,5 --in-memory  # will use &quot;dpdk_telemetry.v2:1&quot;
+</pre></div>
+</div>
+<p>The following telemetry script commands would allow one to connect to each binary:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./usertools/dpdk-telemetry.py       # will connect to testpmd
+
+$ ./usertools/dpdk-telemetry.py -i 1  # will connect to test binary
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="packet_capture_framework.html" title="previous chapter"><span class="section-number">10. </span>DPDK packet capture libraries and tools</a></li>
+      <li>Next: <a href="debug_troubleshoot.html" title="next chapter"><span class="section-number">12. </span>Debug &amp; Troubleshoot guide</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/telemetry.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

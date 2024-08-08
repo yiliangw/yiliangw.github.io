@@ -1,0 +1,383 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>17. L2 Forwarding Eventdev Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="18. L2 Forwarding Sample Application with Cache Allocation Technology (CAT)" href="l2_forward_cat.html" />
+    <link rel="prev" title="16. L2 Forwarding Sample Application (in Real and Virtualized Environments)" href="l2_forward_real_virtual.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="l2-forwarding-eventdev-sample-application">
+<span id="l2-fwd-event-app"></span><h1><span class="section-number">17. </span>L2 Forwarding Eventdev Sample Application</h1>
+<p>The L2 Forwarding eventdev sample application is a simple example of packet
+processing using the Data Plane Development Kit (DPDK) to demonstrate usage of
+poll and event mode packet I/O mechanism.</p>
+<section id="overview">
+<h2><span class="section-number">17.1. </span>Overview</h2>
+<p>The L2 Forwarding eventdev sample application, performs L2 forwarding for each
+packet that is received on an RX_PORT. The destination port is the adjacent port
+from the enabled portmask, that is, if the first four ports are enabled (portmask=0x0f),
+ports 1 and 2 forward into each other, and ports 3 and 4 forward into each other.
+Also, if MAC addresses updating is enabled, the MAC addresses are affected as follows:</p>
+<ul class="simple">
+<li><p>The source MAC address is replaced by the TX_PORT MAC address</p></li>
+<li><p>The destination MAC address is replaced by  02:00:00:00:00:TX_PORT_ID</p></li>
+</ul>
+<p>Application receives packets from RX_PORT using below mentioned methods:</p>
+<ul class="simple">
+<li><p>Poll mode</p></li>
+<li><p>Eventdev mode (default)</p></li>
+</ul>
+<p>This application can be used to benchmark performance using a traffic-generator,
+as shown in the <a class="reference internal" href="#figure-l2fwd-event-benchmark-setup"><span class="std std-numref">Fig. 17.1</span></a>.</p>
+<figure class="align-default" id="id1">
+<span id="figure-l2fwd-event-benchmark-setup"></span><img alt="../_images/l2_fwd_benchmark_setup.svg" src="../_images/l2_fwd_benchmark_setup.svg" /><figcaption>
+<p><span class="caption-number">Fig. 17.1 </span><span class="caption-text">Performance Benchmark Setup (Basic Environment)</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">17.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">l2fwd-event</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">17.3. </span>Running the Application</h2>
+<p>The application requires a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-event [EAL options] -- -p PORTMASK</span>
+<span class="go">                                                    [-q NQ]</span>
+<span class="go">                                                    [--[no-]mac-updating]</span>
+<span class="go">                                                    [--mode=MODE]</span>
+<span class="go">                                                    [--eventq-sched=SCHED_MODE]</span>
+<span class="go">                                                    [--event-vector [--event-vector-size SIZE] [--event-vector-tmo NS]]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul class="simple">
+<li><p>p PORTMASK: A hexadecimal bitmask of the ports to configure</p></li>
+<li><p>q NQ: A number of queues (=ports) per lcore (default is 1)</p></li>
+<li><p>–[no-]mac-updating: Enable or disable MAC addresses updating (enabled by default).</p></li>
+<li><p>–mode=MODE: Packet transfer mode for I/O, poll or eventdev. Eventdev by default.</p></li>
+<li><p>–eventq-sched=SCHED_MODE: Event queue schedule mode, Ordered, Atomic or Parallel. Atomic by default.</p></li>
+<li><p>–config: Configure forwarding port pair mapping. Alternate port pairs by default.</p></li>
+<li><p>–event-vector: Enable event vectorization. Only valid if –mode=eventdev.</p></li>
+<li><p>–event-vector-size: Max vector size if event vectorization is enabled.</p></li>
+<li><p>–event-vector-tmo: Max timeout to form vector in nanoseconds if event vectorization is enabled.</p></li>
+</ul>
+<p>Sample usage commands are given below to run the application into different mode:</p>
+<p>Poll mode with 4 lcores, 16 ports and 8 RX queues per lcore and MAC address updating enabled,
+issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-event -l 0-3 -n 4 -- -q 8 -p ffff --mode=poll</span>
+</pre></div>
+</div>
+<p>Eventdev mode with 4 lcores, 16 ports , sched method ordered and MAC address updating enabled,
+issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-event -l 0-3 -n 4 -- -p ffff --eventq-sched=ordered</span>
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-event -l 0-3 -n 4 -- -q 8 -p ffff --mode=eventdev --eventq-sched=ordered</span>
+</pre></div>
+</div>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running
+applications and the Environment Abstraction Layer (EAL) options.</p>
+<p>To run application with S/W scheduler, it uses following DPDK services:</p>
+<ul class="simple">
+<li><p>Software scheduler</p></li>
+<li><p>Rx adapter service function</p></li>
+<li><p>Tx adapter service function</p></li>
+</ul>
+<p>Application needs service cores to run above mentioned services. Service cores
+must be provided as EAL parameters along with the –vdev=event_sw0 to enable S/W
+scheduler. Following is the sample command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-event -l 0-7 -s 0-3 -n 4 --vdev event_sw0 -- -q 8 -p ffff --mode=eventdev --eventq-sched=ordered</span>
+</pre></div>
+</div>
+</section>
+<section id="explanation">
+<h2><span class="section-number">17.4. </span>Explanation</h2>
+<p>The following sections provide some explanation of the code.</p>
+<section id="command-line-arguments">
+<span id="l2-fwd-event-app-cmd-arguments"></span><h3><span class="section-number">17.4.1. </span>Command Line Arguments</h3>
+<p>The L2 Forwarding eventdev sample application takes specific parameters,
+in addition to Environment Abstraction Layer (EAL) arguments.
+The preferred way to parse parameters is to use the getopt() function,
+since it is part of a well-defined and portable library.</p>
+<p>The parsing of arguments is done in the <strong>l2fwd_parse_args()</strong> function for non
+eventdev parameters and in <strong>parse_eventdev_args()</strong> for eventdev parameters.
+The method of argument parsing is not described here. Refer to the
+<em>glibc getopt(3)</em> man page for details.</p>
+<p>EAL arguments are parsed first, then application-specific arguments.
+This is done at the beginning of the main() function and eventdev parameters
+are parsed in eventdev_resource_setup() function during eventdev setup:</p>
+</section>
+<section id="mbuf-pool-initialization">
+<h3><span class="section-number">17.4.2. </span>Mbuf Pool Initialization</h3>
+<p>Once the arguments are parsed, the mbuf pool is created.
+The mbuf pool contains a set of mbuf objects that will be used by the driver
+and the application to store network packet data:</p>
+<p>The rte_mempool is a generic structure used to handle pools of objects.
+In this case, it is necessary to create a pool that will be used by the driver.
+The number of allocated pkt mbufs is NB_MBUF, with a data room size of
+RTE_MBUF_DEFAULT_BUF_SIZE each.
+A per-lcore cache of 32 mbufs is kept.
+The memory is allocated in NUMA socket 0,
+but it is possible to extend this code to allocate one mbuf pool per socket.</p>
+<p>The rte_pktmbuf_pool_create() function uses the default mbuf pool and mbuf
+initializers, respectively rte_pktmbuf_pool_init() and rte_pktmbuf_init().
+An advanced application may want to use the mempool API to create the
+mbuf pool with more control.</p>
+</section>
+<section id="driver-initialization">
+<span id="l2-fwd-event-app-drv-init"></span><h3><span class="section-number">17.4.3. </span>Driver Initialization</h3>
+<p>The main part of the code in the main() function relates to the initialization
+of the driver. To fully understand this code, it is recommended to study the
+chapters that related to the Poll Mode and Event mode Driver in the
+<em>DPDK Programmer’s Guide</em> - Rel 1.4 EAR and the <em>DPDK API Reference</em>.</p>
+<p>The next step is to configure the RX and TX queues. For each port, there is only
+one RX queue (only one lcore is able to poll a given port). The number of TX
+queues depends on the number of available lcores. The rte_eth_dev_configure()
+function is used to configure the number of queues for a port:</p>
+</section>
+<section id="rx-queue-initialization">
+<h3><span class="section-number">17.4.4. </span>RX Queue Initialization</h3>
+<p>The application uses one lcore to poll one or several ports, depending on the -q
+option, which specifies the number of queues per lcore.</p>
+<p>For example, if the user specifies -q 4, the application is able to poll four
+ports with one lcore. If there are 16 ports on the target (and if the portmask
+argument is -p ffff ), the application will need four lcores to poll all the
+ports.</p>
+<p>The list of queues that must be polled for a given lcore is stored in a private
+structure called struct lcore_queue_conf.</p>
+<p>The values n_rx_port and rx_port_list[] are used in the main packet processing
+loop (see <a class="reference internal" href="#l2-fwd-event-app-rx-tx-packets"><span class="std std-ref">Receive, Process and Transmit Packets</span></a>).</p>
+</section>
+<section id="tx-queue-initialization">
+<span id="l2-fwd-event-app-tx-init"></span><h3><span class="section-number">17.4.5. </span>TX Queue Initialization</h3>
+<p>Each lcore should be able to transmit on any port. For every port, a single TX
+queue is initialized.</p>
+<p>To configure eventdev support, application setups following components:</p>
+<ul class="simple">
+<li><p>Event dev</p></li>
+<li><p>Event queue</p></li>
+<li><p>Event Port</p></li>
+<li><p>Rx/Tx adapters</p></li>
+<li><p>Ethernet ports</p></li>
+</ul>
+</section>
+<section id="event-device-initialization">
+<span id="l2-fwd-event-app-event-dev-init"></span><h3><span class="section-number">17.4.6. </span>Event device Initialization</h3>
+<p>Application can use either H/W or S/W based event device scheduler
+implementation and supports single instance of event device. It configures event
+device as per below configuration</p>
+<p>In case of S/W scheduler, application runs eventdev scheduler service on service
+core. Application retrieves service id and finds the best possible service core to
+run S/W scheduler.</p>
+</section>
+<section id="event-queue-initialization">
+<h3><span class="section-number">17.4.7. </span>Event queue Initialization</h3>
+<p>Each Ethernet device is assigned a dedicated event queue which will be linked
+to all available event ports i.e. each lcore can dequeue packets from any of the
+Ethernet ports.</p>
+<p>In case of S/W scheduler, an extra event queue is created which will be used for
+Tx adapter service function for enqueue operation.</p>
+</section>
+<section id="event-port-initialization">
+<span id="l2-fwd-app-event-port-init"></span><h3><span class="section-number">17.4.8. </span>Event port Initialization</h3>
+<p>Each worker thread is assigned a dedicated event port for enq/deq operations
+to/from an event device. All event ports are linked with all available event
+queues.</p>
+<p>In case of S/W scheduler, an extra event port is created by DPDK library which
+is retrieved  by the application and same will be used by Tx adapter service.</p>
+</section>
+<section id="rx-tx-adapter-initialization">
+<h3><span class="section-number">17.4.9. </span>Rx/Tx adapter Initialization</h3>
+<p>Each Ethernet port is assigned a dedicated Rx/Tx adapter for H/W scheduler. Each
+Ethernet port’s Rx queues are connected to its respective event queue at
+priority 0 via Rx adapter configuration and Ethernet port’s tx queues are
+connected via Tx adapter.</p>
+<p>For S/W scheduler instead of dedicated adapters, common Rx/Tx adapters are
+configured which will be shared among all the Ethernet ports. Also DPDK library
+need service cores to run internal services for Rx/Tx adapters. Application gets
+service id for Rx/Tx adapters and after successful setup it runs the services
+on dedicated service cores.</p>
+</section>
+<section id="receive-process-and-transmit-packets">
+<span id="l2-fwd-event-app-rx-tx-packets"></span><h3><span class="section-number">17.4.10. </span>Receive, Process and Transmit Packets</h3>
+<p>In the <strong>l2fwd_main_loop()</strong> function, the main task is to read ingress packets from
+the RX queues. This is done using the following code:</p>
+<p>Packets are read in a burst of size MAX_PKT_BURST. The rte_eth_rx_burst()
+function writes the mbuf pointers in a local table and returns the number of
+available mbufs in the table.</p>
+<p>Then, each mbuf in the table is processed by the l2fwd_simple_forward()
+function. The processing is very simple: process the TX port from the RX port,
+then replace the source and destination MAC addresses if MAC addresses updating
+is enabled.</p>
+<p>During the initialization process, a static array of destination ports
+(l2fwd_dst_ports[]) is filled such that for each source port, a destination port
+is assigned that is either the next or previous enabled port from the portmask.
+If number of ports are odd in portmask then packet from last port will be
+forwarded to first port i.e. if portmask=0x07, then forwarding will take place
+like p0—&gt;p1, p1—&gt;p2, p2—&gt;p0.</p>
+<p>Also to optimize enqueue operation, l2fwd_simple_forward() stores incoming mbufs
+up to MAX_PKT_BURST. Once it reaches up to limit, all packets are transmitted to
+destination ports.</p>
+<p>For this test application, the processing is exactly the same for all packets
+arriving on the same RX port. Therefore, it would have been possible to call
+the rte_eth_tx_buffer() function directly from the main loop to send all the
+received packets on the same TX port, using the burst-oriented send function,
+which is more efficient.</p>
+<p>However, in real-life applications (such as, L3 routing),
+packet N is not necessarily forwarded on the same port as packet N-1.
+The application is implemented to illustrate that, so the same approach can be
+reused in a more complex application.</p>
+<p>To ensure that no packets remain in the tables, each lcore does a draining of TX
+queue in its main loop. This technique introduces some latency when there are
+not many packets to send, however it improves performance:</p>
+<p>In the <strong>l2fwd_event_loop()</strong> function, the main task is to read ingress
+packets from the event ports. This is done using the following code:</p>
+<p>Before reading packets, deq_len is fetched to ensure correct allowed deq length
+by the eventdev.
+The rte_event_dequeue_burst() function writes the mbuf pointers in a local table
+and returns the number of available mbufs in the table.</p>
+<p>Then, each mbuf in the table is processed by the l2fwd_eventdev_forward()
+function. The processing is very simple: process the TX port from the RX port,
+then replace the source and destination MAC addresses if MAC addresses updating
+is enabled.</p>
+<p>During the initialization process, a static array of destination ports
+(l2fwd_dst_ports[]) is filled such that for each source port, a destination port
+is assigned that is either the next or previous enabled port from the portmask.
+If number of ports are odd in portmask then packet from last port will be
+forwarded to first port i.e. if portmask=0x07, then forwarding will take place
+like p0—&gt;p1, p1—&gt;p2, p2—&gt;p0.</p>
+<p>l2fwd_eventdev_forward() does not stores incoming mbufs. Packet will forwarded
+be to destination ports via Tx adapter or generic event dev enqueue API
+depending H/W or S/W scheduler is used.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="l2_forward_real_virtual.html" title="previous chapter"><span class="section-number">16. </span>L2 Forwarding Sample Application (in Real and Virtualized Environments)</a></li>
+      <li>Next: <a href="l2_forward_cat.html" title="next chapter"><span class="section-number">18. </span>L2 Forwarding Sample Application with Cache Allocation Technology (CAT)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/l2_forward_event.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

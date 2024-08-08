@@ -1,0 +1,263 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>7. Software Eventdev Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="8. OCTEON TX SSOVF Eventdev Driver" href="octeontx.html" />
+    <link rel="prev" title="6. Distributed Software Eventdev Poll Mode Driver" href="dsw.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="software-eventdev-poll-mode-driver">
+<h1><span class="section-number">7. </span>Software Eventdev Poll Mode Driver</h1>
+<p>The software eventdev is an implementation of the eventdev API, that provides a
+wide range of the eventdev features. The eventdev relies on a CPU core to
+perform event scheduling. This PMD can use the service core library to run the
+scheduling function, allowing an application to utilize the power of service
+cores to multiplex other work on the same core if required.</p>
+<section id="features">
+<h2><span class="section-number">7.1. </span>Features</h2>
+<p>The software eventdev implements many features in the eventdev API;</p>
+<dl class="simple">
+<dt>Queues</dt><dd><ul class="simple">
+<li><p>Atomic</p></li>
+<li><p>Ordered</p></li>
+<li><p>Parallel</p></li>
+<li><p>Single-Link</p></li>
+</ul>
+</dd>
+<dt>Ports</dt><dd><ul class="simple">
+<li><p>Load balanced (for Atomic, Ordered, Parallel queues)</p></li>
+<li><p>Single Link (for single-link queues)</p></li>
+</ul>
+</dd>
+<dt>Event Priorities</dt><dd><ul class="simple">
+<li><p>Each event has a priority, which can be used to provide basic QoS</p></li>
+</ul>
+</dd>
+</dl>
+</section>
+<section id="configuration-and-options">
+<h2><span class="section-number">7.2. </span>Configuration and Options</h2>
+<p>The software eventdev is a vdev device, and as such can be created from the
+application code, or from the EAL command line:</p>
+<ul class="simple">
+<li><p>Call <code class="docutils literal notranslate"><span class="pre">rte_vdev_init(&quot;event_sw0&quot;)</span></code> from the application</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--vdev=&quot;event_sw0&quot;</span></code> in the EAL options, which will call
+rte_vdev_init() internally</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_eventdev_application --vdev=&quot;event_sw0&quot;</span>
+</pre></div>
+</div>
+<section id="scheduling-quanta">
+<h3><span class="section-number">7.2.1. </span>Scheduling Quanta</h3>
+<p>The scheduling quanta sets the number of events that the device attempts to
+schedule in a single schedule call performed by the service core. Note that
+is a <em>hint</em> only, and that fewer or more events may be scheduled in a given
+iteration.</p>
+<p>The scheduling quanta can be set using a string argument to the vdev
+create call:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev=&quot;event_sw0,sched_quanta=64&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="credit-quanta">
+<h3><span class="section-number">7.2.2. </span>Credit Quanta</h3>
+<p>The credit quanta is the number of credits that a port will fetch at a time from
+the instance’s credit pool. Higher numbers will cause less overhead in the
+atomic credit fetch code, however it also reduces the overall number of credits
+in the system faster. A balanced number (e.g. 32) ensures that only small numbers
+of credits are pre-allocated at a time, while also mitigating performance impact
+of the atomics.</p>
+<p>Experimentation with higher values may provide minor performance improvements,
+at the cost of the whole system having less credits. On the other hand,
+reducing the quanta may cause measurable performance impact but provide the
+system with a higher number of credits at all times.</p>
+<p>A value of 32 seems a good balance however your specific application may
+benefit from a higher or reduced quanta size, experimentation is required to
+verify possible gains.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev=&quot;event_sw0,credit_quanta=64&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="scheduler-tuning-arguments">
+<h3><span class="section-number">7.2.3. </span>Scheduler tuning arguments</h3>
+<p>The scheduler minimum number of events that are processed can be increased to
+reduce per event overhead and increase internal burst sizes, which can
+improve throughput.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">min_burst</span></code> specifies the minimum number of inflight events that can be
+moved to the next stage in the scheduler. Default value is 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">refill_once</span></code> is a switch that when set instructs the scheduler to deque
+the events waiting in the ingress rings only once per call. The default
+behavior is to dequeue as needed.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">deq_burst</span></code> is the burst size used to dequeue from the port rings.
+Default value is 32, and it should be increased to 64 or 128 when setting
+<code class="docutils literal notranslate"><span class="pre">refill_once=1</span></code>.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev=&quot;event_sw0,min_burst=8,deq_burst=64,refill_once=1&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="limitations">
+<h2><span class="section-number">7.3. </span>Limitations</h2>
+<p>The software eventdev implementation has a few limitations. The reason for
+these limitations is usually that the performance impact of supporting the
+feature would be significant.</p>
+<section id="all-types-queues">
+<h3><span class="section-number">7.3.1. </span>“All Types” Queues</h3>
+<p>The software eventdev does not support creating queues that handle all types of
+traffic. An eventdev with this capability allows enqueuing Atomic, Ordered and
+Parallel traffic to the same queue, but scheduling each of them appropriately.</p>
+<p>The reason to not allow Atomic, Ordered and Parallel event types in the
+same queue is that it causes excessive branching in the code to enqueue packets
+to the queue, causing a significant performance impact.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DEV_CAP_QUEUE_ALL_TYPES</span></code> flag is not set in the
+<code class="docutils literal notranslate"><span class="pre">event_dev_cap</span></code> field of the <code class="docutils literal notranslate"><span class="pre">rte_event_dev_info</span></code> struct for the software
+eventdev.</p>
+</section>
+<section id="distributed-scheduler">
+<h3><span class="section-number">7.3.2. </span>Distributed Scheduler</h3>
+<p>The software eventdev is a centralized scheduler, requiring a service core to
+perform the required event distribution. This is not really a limitation but
+rather a design decision.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_DEV_CAP_DISTRIBUTED_SCHED</span></code> flag is not set in the
+<code class="docutils literal notranslate"><span class="pre">event_dev_cap</span></code> field of the <code class="docutils literal notranslate"><span class="pre">rte_event_dev_info</span></code> struct for the software
+eventdev.</p>
+</section>
+<section id="dequeue-timeout">
+<h3><span class="section-number">7.3.3. </span>Dequeue Timeout</h3>
+<p>The eventdev API supports a timeout when dequeuing packets using the
+<code class="docutils literal notranslate"><span class="pre">rte_event_dequeue_burst</span></code> function.
+This allows a core to wait for an event to arrive, or until <code class="docutils literal notranslate"><span class="pre">timeout</span></code> number
+of ticks have passed. Timeout ticks is not supported by the software eventdev
+for performance reasons.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Event Device Drivers</a><ul>
+      <li>Previous: <a href="dsw.html" title="previous chapter"><span class="section-number">6. </span>Distributed Software Eventdev Poll Mode Driver</a></li>
+      <li>Next: <a href="octeontx.html" title="next chapter"><span class="section-number">8. </span>OCTEON TX SSOVF Eventdev Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/eventdevs/sw.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,411 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. IFPGA Rawdev Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. NTB Rawdev Driver" href="ntb.html" />
+    <link rel="prev" title="3. NXP DPAA2 CMDIF Driver" href="dpaa2_cmdif.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ifpga-rawdev-driver">
+<h1><span class="section-number">4. </span>IFPGA Rawdev Driver</h1>
+<p>FPGA is used more and more widely in Cloud and NFV, one primary reason is
+that FPGA not only provides ASIC performance but also it’s more flexible
+than ASIC.</p>
+<p>FPGA uses Partial Reconfigure (PR) Parts of Bit Stream to achieve its
+flexibility. That means one FPGA Device Bit Stream is divided into many Parts
+of Bit Stream(each Part of Bit Stream is defined as AFU-Accelerated Function
+Unit), and each AFU is a hardware acceleration unit which can be dynamically
+reloaded respectively.</p>
+<p>By PR (Partial Reconfiguration) AFUs, one FPGA resources can be time-shared by
+different users. FPGA hot upgrade and fault tolerance can be provided easily.</p>
+<p>The SW IFPGA Rawdev Driver (<strong>ifpga_rawdev</strong>) provides a Rawdev driver
+that utilizes Intel FPGA Software Stack OPAE(Open Programmable Acceleration
+Engine) for FPGA management.</p>
+<section id="implementation-details">
+<h2><span class="section-number">4.1. </span>Implementation details</h2>
+<p>Each instance of IFPGA Rawdev Driver is probed by Intel FpgaDev. In coordination
+with OPAE share code IFPGA Rawdev Driver provides common FPGA management ops
+for FPGA operation, OPAE provides all following operations:
+- FPGA PR (Partial Reconfiguration) management
+- FPGA AFUs Identifying
+- FPGA Thermal Management
+- FPGA Power Management
+- FPGA Performance reporting
+- FPGA Remote Debug</p>
+<p>All configuration parameters are taken by vdev_ifpga_cfg driver. Besides
+configuration, vdev_ifpga_cfg driver also hot plugs in IFPGA Bus.</p>
+<p>All of the AFUs of one FPGA may share same PCI BDF and AFUs scan depend on
+IFPGA Rawdev Driver so IFPGA Bus takes AFU device scan and AFU drivers probe.
+All AFU device driver bind to AFU device by its UUID (Universally Unique
+Identifier).</p>
+<p>To avoid unnecessary code duplication and ensure maximum performance,
+handling of AFU devices is left to different PMDs; all the design as
+summarized by the following block diagram:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+---------------------------------------------------------------+
+|                       Application(s)                          |
++----------------------------.----------------------------------+
+                             |
+                             |
++----------------------------&#39;----------------------------------+
+|                    DPDK Framework (APIs)                      |
++----------|------------|--------.---------------------|--------+
+          /              \                             |
+         /                \                            |
++-------&#39;-------+  +-------&#39;-------+          +--------&#39;--------+
+|    Eth PMD    |  |   Crypto PMD  |          |                 |
++-------.-------+  +-------.-------+          |                 |
+        |                  |                  |                 |
+        |                  |                  |                 |
++-------&#39;-------+  +-------&#39;-------+          |      IFPGA      |
+|  Eth AFU Dev  |  |Crypto AFU Dev |          |  Rawdev Driver  |
++-------.-------+  +-------.-------+          |(OPAE Share Code)|
+        |                  |                  |                 |
+        |                  |          Rawdev  |                 |
++-------&#39;------------------&#39;-------+    Ops   |                 |
+|              IFPGA Bus           | --------&gt;|                 |
++-----------------.----------------+          +--------.--------+
+                  |                                    |
+    Hot-plugin --&gt;|                                    |
+                  |                                    |
++-----------------&#39;------------------+        +--------&#39;--------+
+|        vdev_ifpga_cfg driver       |        |  Intel FpgaDev  |
++------------------------------------+        +-----------------+
+</pre></div>
+</div>
+</section>
+<section id="run-time-parameters">
+<h2><span class="section-number">4.2. </span>Run-time parameters</h2>
+<p>This driver is invoked automatically in systems added with Intel FPGA,
+but PR and IFPGA Bus scan is triggered by command line using
+<code class="docutils literal notranslate"><span class="pre">--vdev</span> <span class="pre">'ifpga_rawdev_cfg</span></code> EAL option.</p>
+<p>The following device parameters are supported:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">ifpga</span></code> [string]</p>
+<p>Provide a specific Intel FPGA device PCI BDF. Can be provided multiple
+times for additional instances.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">port</span></code> [int]</p>
+<p>Each FPGA can provide many channels to PR AFU by software, each channels
+is identified by this parameter.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">afu_bts</span></code> [string]</p>
+<p>If null, the AFU Bit Stream has been PR in FPGA, if not forces PR and
+identifies AFU Bit Stream file.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="ifpga-afu-driver">
+<h1><span class="section-number">5. </span>IFPGA AFU Driver</h1>
+<p>AFU (Acceleration Function Unit) is a function or set of functions
+that perform various acceleration task on FPGA platform.
+The image of AFU is called as GBS (Green Bit Stream)
+which can be used by PR (Partial Reconfigure) tool to load into the FPGA,
+different AFUs can be dynamically reloaded respectively.</p>
+<p>AFU has two main communication paths between the host:</p>
+<ul>
+<li><p>FPGA to host transactions</p>
+<p>The FPGA accesses host memory using a 512 bits data path.
+This data path has separate channels for read and write traffic
+allowing for simultaneous read and write to occur.
+The read and write channels support bursts of 1, 2, and 4 cache lines.</p>
+</li>
+<li><p>Host to FPGA (MMIO) transactions</p>
+<p>The host can access a 256 KB address space within the FPGA.
+This address space contains Device Feature Header (DFHs)
+and the control and status registers of the AFU hardware.</p>
+</li>
+</ul>
+<p>AFU must implement the following registers:</p>
+<ul class="simple">
+<li><p>AFU DFH - a 64-bit header at MMIO address offset 0x0</p></li>
+<li><p>AFU ID - a 128-bit UUID at MMIO address offset 0x2</p></li>
+</ul>
+<p>The AFU is enumerated and recorded by IFPGA Rawdev Driver.
+Then AFU devices are created with the help of IFPGA Bus Driver,
+AFU driver probe these AFU devices and expose them
+as standard raw devices for application to access.</p>
+<section id="id1">
+<h2><span class="section-number">5.1. </span>Implementation details</h2>
+<p>IFPGA Rawdev Driver identifies AFU in FPGA, AFU location (PF/VF address)
+and UUID are taken by <code class="docutils literal notranslate"><span class="pre">ifpga_rawdev_cfg</span></code> vdev driver
+which hot plug AFU into IFPGA Bus.</p>
+<p>IFPGA Bus takes AFU device scan and AFU driver probe.
+All AFU device driver bind to AFU device by its dedicated UUID.
+To avoid unnecessary code duplication and ensure maximum performance,
+AFU driver implements the common part of raw device driver.
+Several specific AFU drivers are provided for reference.
+The design is summarized by the following block diagram:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+---------------------------------------------------------------+
+|                       Application(s)                          |
++----------------------------.----------------------------------+
+                             |
++----------------------------&#39;----------------------------------+
+|                  DPDK Framework (Rawdev APIs)                 |
++-----------------+------------------------------------+--------+
+                  |                                    |
++-----------------&#39;----------------+                   |
+|          IFPGA AFU Driver        |          +--------&#39;--------+
+|                                  |          |                 |
+|+---------------+ +--------------+|          |                 |
+||  AFU Dev1 PMD | | AFU Dev2 PMD ||          |                 |
+|+-------+-------+ +-------+------+|          |                 |
++--------|-----------------|-------+          |                 |
+         |                 |                  |                 |
++--------&#39;------+  +-------&#39;-------+          |      IFPGA      |
+|    AFU Dev1   |  |    AFU Dev2   |          |  Rawdev Driver  |
++-------.-------+  +-------.-------+          |                 |
+        |                  |          Rawdev  |                 |
++-------&#39;------------------&#39;-------+    Ops   |                 |
+|              IFPGA Bus           |---------&gt;|                 |
++-----------------.----------------+          +--------.--------+
+                  |                                    |
+    Hot-plugin --&gt;|                                    |
+                  |                                    |
++-----------------&#39;------------------+        +--------&#39;--------+
+|    ifpga_rawdev_cfg vdev driver    |        |  Intel FpgaDev  |
++------------------------------------+        +-----------------+
+</pre></div>
+</div>
+</section>
+<section id="how-to-test-afu-function">
+<h2><span class="section-number">5.2. </span>How to test AFU function</h2>
+<p>Suppose AFU is found in FPGA at PCI address 31:00.0,
+then you can create and test a AFU device by following steps in application.</p>
+<ol class="arabic simple">
+<li><p>rte_vdev_init(“ifpga_rawdev_cfg0”, “ifpga=31:00.0,port=0”)</p></li>
+<li><p>rawdev = rte_rawdev_pmd_get_named_dev(“afu_0|31:00.0”)</p></li>
+<li><p>rte_rawdev_configure(rawdev-&gt;dev_id, &amp;cfg, sizeof(cfg))</p></li>
+<li><p>rte_rawdev_selftest(rawdev-&gt;dev_id)</p></li>
+<li><p>rte_vdev_uninit(“ifpga_rawdev_cfg0”)</p></li>
+</ol>
+<p>AFU device name format used in <code class="docutils literal notranslate"><span class="pre">rte_rawdev_pmd_get_named_dev</span></code> is <code class="docutils literal notranslate"><span class="pre">afu_[port]|[BDF]</span></code>.
+Please refer to OPAE documentation for the meaning of port.
+Each AFU device has specific configuration data, they are defined in <code class="docutils literal notranslate"><span class="pre">rte_pmd_afu.h</span></code>.</p>
+</section>
+</section>
+<section id="open-fpga-stack">
+<h1><span class="section-number">6. </span>Open FPGA Stack</h1>
+<p>Open FPGA Stack (OFS) is a collection of RTL and open source software providing
+interfaces to access the instantiated RTL easily in an FPGA. OFS leverages the
+DFL for the implementation of the FPGA RTL design.</p>
+<p>OFS designs allow for the arrangement of software interfaces across multiple
+PCIe endpoints. Some of these interfaces may be PFs defined in the static region
+that connect to interfaces in an IP that is loaded via Partial Reconfiguration (PR).
+And some of these interfaces may be VFs defined in the PR region that can be
+reconfigured by the end-user. Furthermore, these PFs/VFs may use DFLs such that
+features may be discovered and accessed in user space with the aid of a generic
+kernel driver like vfio-pci. The diagram below depicts an example design with one
+PF and two VFs. In this example, it will export the management functions via PF0
+and acceleration functions via VF0 and VF1, leverage VFIO to export the MMIO space
+to an application.:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+-----------------+  +-------------+  +------------+
+| FPGA Management |  |  DPDK App   |  |  User App  |
+|      App        |  |             |  |            |
++--------+--------+  +------+------+  +-----+------+
+         |                  |               |
++--------+--------+  +------+------+        |
+|    IFPGA PMD    |  |   AFU PMD   |        |
++--------+--------+  +------+------+        |
+         |                  |               |
++--------+------------------+---------------+------+
+|                VFIO-PCI                          |
++--------+------------------+---------------+------+
+         |                  |               |
++--------+--------+  +------+------+  +-----+------+
+|       PF0       |  |   PF0_VF0   |  |  PF0_VF1   |
++-----------------+  +-------------+  +------------+
+</pre></div>
+</div>
+<p>As accelerators are specialized hardware, they are typically limited in the
+number installed in a given system. Many use cases require them to be shared
+across multiple software contexts or threads of software execution, either
+through partitioning of individual dedicated resources, or virtualization of
+shared resources. OFS provides several models to share the AFU resources via
+PR mechanism and hardware-based virtualization schemes.</p>
+<ol class="arabic simple">
+<li><p>Legacy model.
+With legacy model FPGA cards like Intel PAC N3000 or N5000, there is
+a notion that the boundary between the AFU and the shell is also the unit of
+PR for those FPGA platforms. This model is only able to handle a
+single context, because it only has one PR engine, and one PR region which
+has an associated Port device.</p></li>
+<li><p>Multiple VFs per PR slot.
+In this model, available AFU resources may allow instantiation of many VFs
+which have a dedicated PCIe function with their own dedicated MMIO space, or
+partition a region of MMIO space on a single PCIe function. Intel PAC N6000
+card has implemented this model.
+In this model, the AFU/PR slot was not connected to port device. For DFL’s view,
+the Next_AFU pointer in FIU feature header of port device points to NULL in this
+model. On the other hand, each VF can start with an AFU feature header without
+being connected to a FIU Port feature header.</p></li>
+</ol>
+<p>The VFs are created through the Linux kernel driver before we use them in DPDK.</p>
+<p>OFS provides the diversity for accessing the AFU resource to RTL developer.
+An IP designer may choose to add more than one PF for interfacing with IP
+on the FPGA and choose different model to access the AFU resource.</p>
+<p>There is one reference architecture design using the “Multiple VFs per PR slot”
+model for OFS as illustrated below. In this reference design, it exports the
+FPGA management functions via PF0. PF1 will bind with DPDK virtio driver
+presenting itself as a network interface to the application. PF2 will bind to the
+vfio-pci driver allowing the user space software to discover and interface
+with the specific workload like diagnostic test. It leverages AFU PMD driver to
+access the AFU resources in DPDK.:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>                            +----------------------+
+                            |   PF/VF mux/demux    |
+                            +--+--+-----+------+-+-+
+                               |  |     |      | |
+      +------------------------+  |     |      | |
+PF0   |                 +---------+   +-+      | |
+  +---+---+             |         +---+----+   | |
+  |  DFH  |             |         |   DFH  |   | |
+  +-------+       +-----+----+    +--------+   | |
+  |  FME  |       |  VirtIO  |    |  Test  |   | |
+  +---+---+       +----------+    +--------+   | |
+      |                PF1            PF2      | |
+      |                                        | |
+      |                             +----------+ |
+      |                             |           ++
+      |                             |           |
+      |                             | PF0_VF0   | PF0_VF1
+      |           +-----------------+-----------+------------+
+      |           |           +-----+-----------+--------+   |
+      |           |           |     |           |        |   |
+      |           | +------+  |  +--+ -+     +--+---+    |   |
+      |           | | Port |  |  | DFH |     |  DFH |    |   |
+      +-----------+ +------+  |  +-----+     +------+    |   |
+                  |           |  | DEV |     |  DEV |    |   |
+                  |           |  +-----+     +------+    |   |
+                  |           |            PR Slot       |   |
+                  |           +--------------------------+   |
+                  | Port Gasket                              |
+                  +------------------------------------------+
+</pre></div>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Rawdev Drivers</a><ul>
+      <li>Previous: <a href="dpaa2_cmdif.html" title="previous chapter"><span class="section-number">3. </span>NXP DPAA2 CMDIF Driver</a></li>
+      <li>Next: <a href="ntb.html" title="next chapter"><span class="section-number">7. </span>NTB Rawdev Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rawdevs/ifpga.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

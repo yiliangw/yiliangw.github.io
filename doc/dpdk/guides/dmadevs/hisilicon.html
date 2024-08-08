@@ -1,0 +1,171 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. HISILICON Kunpeng DMA Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. IDXD DMA Device Driver" href="idxd.html" />
+    <link rel="prev" title="3. NXP DPAA2 QDMA Driver" href="dpaa2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="hisilicon-kunpeng-dma-driver">
+<h1><span class="section-number">4. </span>HISILICON Kunpeng DMA Driver</h1>
+<p>Kunpeng SoC has an internal DMA unit which can be used by application
+to accelerate data copies.
+The DMA PF function supports multiple DMA channels.</p>
+<section id="supported-kunpeng-socs">
+<h2><span class="section-number">4.1. </span>Supported Kunpeng SoCs</h2>
+<ul class="simple">
+<li><p>Kunpeng 920</p></li>
+<li><p>Kunpeng 930</p></li>
+</ul>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">4.2. </span>Device Setup</h2>
+<p>Kunpeng DMA devices will need to be bound to a suitable DPDK-supported
+user-space IO driver such as <code class="docutils literal notranslate"><span class="pre">vfio-pci</span></code> in order to be used by DPDK.</p>
+<section id="device-probing-and-initialization">
+<h3><span class="section-number">4.2.1. </span>Device Probing and Initialization</h3>
+<p>Once probed successfully, the device will appear as four <code class="docutils literal notranslate"><span class="pre">dmadev</span></code>
+which can be accessed using API from the <code class="docutils literal notranslate"><span class="pre">rte_dmadev</span></code> library.</p>
+<p>The name of the <code class="docutils literal notranslate"><span class="pre">dmadev</span></code> created is like “B:D.F-chX”, e.g. DMA 0000:7b:00.0
+will create four <code class="docutils literal notranslate"><span class="pre">dmadev</span></code>,
+the 1st <code class="docutils literal notranslate"><span class="pre">dmadev</span></code> name is “0000:7b:00.0-ch0”,
+and the 2nd <code class="docutils literal notranslate"><span class="pre">dmadev</span></code> name is “0000:7b:00.0-ch1”.</p>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">4.2.2. </span>Device Configuration</h3>
+<p>Kunpeng DMA configuration requirements:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">ring_size</span></code> must be a power of two, between 32 and 8192.</p></li>
+<li><p>Only one <code class="docutils literal notranslate"><span class="pre">vchan</span></code> is supported per <code class="docutils literal notranslate"><span class="pre">dmadev</span></code>.</p></li>
+<li><p>Silent mode is not supported.</p></li>
+<li><p>The transfer direction must be set to <code class="docutils literal notranslate"><span class="pre">RTE_DMA_DIR_MEM_TO_MEM</span></code>.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DMA Device Drivers</a><ul>
+      <li>Previous: <a href="dpaa2.html" title="previous chapter"><span class="section-number">3. </span>NXP DPAA2 QDMA Driver</a></li>
+      <li>Next: <a href="idxd.html" title="next chapter"><span class="section-number">5. </span>IDXD DMA Device Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/dmadevs/hisilicon.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

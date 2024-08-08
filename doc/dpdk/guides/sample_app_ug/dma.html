@@ -1,0 +1,299 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>13. Packet copying using DMAdev library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="14. L2 Forwarding with Crypto Sample Application" href="l2_forward_crypto.html" />
+    <link rel="prev" title="12. Keep Alive Sample Application" href="keep_alive.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packet-copying-using-dmadev-library">
+<h1><span class="section-number">13. </span>Packet copying using DMAdev library</h1>
+<section id="overview">
+<h2><span class="section-number">13.1. </span>Overview</h2>
+<p>This sample is intended as a demonstration of the basic components of a DPDK
+forwarding application and example of how to use the DMAdev API to make a packet
+copy application.</p>
+<p>Also while forwarding, the MAC addresses are affected as follows:</p>
+<ul class="simple">
+<li><p>The source MAC address is replaced by the TX port MAC address</p></li>
+<li><p>The destination MAC address is replaced by  02:00:00:00:00:TX_PORT_ID</p></li>
+</ul>
+<p>This application can be used to compare performance of using software packet
+copy with copy done using a DMA device for different sizes of packets.
+The example will print out statistics each second. The stats shows
+received/send packets and packets dropped or failed to copy.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">13.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">dma</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">13.3. </span>Running the Application</h2>
+<p>In order to run the hardware copy application, the copying device
+needs to be bound to user-space IO driver.</p>
+<p>Refer to the “DMAdev library” chapter in the “Programmers guide” for information
+on using the library.</p>
+<p>The application requires a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-dma [EAL options] -- [-p MASK] [-q NQ] [-s RS] [-c &lt;sw|hw&gt;]</span>
+<span class="go">    [--[no-]mac-updating] [-b BS] [-f FS] [-i SI]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul class="simple">
+<li><p>p MASK: A hexadecimal bitmask of the ports to configure (default is all)</p></li>
+<li><p>q NQ: Number of Rx queues used per port equivalent to DMA channels
+per port (default is 1)</p></li>
+<li><p>c CT: Performed packet copy type: software (sw) or hardware using
+DMA (hw) (default is hw)</p></li>
+<li><p>s RS: Size of dmadev descriptor ring for hardware copy mode or rte_ring for
+software copy mode (default is 2048)</p></li>
+<li><p>–[no-]mac-updating: Whether MAC address of packets should be changed
+or not (default is mac-updating)</p></li>
+<li><p>b BS: set the DMA batch size</p></li>
+<li><p>f FS: set the max frame size</p></li>
+<li><p>i SI: set the interval, in second, between statistics prints (default is 1)</p></li>
+</ul>
+<p>The application can be launched in various configurations depending on
+provided parameters. The app can use up to 2 lcores: one of them receives
+incoming traffic and makes a copy of each packet. The second lcore then
+updates MAC address and sends the copy. If one lcore per port is used,
+both operations are done sequentially. For each configuration an additional
+lcore is needed since the main lcore does not handle traffic but is
+responsible for configuration, statistics printing and safe shutdown of
+all ports and devices.</p>
+<p>The application can use a maximum of 8 ports.</p>
+<p>To run the application in a Linux environment with 3 lcores (the main lcore,
+plus two forwarding cores), a single port (port 0), software copying and MAC
+updating issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-dma -l <span class="m">0</span>-2 -n <span class="m">2</span> -- -p 0x1 --mac-updating -c sw
+</pre></div>
+</div>
+<p>To run the application in a Linux environment with 2 lcores (the main lcore,
+plus one forwarding core), 2 ports (ports 0 and 1), hardware copying and no MAC
+updating issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-dma -l <span class="m">0</span>-1 -n <span class="m">1</span> -- -p 0x3 --no-mac-updating -c hw
+</pre></div>
+</div>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on
+running applications and the Environment Abstraction Layer (EAL) options.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">13.4. </span>Explanation</h2>
+<p>The following sections provide an explanation of the main components of the
+code.</p>
+<p>All DPDK library functions used in the sample code are prefixed with
+<code class="docutils literal notranslate"><span class="pre">rte_</span></code> and are explained in detail in the <em>DPDK API Documentation</em>.</p>
+<section id="the-main-function">
+<h3><span class="section-number">13.4.1. </span>The Main Function</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> function performs the initialization and calls the execution
+threads for each lcore.</p>
+<p>The first task is to initialize the Environment Abstraction Layer (EAL).
+The <code class="docutils literal notranslate"><span class="pre">argc</span></code> and <code class="docutils literal notranslate"><span class="pre">argv</span></code> arguments are provided to the <code class="docutils literal notranslate"><span class="pre">rte_eal_init()</span></code>
+function. The value returned is the number of parsed arguments:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> also allocates a mempool to hold the mbufs (Message Buffers)
+used by the application:</p>
+<p>Mbufs are the packet buffer structure used by DPDK. They are explained in
+detail in the “Mbuf Library” section of the <em>DPDK Programmer’s Guide</em>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> function also initializes the ports:</p>
+<p>Each port is configured using <code class="docutils literal notranslate"><span class="pre">port_init()</span></code> function. The Ethernet
+ports are configured with local settings using the <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure()</span></code>
+function and the <code class="docutils literal notranslate"><span class="pre">port_conf</span></code> struct. The RSS is enabled so that
+multiple Rx queues could be used for packet receiving and copying by
+multiple DMA channels per port:</p>
+<p>For this example the ports are set up with the number of Rx queues provided
+with -q option and 1 Tx queue using the <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_queue_setup()</span></code>
+and <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_queue_setup()</span></code> functions.</p>
+<p>The Ethernet port is then started:</p>
+<p>Finally the Rx port is set in promiscuous mode:</p>
+<p>After that each port application assigns resources needed.</p>
+<p>Ring structures are assigned for exchanging packets between lcores for both SW
+and HW copy modes.</p>
+<p>When using hardware copy each Rx queue of the port is assigned a DMA device
+(<code class="docutils literal notranslate"><span class="pre">assign_dmadevs()</span></code>) using DMAdev library API functions:</p>
+<p>The initialization of hardware device is done by <code class="docutils literal notranslate"><span class="pre">rte_dma_configure()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_dma_vchan_setup()</span></code> functions using the <code class="docutils literal notranslate"><span class="pre">rte_dma_conf</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_dma_vchan_conf</span></code> structs. After configuration the device is started
+using <code class="docutils literal notranslate"><span class="pre">rte_dma_start()</span></code> function. Each of the above operations is done in
+<code class="docutils literal notranslate"><span class="pre">configure_dmadev_queue()</span></code>.</p>
+<p>If initialization is successful, memory for hardware device
+statistics is allocated.</p>
+<p>Finally <code class="docutils literal notranslate"><span class="pre">main()</span></code> function starts all packet handling lcores and starts
+printing stats in a loop on the main lcore. The application can be
+interrupted and closed using <code class="docutils literal notranslate"><span class="pre">Ctrl-C</span></code>. The main lcore waits for
+all worker lcores to finish, deallocates resources and exits.</p>
+<p>The processing lcores launching function are described below.</p>
+</section>
+<section id="the-lcores-launching-functions">
+<h3><span class="section-number">13.4.2. </span>The Lcores Launching Functions</h3>
+<p>As described above, <code class="docutils literal notranslate"><span class="pre">main()</span></code> function invokes <code class="docutils literal notranslate"><span class="pre">start_forwarding_cores()</span></code>
+function in order to start processing for each lcore:</p>
+<p>The function launches Rx/Tx processing functions on configured lcores
+using <code class="docutils literal notranslate"><span class="pre">rte_eal_remote_launch()</span></code>. The configured ports, their number
+and number of assigned lcores are stored in user-defined
+<code class="docutils literal notranslate"><span class="pre">rxtx_transmission_config</span></code> struct:</p>
+<p>The structure is initialized in ‘main()’ function with the values
+corresponding to ports and lcores configuration provided by the user.</p>
+</section>
+<section id="the-lcores-processing-functions">
+<h3><span class="section-number">13.4.3. </span>The Lcores Processing Functions</h3>
+<p>For receiving packets on each port, the <code class="docutils literal notranslate"><span class="pre">dma_rx_port()</span></code> function is used.
+The function receives packets on each configured Rx queue. Depending on the
+mode the user chose, it will enqueue packets to DMA channels and
+then invoke copy process (hardware copy), or perform software copy of each
+packet using <code class="docutils literal notranslate"><span class="pre">pktmbuf_sw_copy()</span></code> function and enqueue them to an rte_ring:</p>
+<p>The packets are received in burst mode using <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_burst()</span></code>
+function. When using hardware copy mode the packets are enqueued in
+copying device’s buffer using <code class="docutils literal notranslate"><span class="pre">dma_enqueue_packets()</span></code> which calls
+<code class="docutils literal notranslate"><span class="pre">rte_dma_copy()</span></code>. When all received packets are in the
+buffer the copy operations are started by calling <code class="docutils literal notranslate"><span class="pre">rte_dma_submit()</span></code>.
+Function <code class="docutils literal notranslate"><span class="pre">rte_dma_copy()</span></code> operates on physical address of
+the packet. Structure <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code> contains only physical address to
+start of the data buffer (<code class="docutils literal notranslate"><span class="pre">buf_iova</span></code>). Thus the <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_iova()</span></code> API is
+used to get the address of the start of the data within the mbuf.</p>
+<p>Once the copies have been completed (this includes gathering the completions in
+HW copy mode), the copied packets are enqueued to the <code class="docutils literal notranslate"><span class="pre">rx_to_tx_ring</span></code>, which
+is used to pass the packets to the TX function.</p>
+<p>All completed copies are processed by <code class="docutils literal notranslate"><span class="pre">dma_tx_port()</span></code> function. This function
+dequeues copied packets from the <code class="docutils literal notranslate"><span class="pre">rx_to_tx_ring</span></code>. Then each packet MAC address is changed
+if it was enabled. After that copies are sent in burst mode using <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst()</span></code>.</p>
+</section>
+<section id="the-packet-copying-functions">
+<h3><span class="section-number">13.4.4. </span>The Packet Copying Functions</h3>
+<p>In order to perform SW packet copy, there are user-defined functions to first copy
+the packet metadata (<code class="docutils literal notranslate"><span class="pre">pktmbuf_metadata_copy()</span></code>) and then the packet data
+(<code class="docutils literal notranslate"><span class="pre">pktmbuf_sw_copy()</span></code>):</p>
+<p>The metadata in this example is copied from <code class="docutils literal notranslate"><span class="pre">rx_descriptor_fields1</span></code> marker of
+<code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code> struct up to <code class="docutils literal notranslate"><span class="pre">buf_len</span></code> member.</p>
+<p>In order to understand why software packet copying is done as shown
+above please refer to the “Mbuf Library” section of the
+<em>DPDK Programmer’s Guide</em>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="keep_alive.html" title="previous chapter"><span class="section-number">12. </span>Keep Alive Sample Application</a></li>
+      <li>Next: <a href="l2_forward_crypto.html" title="next chapter"><span class="section-number">14. </span>L2 Forwarding with Crypto Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/dma.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1070 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>13. dpdk-test-eventdev Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="14. dpdk-test-regex Tool" href="testregex.html" />
+    <link rel="prev" title="12. dpdk-test-compress-perf Tool" href="comp_perf.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-test-eventdev-application">
+<h1><span class="section-number">13. </span>dpdk-test-eventdev Application</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-test-eventdev</span></code> tool is a Data Plane Development Kit (DPDK)
+application that allows exercising various eventdev use cases.
+This application has a generic framework to add new eventdev based test cases to
+verify functionality and measure the performance parameters of DPDK eventdev
+devices.</p>
+<section id="running-the-application">
+<h2><span class="section-number">13.1. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-test-eventdev [EAL Options] -- [application options]</span>
+</pre></div>
+</div>
+<section id="eal-options">
+<h3><span class="section-number">13.1.1. </span>EAL Options</h3>
+<p>The following are the EAL command-line options that can be used in conjunction
+with the <code class="docutils literal notranslate"><span class="pre">dpdk-test-eventdev</span></code> application.
+See the DPDK Getting Started Guides for more information on these options.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c</span> <span class="pre">&lt;COREMASK&gt;</span></code> or <code class="docutils literal notranslate"><span class="pre">-l</span> <span class="pre">&lt;CORELIST&gt;</span></code></p>
+<blockquote>
+<div><p>Set the hexadecimal bitmask of the cores to run on. The corelist is a
+list of cores to use.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vdev</span> <span class="pre">&lt;driver&gt;&lt;id&gt;</span></code></p>
+<blockquote>
+<div><p>Add a virtual eventdev device.</p>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="application-options">
+<h3><span class="section-number">13.1.2. </span>Application Options</h3>
+<p>The following are the application command-line options:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--verbose</span></code></p>
+<blockquote>
+<div><p>Set verbose level. Default is 1. Value &gt; 1 displays more details.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dev</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the device id of the event device.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--test</span> <span class="pre">&lt;name&gt;</span></code></p>
+<blockquote>
+<div><p>Set test name, where <code class="docutils literal notranslate"><span class="pre">name</span></code> is one of the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>order_queue
+order_atq
+perf_queue
+perf_atq
+pipeline_atq
+pipeline_queue
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--socket_id</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the socket id of the application resources.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--pool-sz</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the number of mbufs to be allocated from the mempool.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plcores</span> <span class="pre">&lt;CORELIST&gt;</span></code></p>
+<blockquote>
+<div><p>Set the list of cores to be used as producers.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--wlcores</span> <span class="pre">&lt;CORELIST&gt;</span></code></p>
+<blockquote>
+<div><p>Set the list of cores to be used as workers.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--stlist</span> <span class="pre">&lt;type_list&gt;</span></code></p>
+<blockquote>
+<div><p>Set the scheduled type of each stage where <code class="docutils literal notranslate"><span class="pre">type_list</span></code> size
+determines the number of stages used in the test application.
+Each type_list member can be one of the following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>P or p : Parallel schedule type
+O or o : Ordered schedule type
+A or a : Atomic schedule type
+</pre></div>
+</div>
+<p>Application expects the <code class="docutils literal notranslate"><span class="pre">type_list</span></code> in comma separated form (i.e. <code class="docutils literal notranslate"><span class="pre">--stlist</span> <span class="pre">o,a,a,a</span></code>)</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb_flows</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the number of flows to produce.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb_pkts</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the number of packets to produce. 0 implies no limit.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--worker_deq_depth</span> <span class="pre">&lt;n&gt;</span></code></p>
+<blockquote>
+<div><p>Set the dequeue depth of the worker.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--fwd_latency</span></code></p>
+<blockquote>
+<div><p>Perform forward latency measurement.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--queue_priority</span></code></p>
+<blockquote>
+<div><p>Enable queue priority.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prod_type_ethdev</span></code></p>
+<blockquote>
+<div><p>Use ethernet device as producer.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prod_type_timerdev</span></code></p>
+<blockquote>
+<div><p>Use event timer adapter as producer.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prod_type_timerdev_burst</span></code></p>
+<blockquote>
+<div><p>Use burst mode event timer adapter as producer.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prod_type_cryptodev</span></code></p>
+<blockquote>
+<div><p>Use crypto device as producer.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--timer_tick_nsec</span></code></p>
+<blockquote>
+<div><p>Used to dictate number of nano seconds between bucket traversal of the
+event timer adapter. Refer <cite>rte_event_timer_adapter_conf</cite>.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max_tmo_nsec</span></code></p>
+<blockquote>
+<div><p>Used to configure event timer adapter max arm timeout in nano seconds.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--expiry_nsec</span></code></p>
+<blockquote>
+<div><p>Dictate the number of nano seconds after which the event timer expires.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb_timers</span></code></p>
+<blockquote>
+<div><p>Number of event timers each producer core will generate.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb_timer_adptrs</span></code></p>
+<blockquote>
+<div><p>Number of event timer adapters to be used. Each adapter is used in
+round robin manner by the producer cores.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--deq_tmo_nsec</span></code></p>
+<blockquote>
+<div><p>Global dequeue timeout for all the event ports if the provided dequeue
+timeout is out of the supported range of event device it will be
+adjusted to the highest/lowest supported dequeue timeout supported.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--crypto_adptr_mode</span></code></p>
+<blockquote>
+<div><p>Set crypto adapter mode. Use 0 for OP_NEW (default) and 1 for
+OP_FORWARD mode.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--crypto_op_type</span></code></p>
+<blockquote>
+<div><p>Set crypto operation type. Use 0 for symmetric crypto ops (default)
+and 1 for asymmetric crypto ops.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--crypto_cipher_alg</span></code></p>
+<blockquote>
+<div><p>Cipher algorithm to be used. Default algorithm is NULL.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--crypto_cipher_key</span></code></p>
+<blockquote>
+<div><p>Key for the cipher algorithm selected.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--crypto_cipher_iv_sz</span></code></p>
+<blockquote>
+<div><p>IV size for the cipher algorithm</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mbuf_sz</span></code></p>
+<blockquote>
+<div><p>Set packet mbuf size. Can be used to configure Jumbo Frames. Only
+applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max_pkt_sz</span></code></p>
+<blockquote>
+<div><p>Set max packet mbuf size. Can be used to configure Rx/Tx scatter gather.
+Only applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--prod_enq_burst_sz</span></code></p>
+<blockquote>
+<div><p>Set producer enqueue burst size. Can be used to configure the number of
+events the producer(s) will enqueue as a burst to the event device.
+Only applicable for <cite>perf_queue</cite> and <cite>perf_atq</cite> test in combination with
+CPU (default) or crypto device (<code class="docutils literal notranslate"><span class="pre">--prod_type_cryptodev</span></code>) producers.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--nb_eth_queues</span></code></p>
+<blockquote>
+<div><p>Configure multiple Rx queues per each ethernet port.
+Only applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable_vector</span></code></p>
+<blockquote>
+<div><p>Enable event vector for Rx/Tx/crypto adapters.
+Only applicable for <cite>pipeline_*</cite> and <cite>perf_*</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vector_size</span></code></p>
+<blockquote>
+<div><p>Vector size to configure for the Rx/crypto adapter.
+Only applicable for <cite>pipeline_*</cite> and <cite>perf_*</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vector_tmo_ns</span></code></p>
+<blockquote>
+<div><p>Vector timeout nanoseconds to be configured for the Rx/crypto adapter.
+Only applicable for <cite>pipeline_*</cite> and <cite>perf_*</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--per_port_pool</span></code></p>
+<blockquote>
+<div><p>Configure unique mempool per ethernet device, the size of each pool
+is equal to <cite>pool_sz</cite>.
+Only applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx_first</span></code></p>
+<blockquote>
+<div><p>Transmit given number of packets across all the ethernet device that
+are enabled in the test.
+Only applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx_pkt_sz</span></code></p>
+<blockquote>
+<div><p>Packet size to use for <cite>–tx_first</cite>.
+Only applicable for <cite>pipeline_atq</cite> and <cite>pipeline_queue</cite> tests.</p>
+</div></blockquote>
+</li>
+</ul>
+</section>
+</section>
+<section id="eventdev-tests">
+<h2><span class="section-number">13.2. </span>Eventdev Tests</h2>
+<section id="order-queue-test">
+<h3><span class="section-number">13.2.1. </span>ORDER_QUEUE Test</h3>
+<p>This is a functional test case that aims at testing the following:</p>
+<ol class="arabic simple">
+<li><p>Verify the ingress order maintenance.</p></li>
+<li><p>Verify the exclusive(atomic) access to given atomic flow per eventdev port.</p></li>
+</ol>
+<span id="table-eventdev-order-queue-test"></span><table class="docutils align-default" id="id12">
+<caption><span class="caption-number">Table 13.1 </span><span class="caption-text">Order queue test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 25%" />
+<col style="width: 28%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>2</p></td>
+<td><p>q0(ordered), q1(atomic)</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>1</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+1</p></td>
+<td><p>Workers use port 0 to
+port n-1. Producer uses
+port n</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id13">
+<span id="figure-eventdev-order-queue-test"></span><img alt="../_images/eventdev_order_queue_test.svg" src="../_images/eventdev_order_queue_test.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.3 </span><span class="caption-text">order queue test operation.</span></p>
+</figcaption>
+</figure>
+<p>The order queue test configures the eventdev with two queues and an event
+producer to inject the events to q0(ordered) queue. Both q0(ordered) and
+q1(atomic) are linked to all the workers.</p>
+<p>The event producer maintains a sequence number per flow and injects the events
+to the ordered queue. The worker receives the events from ordered queue and
+forwards to atomic queue. Since the events from an ordered queue can be
+processed in parallel on the different workers, the ingress order of events
+might have changed on the downstream atomic queue enqueue. On enqueue to the
+atomic queue, the eventdev PMD reorders the event to the original
+ingress order(i.e producer ingress order).</p>
+<p>When the event is dequeued from the atomic queue by the worker, this test
+verifies the expected sequence number of associated event per flow by comparing
+the free running expected sequence number per flow.</p>
+<section id="id1">
+<h4><span class="section-number">13.2.1.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--plcores
+--wlcores
+--nb_flows
+--nb_pkts
+--worker_deq_depth
+--deq_tmo_nsec
+</pre></div>
+</div>
+</section>
+<section id="example">
+<h4><span class="section-number">13.2.1.2. </span>Example</h4>
+<p>Example command to run order queue test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev --vdev=event_sw0 -- \</span>
+<span class="go">             --test=order_queue --plcores 1 --wlcores 2,3</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="order-atq-test">
+<h3><span class="section-number">13.2.2. </span>ORDER_ATQ Test</h3>
+<p>This test verifies the same aspects of <code class="docutils literal notranslate"><span class="pre">order_queue</span></code> test, the difference is
+the number of queues used, this test operates on a single <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue(atq)</span></code>
+instead of two different queues for ordered and atomic.</p>
+<span id="table-eventdev-order-atq-test"></span><table class="docutils align-default" id="id14">
+<caption><span class="caption-number">Table 13.2 </span><span class="caption-text">Order all types queue test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 5%" />
+<col style="width: 25%" />
+<col style="width: 28%" />
+<col style="width: 42%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>1</p></td>
+<td><p>q0(all types queue)</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>1</p></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+1</p></td>
+<td><p>Workers use port 0 to
+port n-1.Producer uses
+port n.</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id15">
+<span id="figure-eventdev-order-atq-test"></span><img alt="../_images/eventdev_order_atq_test.svg" src="../_images/eventdev_order_atq_test.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.4 </span><span class="caption-text">order all types queue test operation.</span></p>
+</figcaption>
+</figure>
+<section id="id2">
+<h4><span class="section-number">13.2.2.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--plcores
+--wlcores
+--nb_flows
+--nb_pkts
+--worker_deq_depth
+--deq_tmo_nsec
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h4><span class="section-number">13.2.2.2. </span>Example</h4>
+<p>Example command to run order <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev --vdev=event_octeontx -- \</span>
+<span class="go">                     --test=order_atq --plcores 1 --wlcores 2,3</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="perf-queue-test">
+<h3><span class="section-number">13.2.3. </span>PERF_QUEUE Test</h3>
+<p>This is a performance test case that aims at testing the following:</p>
+<ol class="arabic simple">
+<li><p>Measure the number of events can be processed in a second.</p></li>
+<li><p>Measure the latency to forward an event.</p></li>
+</ol>
+<span id="table-eventdev-perf-queue-test"></span><table class="docutils align-default" id="id16">
+<caption><span class="caption-number">Table 13.3 </span><span class="caption-text">Perf queue test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 19%" />
+<col style="width: 22%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>nb_producers *
+nb_stages</p></td>
+<td><p>Queues will be configured based on the
+user requested sched type list(–stlist)</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –plcores command line
+argument.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –wlcores command line
+argument</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+nb_producers</p></td>
+<td><p>Workers use port 0 to port n-1.
+Producers use port n to port p</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id17">
+<span id="figure-eventdev-perf-queue-test"></span><img alt="../_images/eventdev_perf_queue_test.svg" src="../_images/eventdev_perf_queue_test.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.5 </span><span class="caption-text">perf queue test operation.</span></p>
+</figcaption>
+</figure>
+<p>The perf queue test configures the eventdev with Q queues and P ports, where
+Q and P is a function of the number of workers, the number of producers and
+number of stages as mentioned in <a class="reference internal" href="#table-eventdev-perf-queue-test"><span class="std std-numref">Table 13.3</span></a>.</p>
+<p>The user can choose the number of workers, the number of producers and number of
+stages through the <code class="docutils literal notranslate"><span class="pre">--wlcores</span></code>, <code class="docutils literal notranslate"><span class="pre">--plcores</span></code> and the <code class="docutils literal notranslate"><span class="pre">--stlist</span></code> application
+command line arguments respectively.</p>
+<p>The producer(s) injects the events to eventdev based on the first stage sched type
+list requested by the user through <code class="docutils literal notranslate"><span class="pre">--stlist</span></code> command line argument. It can
+inject a burst of events using <code class="docutils literal notranslate"><span class="pre">--prod_enq_burst_sz</span></code> command line argument.</p>
+<p>Based on the number of stages to process(selected through <code class="docutils literal notranslate"><span class="pre">--stlist</span></code>),
+The application forwards the event to next upstream queue and terminates when it
+reaches the last stage in the pipeline. On event termination, application
+increments the number events processed and print periodically in one second
+to get the number of events processed in one second.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">--fwd_latency</span></code> command line option selected, the application inserts
+the timestamp in the event on the first stage and then on termination, it
+updates the number of cycles to forward a packet. The application uses this
+value to compute the average latency to a forward packet.</p>
+<p>When <code class="docutils literal notranslate"><span class="pre">--prod_type_ethdev</span></code> command line option is selected, the application
+uses the probed ethernet devices as producers by configuring them as Rx
+adapters instead of using synthetic producers.</p>
+<section id="id4">
+<h4><span class="section-number">13.2.3.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--plcores
+--wlcores
+--stlist
+--nb_flows
+--nb_pkts
+--worker_deq_depth
+--fwd_latency
+--queue_priority
+--prod_type_ethdev
+--prod_type_timerdev_burst
+--prod_type_timerdev
+--prod_type_cryptodev
+--prod_enq_burst_sz
+--timer_tick_nsec
+--max_tmo_nsec
+--expiry_nsec
+--nb_timers
+--nb_timer_adptrs
+--deq_tmo_nsec
+--crypto_adptr_mode
+</pre></div>
+</div>
+</section>
+<section id="id5">
+<h4><span class="section-number">13.2.3.2. </span>Example</h4>
+<p>Example command to run perf queue test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x1 --vdev=event_sw0 -- \</span>
+<span class="go">     --test=perf_queue --plcores=2 --wlcore=3 --stlist=p --nb_pkts=0</span>
+</pre></div>
+</div>
+<p>Example command to run perf queue test with producer enqueuing a burst of events:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x1 --vdev=event_sw0 -- \</span>
+<span class="go">     --test=perf_queue --plcores=2 --wlcore=3 --stlist=p --nb_pkts=0 \</span>
+<span class="go">     --prod_enq_burst_sz=32</span>
+</pre></div>
+</div>
+<p>Example command to run perf queue test with ethernet ports:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo build/app/dpdk-test-eventdev --vdev=event_sw0 -- \</span>
+<span class="go">     --test=perf_queue --plcores=2 --wlcore=3 --stlist=p --prod_type_ethdev</span>
+</pre></div>
+</div>
+<p>Example command to run perf queue test with event timer adapter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo  &lt;build_dir&gt;/app/dpdk-test-eventdev --vdev=&quot;event_octeontx&quot; -- \</span>
+<span class="go">             --wlcores 4 --plcores 12 --test perf_queue --stlist=a \</span>
+<span class="go">             --prod_type_timerdev --fwd_latency</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="perf-atq-test">
+<h3><span class="section-number">13.2.4. </span>PERF_ATQ Test</h3>
+<p>This is a performance test case that aims at testing the following with
+<code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue</span></code> eventdev scheme.</p>
+<ol class="arabic simple">
+<li><p>Measure the number of events can be processed in a second.</p></li>
+<li><p>Measure the latency to forward an event.</p></li>
+</ol>
+<span id="table-eventdev-perf-atq-test"></span><table class="docutils align-default" id="id18">
+<caption><span class="caption-number">Table 13.4 </span><span class="caption-text">Perf all types queue test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 19%" />
+<col style="width: 22%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>nb_producers</p></td>
+<td><p>Queues will be configured based on the
+user requested sched type list(–stlist)</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –plcores command line
+argument.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –wlcores command line
+argument</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+nb_producers</p></td>
+<td><p>Workers use port 0 to port n-1.
+Producers use port n to port p</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="id19">
+<span id="figure-eventdev-perf-atq-test"></span><img alt="../_images/eventdev_perf_atq_test.svg" src="../_images/eventdev_perf_atq_test.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.6 </span><span class="caption-text">perf all types queue test operation.</span></p>
+</figcaption>
+</figure>
+<p>The <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queues(atq)</span></code> perf test configures the eventdev with Q queues
+and P ports, where Q and P is a function of the number of workers and number of
+producers as mentioned in <a class="reference internal" href="#table-eventdev-perf-atq-test"><span class="std std-numref">Table 13.4</span></a>.</p>
+<p>The atq queue test functions as same as <code class="docutils literal notranslate"><span class="pre">perf_queue</span></code> test. The difference
+is, It uses, <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">type</span> <span class="pre">queue</span> <span class="pre">scheme</span></code> instead of separate queues for each
+stage and thus reduces the number of queues required to realize the use case
+and enables flow pinning as the event does not move to the next queue.</p>
+<section id="id6">
+<h4><span class="section-number">13.2.4.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--plcores
+--wlcores
+--stlist
+--nb_flows
+--nb_pkts
+--worker_deq_depth
+--fwd_latency
+--prod_type_ethdev
+--prod_type_timerdev_burst
+--prod_type_timerdev
+--prod_type_cryptodev
+--timer_tick_nsec
+--max_tmo_nsec
+--expiry_nsec
+--nb_timers
+--nb_timer_adptrs
+--deq_tmo_nsec
+--crypto_adptr_mode
+</pre></div>
+</div>
+</section>
+<section id="id7">
+<h4><span class="section-number">13.2.4.2. </span>Example</h4>
+<p>Example command to run perf <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue</span></code> test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev --vdev=event_octeontx -- \</span>
+<span class="go">             --test=perf_atq --plcores=2 --wlcore=3 --stlist=p --nb_pkts=0</span>
+</pre></div>
+</div>
+<p>Example command to run perf <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue</span></code> test with event timer adapter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo  &lt;build_dir&gt;/app/dpdk-test-eventdev --vdev=&quot;event_octeontx&quot; -- \</span>
+<span class="go">             --wlcores 4 --plcores 12 --test perf_atq --verbose 20 \</span>
+<span class="go">             --stlist=a --prod_type_timerdev --fwd_latency</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="pipeline-queue-test">
+<h3><span class="section-number">13.2.5. </span>PIPELINE_QUEUE Test</h3>
+<p>This is a pipeline test case that aims at testing the following:</p>
+<ol class="arabic simple">
+<li><p>Measure the end-to-end performance of an event dev with a ethernet dev.</p></li>
+<li><p>Maintain packet ordering from Rx to Tx.</p></li>
+</ol>
+<span id="table-eventdev-pipeline-queue-test"></span><table class="docutils align-default" id="id20">
+<caption><span class="caption-number">Table 13.5 </span><span class="caption-text">Pipeline queue test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 19%" />
+<col style="width: 22%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>(nb_producers
+* nb_stages) +
+nb_producers</p></td>
+<td><p>Queues will be configured based on the
+user requested sched type list(–stlist)
+At the last stage of the schedule list
+the event is enqueued onto per port
+unique queue which is then Transmitted.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Producers will be configured based on
+the number of detected ethernet devices.
+Each ethdev will be configured as an Rx
+adapter.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –wlcores command line
+argument</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+(nb_produces *
+2)</p></td>
+<td><p>Workers use port 0 to port n.
+Producers use port n+1 to port n+m,
+depending on the Rx adapter capability.
+Consumers use port n+m+1 to port n+o
+depending on the Tx adapter capability.</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="figure-eventdev-pipeline-queue-test-generic">
+<img alt="../_images/eventdev_pipeline_queue_test_generic.svg" src="../_images/eventdev_pipeline_queue_test_generic.svg" /></figure>
+<figure class="align-default" id="id21">
+<span id="figure-eventdev-pipeline-queue-test-internal-port"></span><img alt="../_images/eventdev_pipeline_queue_test_internal_port.svg" src="../_images/eventdev_pipeline_queue_test_internal_port.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.7 </span><span class="caption-text">pipeline queue test operation.</span></p>
+</figcaption>
+</figure>
+<p>The pipeline queue test configures the eventdev with Q queues and P ports,
+where Q and P is a function of the number of workers, the number of producers
+and number of stages as mentioned in <a class="reference internal" href="#table-eventdev-pipeline-queue-test"><span class="std std-numref">Table 13.5</span></a>.</p>
+<p>The user can choose the number of workers and number of stages through the
+<code class="docutils literal notranslate"><span class="pre">--wlcores</span></code> and the <code class="docutils literal notranslate"><span class="pre">--stlist</span></code> application command line arguments
+respectively.</p>
+<p>The number of producers depends on the number of ethernet devices detected and
+each ethernet device is configured as a event_eth_rx_adapter that acts as a
+producer.</p>
+<p>The producer(s) injects the events to eventdev based the first stage sched type
+list requested by the user through <code class="docutils literal notranslate"><span class="pre">--stlist</span></code> the command line argument.</p>
+<p>Based on the number of stages to process(selected through <code class="docutils literal notranslate"><span class="pre">--stlist</span></code>),
+The application forwards the event to next upstream queue and when it reaches
+the last stage in the pipeline if the event type is <code class="docutils literal notranslate"><span class="pre">atomic</span></code> it is enqueued
+onto ethdev Tx queue else to maintain ordering the event type is set to
+<code class="docutils literal notranslate"><span class="pre">atomic</span></code> and enqueued onto the last stage queue.</p>
+<p>If the ethdev and eventdev pair have <code class="docutils literal notranslate"><span class="pre">RTE_EVENT_ETH_TX_ADAPTER_CAP_INTERNAL_PORT</span></code>
+capability then the worker cores enqueue the packets to the eventdev directly
+using <code class="docutils literal notranslate"><span class="pre">rte_event_eth_tx_adapter_enqueue</span></code> else the worker cores enqueue the
+packet onto the <code class="docutils literal notranslate"><span class="pre">SINGLE_LINK_QUEUE</span></code> that is managed by the Tx adapter.
+The Tx adapter dequeues the packet and transmits it.</p>
+<p>On packet Tx, application increments the number events processed and print
+periodically in one second to get the number of events processed in one
+second.</p>
+<section id="id8">
+<h4><span class="section-number">13.2.5.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--wlcores
+--stlist
+--worker_deq_depth
+--prod_type_ethdev
+--deq_tmo_nsec
+--nb_eth_queues
+--enable_vector
+--vector_size
+--vector_tmo_ns
+--per_port_pool
+--tx_first
+--tx_pkt_sz
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--prod_type_ethdev</span></code> is mandatory for running this test.</p></li>
+</ul>
+</div>
+</section>
+<section id="id9">
+<h4><span class="section-number">13.2.5.2. </span>Example</h4>
+<p>Example command to run pipeline queue test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x8 --vdev=event_sw0 -- \</span>
+<span class="go">    --test=pipeline_queue --wlcore=1 --prod_type_ethdev --stlist=a</span>
+</pre></div>
+</div>
+<p>Example command to run pipeline atq test with vector events:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x8 --vdev=event_sw0 -- \</span>
+<span class="go">    --test=pipeline_queue --wlcore=1 --prod_type_ethdev --stlist=a \</span>
+<span class="go">    --enable_vector  --vector_size 512</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="pipeline-atq-test">
+<h3><span class="section-number">13.2.6. </span>PIPELINE_ATQ Test</h3>
+<p>This is a pipeline test case that aims at testing the following with
+<code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">types</span> <span class="pre">queue</span></code> eventdev scheme.</p>
+<ol class="arabic simple">
+<li><p>Measure the end-to-end performance of an event dev with a ethernet dev.</p></li>
+<li><p>Maintain packet ordering from Rx to Tx.</p></li>
+</ol>
+<span id="table-eventdev-pipeline-atq-test"></span><table class="docutils align-default" id="id22">
+<caption><span class="caption-number">Table 13.6 </span><span class="caption-text">Pipeline atq test eventdev configuration.</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 19%" />
+<col style="width: 22%" />
+<col style="width: 55%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Items</p></th>
+<th class="head"><p>Value</p></th>
+<th class="head"><p>Comments</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>nb_queues</p></td>
+<td><p>nb_producers +
+x</p></td>
+<td><p>Queues will be configured based on the
+user requested sched type list(–stlist)
+where x = nb_producers in generic
+pipeline and 0 if all the ethdev
+being used have Internal port capability</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>nb_producers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Producers will be configured based on
+the number of detected ethernet devices.
+Each ethdev will be configured as an Rx
+adapter.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>nb_workers</p></td>
+<td><p>&gt;= 1</p></td>
+<td><p>Selected through –wlcores command line
+argument</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>nb_ports</p></td>
+<td><p>nb_workers +
+nb_producers +
+x</p></td>
+<td><p>Workers use port 0 to port n.
+Producers use port n+1 to port n+m,
+depending on the Rx adapter capability.
+x = nb_producers in generic pipeline and
+0 if all the ethdev being used have
+Internal port capability.
+Consumers may use port n+m+1 to port n+o
+depending on the Tx adapter capability.</p></td>
+</tr>
+</tbody>
+</table>
+<figure class="align-default" id="figure-eventdev-pipeline-atq-test-generic">
+<img alt="../_images/eventdev_pipeline_atq_test_generic.svg" src="../_images/eventdev_pipeline_atq_test_generic.svg" /></figure>
+<figure class="align-default" id="id23">
+<span id="figure-eventdev-pipeline-atq-test-internal-port"></span><img alt="../_images/eventdev_pipeline_atq_test_internal_port.svg" src="../_images/eventdev_pipeline_atq_test_internal_port.svg" /><figcaption>
+<p><span class="caption-number">Fig. 13.8 </span><span class="caption-text">pipeline atq test operation.</span></p>
+</figcaption>
+</figure>
+<p>The pipeline atq test configures the eventdev with Q queues and P ports,
+where Q and P is a function of the number of workers, the number of producers
+and number of stages as mentioned in <a class="reference internal" href="#table-eventdev-pipeline-atq-test"><span class="std std-numref">Table 13.6</span></a>.</p>
+<p>The atq queue test functions as same as <code class="docutils literal notranslate"><span class="pre">pipeline_queue</span></code> test. The difference
+is, It uses, <code class="docutils literal notranslate"><span class="pre">all</span> <span class="pre">type</span> <span class="pre">queue</span> <span class="pre">scheme</span></code> instead of separate queues for each
+stage and thus reduces the number of queues required to realize the use case.</p>
+<section id="id10">
+<h4><span class="section-number">13.2.6.1. </span>Application options</h4>
+<p>Supported application command line options are following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--verbose
+--dev
+--test
+--socket_id
+--pool_sz
+--wlcores
+--stlist
+--worker_deq_depth
+--prod_type_ethdev
+--deq_tmo_nsec
+--nb_eth_queues
+--enable_vector
+--vector_size
+--vector_tmo_ns
+--per_port_pool
+--tx_first
+--tx_pkt_sz
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">--prod_type_ethdev</span></code> is mandatory for running this test.</p></li>
+</ul>
+</div>
+</section>
+<section id="id11">
+<h4><span class="section-number">13.2.6.2. </span>Example</h4>
+<p>Example command to run pipeline atq test:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x8 --vdev=event_sw0 -- \</span>
+<span class="go">    --test=pipeline_atq --wlcore=1 --prod_type_ethdev --stlist=a</span>
+</pre></div>
+</div>
+<p>Example command to run pipeline atq test with vector events:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo &lt;build_dir&gt;/app/dpdk-test-eventdev -c 0xf -s 0x8 --vdev=event_sw0 -- \</span>
+<span class="go">    --test=pipeline_atq --wlcore=1 --prod_type_ethdev --stlist=a \</span>
+<span class="go">    --enable_vector  --vector_size 512</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DPDK Tools User Guides</a><ul>
+      <li>Previous: <a href="comp_perf.html" title="previous chapter"><span class="section-number">12. </span>dpdk-test-compress-perf Tool</a></li>
+      <li>Next: <a href="testregex.html" title="next chapter"><span class="section-number">14. </span>dpdk-test-regex Tool</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/testeventdev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

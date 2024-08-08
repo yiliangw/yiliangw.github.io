@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>9. IP Fragmentation Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="10. IPv4 Multicast Sample Application" href="ipv4_multicast.html" />
+    <link rel="prev" title="8. Basic RTE Flow Filtering Sample Application" href="flow_filtering.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ip-fragmentation-sample-application">
+<h1><span class="section-number">9. </span>IP Fragmentation Sample Application</h1>
+<p>The IPv4 Fragmentation application is a simple example of packet processing
+using the Data Plane Development Kit (DPDK).
+The application does L3 forwarding with IPv4 and IPv6 packet fragmentation.</p>
+<section id="overview">
+<h2><span class="section-number">9.1. </span>Overview</h2>
+<p>The application demonstrates the use of zero-copy buffers for packet fragmentation.
+The initialization and run-time paths are very similar to those of the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a>.
+This guide highlights the differences between the two applications.</p>
+<p>There are three key differences from the L2 Forwarding sample application:</p>
+<ul class="simple">
+<li><p>The first difference is that the IP Fragmentation sample application makes use of indirect buffers.</p></li>
+<li><p>The second difference is that the forwarding decision is taken
+based on information read from the input packet’s IP header.</p></li>
+<li><p>The third difference is that the application differentiates between
+IP and non-IP traffic by means of offload flags.</p></li>
+</ul>
+<p>The Longest Prefix Match (LPM for IPv4, LPM6 for IPv6) table is used to store/lookup an outgoing port number,
+associated with that IP address.
+Any unmatched packets are forwarded to the originating port.</p>
+<p>By default, input frame sizes up to 9.5 KB are supported.
+Before forwarding, the input IP packet is fragmented to fit into the “standard” Ethernet* v2 MTU (1500 bytes).</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">9.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">ip_fragmentation</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">9.3. </span>Running the Application</h2>
+<p>The LPM object is created and loaded with the pre-configured entries read from
+global l3fwd_ipv4_route_array and l3fwd_ipv6_route_array tables.
+For each input packet, the packet forwarding decision
+(that is, the identification of the output interface for the packet) is taken as a result of LPM lookup.
+If the IP packet size is greater than default output MTU,
+then the input packet is fragmented and several fragments are sent via the output interface.</p>
+<p>Application usage:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_fragmentation [EAL options] -- -p PORTMASK [-q NQ]</span>
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p>-p PORTMASK is a hexadecimal bitmask of ports to configure</p></li>
+<li><p>-q NQ is the number of queue (=ports) per lcore (the default is 1)</p></li>
+</ul>
+<p>To run the example in linux environment with 2 lcores (2,4) over 2 ports(0,2) with 1 RX queue per lcore:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_fragmentation -l 2,4 -n 3 -- -p 5</span>
+<span class="go">EAL: coremask set to 14</span>
+<span class="go">EAL: Detected lcore 0 on socket 0</span>
+<span class="go">EAL: Detected lcore 1 on socket 1</span>
+<span class="go">EAL: Detected lcore 2 on socket 0</span>
+<span class="go">EAL: Detected lcore 3 on socket 1</span>
+<span class="go">EAL: Detected lcore 4 on socket 0</span>
+<span class="go">...</span>
+
+<span class="go">Initializing port 0 on lcore 2... Address:00:1B:21:76:FA:2C, rxq=0 txq=2,0 txq=4,1</span>
+<span class="go">done: Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Skipping disabled port 1</span>
+<span class="go">Initializing port 2 on lcore 4... Address:00:1B:21:5C:FF:54, rxq=0 txq=2,0 txq=4,1</span>
+<span class="go">done: Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Skipping disabled port 3IP_FRAG: Socket 0: adding route 100.10.0.0/16 (port 0)</span>
+<span class="go">IP_FRAG: Socket 0: adding route 100.20.0.0/16 (port 1)</span>
+<span class="go">...</span>
+<span class="go">IP_FRAG: Socket 0: adding route 0101:0101:0101:0101:0101:0101:0101:0101/48 (port 0)</span>
+<span class="go">IP_FRAG: Socket 0: adding route 0201:0101:0101:0101:0101:0101:0101:0101/48 (port 1)</span>
+<span class="go">...</span>
+<span class="go">IP_FRAG: entering main loop on lcore 4</span>
+<span class="go">IP_FRAG: -- lcoreid=4 portid=2</span>
+<span class="go">IP_FRAG: entering main loop on lcore 2</span>
+<span class="go">IP_FRAG: -- lcoreid=2 portid=0</span>
+</pre></div>
+</div>
+<p>To run the example in linux environment with 1 lcore (4) over 2 ports(0,2) with 2 RX queues per lcore:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-ip_fragmentation -l 4 -n 3 -- -p 5 -q 2</span>
+</pre></div>
+</div>
+<p>To test the application, flows should be set up in the flow generator that match the values in the
+l3fwd_ipv4_route_array and/or l3fwd_ipv6_route_array table.</p>
+<p>The default l3fwd_ipv4_route_array table is:</p>
+<p>The default l3fwd_ipv6_route_array table is:</p>
+<p>For example, for the input IPv4 packet with destination address: 100.10.1.1 and packet length 9198 bytes,
+seven IPv4 packets will be sent out from port #0 to the destination address 100.10.1.1:
+six of those packets will have length 1500 bytes and one packet will have length 318 bytes.
+IP Fragmentation sample application provides basic NUMA support
+in that all the memory structures are allocated on all sockets that have active lcores on them.</p>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running applications
+and the Environment Abstraction Layer (EAL) options.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="flow_filtering.html" title="previous chapter"><span class="section-number">8. </span>Basic RTE Flow Filtering Sample Application</a></li>
+      <li>Next: <a href="ipv4_multicast.html" title="next chapter"><span class="section-number">10. </span>IPv4 Multicast Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/ip_frag.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

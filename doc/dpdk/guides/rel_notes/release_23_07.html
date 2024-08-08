@@ -1,0 +1,734 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. DPDK Release 23.07 &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. DPDK Release 23.03" href="release_23_03.html" />
+    <link rel="prev" title="1. DPDK Release 23.11" href="release_23_11.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-release-23-07">
+<h1><span class="section-number">2. </span>DPDK Release 23.07</h1>
+<section id="new-features">
+<h2><span class="section-number">2.1. </span>New Features</h2>
+<ul>
+<li><p><strong>Added AMD CDX bus support.</strong></p>
+<p>CDX bus driver has been added to support the AMD CDX bus
+which operates on FPGA based CDX devices.
+The CDX devices are memory mapped on system buses for embedded CPUs.</p>
+</li>
+<li><p><strong>Added MMIO read and write API to PCI bus.</strong></p>
+<p>Introduced <code class="docutils literal notranslate"><span class="pre">rte_pci_mmio_read()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_pci_mmio_write()</span></code> APIs
+to PCI bus so that PCI drivers can access PCI memory resources
+when they are not mapped to process address spaces.</p>
+</li>
+<li><p><strong>Added ethdev Rx/Tx queue ID check API.</strong></p>
+<p>Added ethdev Rx/Tx queue ID check API.
+If the queue has been set up it is considered valid.</p>
+</li>
+<li><p><strong>Added LLRS FEC mode in ethdev.</strong></p>
+<p>Added LLRS algorithm to Forward Error Correction (FEC) modes.</p>
+</li>
+<li><p><strong>Added flow matching of Tx queue.</strong></p>
+<p>Added <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ITEM_TYPE_TX_QUEUE</span></code> rte_flow pattern
+to match the Tx queue of the sent packet.</p>
+</li>
+<li><p><strong>Added flow matching of Infiniband BTH.</strong></p>
+<p>Added <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ITEM_TYPE_IB_BTH</span></code> to match Infiniband BTH fields.</p>
+</li>
+<li><p><strong>Added actions to push or remove IPv6 extension.</strong></p>
+<p>Added <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_IPV6_EXT_PUSH</span></code> and <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_IPV6_EXT_PUSH</span></code>
+to push or remove the specific IPv6 extension into or from the packets.
+Push always puts the new extension as the last one due to the next header awareness.</p>
+</li>
+<li><p><strong>Added indirect list flow action.</strong></p>
+<p>Added API to manage (create, destroy, update) a list of indirect actions.</p>
+</li>
+<li><p><strong>Added flow rule update.</strong></p>
+<ul class="simple">
+<li><p>Added API for updating the action list in an already existing rule.
+Introduced both <code class="docutils literal notranslate"><span class="pre">rte_flow_actions_update()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_flow_async_actions_update()</span></code> functions.</p></li>
+</ul>
+</li>
+<li><p><strong>Added vhost callback API for interrupt handling.</strong></p>
+<p>Introduced a new callback, <code class="docutils literal notranslate"><span class="pre">guest_notify</span></code> that can be used to handle
+the interrupt kick outside of the datapath fast path.
+In addition, a new API, <code class="docutils literal notranslate"><span class="pre">rte_vhost_notify_guest()</span></code>,
+was added to raise the interrupt outside of the fast path.</p>
+</li>
+<li><p><strong>Added vhost API to set maximum queue pairs supported.</strong></p>
+<p>Introduced <code class="docutils literal notranslate"><span class="pre">rte_vhost_driver_set_max_queue_num()</span></code> to be able to limit
+the maximum number of supported queue pairs, required for VDUSE support.</p>
+</li>
+<li><p><strong>Added VDUSE support into vhost library.</strong></p>
+<p>VDUSE aims at implementing vDPA devices in userspace.
+It can be used as an alternative to Vhost-user when using Vhost-vDPA,
+but it also enables providing a virtio-net netdev to the host
+when using Virtio-vDPA driver.</p>
+<p>A limitation in this release is the lack of reconnection support.
+While VDUSE support is already available in the upstream kernel,
+a couple of patches are required to support network device types,
+which are being upstreamed:
+<a class="reference external" href="https://lore.kernel.org/all/20230419134329.346825-1-maxime.coquelin&#64;redhat.com/">https://lore.kernel.org/all/20230419134329.346825-1-maxime.coquelin&#64;redhat.com/</a></p>
+</li>
+<li><p><strong>Updated Google GVE net driver.</strong></p>
+<ul class="simple">
+<li><p>Added DQO queue descriptor format support.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel e1000 driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for new I219 devices.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel igc driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for I225-LMVP.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel ice driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for link speed change.</p></li>
+<li><p>Added support for double VLAN.</p></li>
+<li><p>Added support for UDP fragmentation offload.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel iavf driver.</strong></p>
+<ul class="simple">
+<li><p>Added new AVX2 Rx/Tx to use HW offload features.</p></li>
+<li><p>Added support for Rx timestamp offload on vector paths.</p></li>
+<li><p>Added support for UDP fragmentation offload.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel idpf driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for Intel IPU E2100 VF.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel cpfl driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for hairpin queue.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Marvell cnxk ethdev driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for reassembly of multi-segment packets.</p></li>
+<li><p>Extended <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_PORT_ID</span></code> to redirect traffic across PF ports.</p></li>
+<li><p>Added support for inline MACsec processing using security library
+for CN103 platform.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated NVIDIA mlx5 net driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for multi-packet receive queue (MPRQ) on Windows.</p></li>
+<li><p>Added support for CQE compression on Windows.</p></li>
+<li><p>Added support for enhanced multi-packet write on Windows.</p></li>
+<li><p>Added support for InfiniBand BTH matching.</p></li>
+<li><p>Added support for quota flow action and item.</p></li>
+<li><p>Added support for flow rule update.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Solarflare network PMD.</strong></p>
+<ul class="simple">
+<li><p>Added support for configuring FEC mode, querying FEC capabilities and
+current FEC mode from a device.</p></li>
+<li><p>Added partial support for transfer flow actions <code class="docutils literal notranslate"><span class="pre">SET_IPV4_DST</span></code>, <code class="docutils literal notranslate"><span class="pre">SET_TP_DST</span></code>,
+<code class="docutils literal notranslate"><span class="pre">SET_IPV4_SRC</span></code> and <code class="docutils literal notranslate"><span class="pre">SET_TP_SRC</span></code> on SN1000 SmartNICs.</p></li>
+<li><p>Added support for transfer flow action <code class="docutils literal notranslate"><span class="pre">INDIRECT</span></code> with subtype <code class="docutils literal notranslate"><span class="pre">COUNT</span></code>,
+for aggregated statistics.</p></li>
+<li><p>Added support for keeping CRC.</p></li>
+<li><p>Added VLAN stripping support on SN1000 SmartNICs.</p></li>
+</ul>
+</li>
+<li><p><strong>Added vmxnet3 version 7 support.</strong></p>
+<p>Added support for vmxnet3 version 7 which includes support
+for uniform passthrough (UPT). The patches also add support
+for new capability registers, large passthrough BAR and some
+performance enhancements for UPT.</p>
+</li>
+<li><p><strong>Added new algorithms to cryptodev.</strong></p>
+<ul class="simple">
+<li><p>Added asymmetric algorithm ShangMi 2 (SM2) along with prime field curve support.</p></li>
+<li><p>Added symmetric hash algorithm SM3-HMAC.</p></li>
+<li><p>Added symmetric cipher algorithm ShangMi 4 (SM4) in CFB and OFB modes.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel QuickAssist Technology (QAT) crypto driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for combined Cipher-CRC offload for DOCSIS for QAT GENs 2, 3 and 4.</p></li>
+<li><p>Added support for SM3-HMAC algorithm for QAT GENs 3 and 4.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Marvell cnxk crypto driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for PDCP chain in cn10k crypto driver.</p></li>
+<li><p>Added support for SM3 hash operations.</p></li>
+<li><p>Added support for SM4 operations in cn10k driver.</p></li>
+<li><p>Added support for AES-CCM in cn9k and cn10k drivers.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated NVIDIA mlx5 crypto driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for AES-GCM crypto.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated OpenSSL crypto driver.</strong></p>
+<ul class="simple">
+<li><p>Added SM2 algorithm support in asymmetric crypto operations.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated ipsec_mb crypto driver.</strong></p>
+<ul class="simple">
+<li><p>Added Intel IPsec MB v1.4 library support for x86 platform.</p></li>
+</ul>
+</li>
+<li><p><strong>Added PDCP Library.</strong></p>
+<p>Added an experimental library to provide PDCP UL and DL processing of packets.</p>
+<p>The library supports all PDCP algorithms
+and leverages lookaside crypto offloads to cryptodevs for crypto processing.
+PDCP features such as IV generation, sequence number handling, etc are supported.
+It is planned to add more features such as packet caching in future releases.</p>
+<p>See <a class="reference internal" href="../prog_guide/pdcp_lib.html"><span class="doc">PDCP Protocol Processing Library</span></a> for more information.</p>
+</li>
+<li><p><strong>Added TCP/IPv6 support in GRO library.</strong></p>
+<p>Enhanced the GRO library to support TCP packets over IPv6 network.</p>
+</li>
+<li><p><strong>Added mcore dispatch model in graph library.</strong></p>
+<ul class="simple">
+<li><p>Added set, get and validate model APIs to enhance graph framework
+to allow choice of different walk models.</p></li>
+<li><p>Added mcore dispatch model to support cross-core dispatching mechanism.</p></li>
+<li><p>Added a command option <code class="docutils literal notranslate"><span class="pre">--model</span></code> in l3fwd-graph example
+to choose RTC or mcore dispatch model.</p></li>
+</ul>
+</li>
+<li><p><strong>Added DMA device performance test application.</strong></p>
+<p>Added an application to test the performance of DMA device and CPU.</p>
+<p>See the <a class="reference internal" href="../tools/dmaperf.html"><span class="doc">dpdk-test-dma-perf Application</span></a> for more details.</p>
+</li>
+</ul>
+</section>
+<section id="removed-items">
+<h2><span class="section-number">2.2. </span>Removed Items</h2>
+<ul class="simple">
+<li><p>Removed LiquidIO ethdev driver located at <code class="docutils literal notranslate"><span class="pre">drivers/net/liquidio/</span></code>.</p></li>
+</ul>
+</section>
+<section id="api-changes">
+<h2><span class="section-number">2.3. </span>API Changes</h2>
+<ul class="simple">
+<li><p>ethdev: Ensured all entries in MAC address list are unique.
+When setting a default MAC address with the function
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_default_mac_addr_set</span></code>,
+the default one needs to be removed by the user
+if it was already in the address list.</p></li>
+</ul>
+</section>
+<section id="abi-changes">
+<h2><span class="section-number">2.4. </span>ABI Changes</h2>
+<ul class="simple">
+<li><p>No ABI change that would break compatibility with 22.11.</p></li>
+<li><p>ethdev: In the experimental <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_flow_action_modify_data</span></code>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">level</span></code> field was reduced to 8 bits.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tag_index</span></code> field replaced <code class="docutils literal notranslate"><span class="pre">level</span></code> field in representing tag array for
+<code class="docutils literal notranslate"><span class="pre">RTE_FLOW_FIELD_TAG</span></code> type.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="known-issues">
+<h2><span class="section-number">2.5. </span>Known Issues</h2>
+<ul>
+<li><p><strong>Testpmd is not forwarding on queues individually stopped.</strong></p>
+<p>Testpmd forwards packets on started queues.
+If a queue explicitly stopped, and later port stopped and started again,
+the status of the previously stopped queue is not updated,
+so forwarding is not working on those queues.</p>
+<p>As a workaround start queues back explicitly, instead of port stop/start.</p>
+</li>
+</ul>
+</section>
+<section id="tested-platforms">
+<h2><span class="section-number">2.6. </span>Tested Platforms</h2>
+<ul class="simple">
+<li><p>Intel® platforms with Intel® NICs combinations</p>
+<ul>
+<li><p>CPU</p>
+<ul>
+<li><p>Intel® Atom™ CPU C3758 &#64; 2.20GHz</p></li>
+<li><p>Intel® Xeon® CPU D-1553N &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2699 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel® Xeon® D-1747NTE CPU &#64; 2.50GHz</p></li>
+<li><p>Intel® Xeon® D-2796NT CPU &#64; 2.00GHz</p></li>
+<li><p>Intel® Xeon® Gold 6139 CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Gold 6140M CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Gold 6252N CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Gold 6348 CPU &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® Platinum 8180 CPU &#64; 2.50GHz</p></li>
+<li><p>Intel® Xeon® Platinum 8280M CPU &#64; 2.70GHz</p></li>
+<li><p>Intel® Xeon® Platinum 8380 CPU &#64; 2.30GHz</p></li>
+<li><p>Genuine Intel® 0000</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>CBL Mariner 2.0</p></li>
+<li><p>Fedora 38</p></li>
+<li><p>FreeBSD 13.2</p></li>
+<li><p>OpenAnolis OS 8.8</p></li>
+<li><p>Red Hat Enterprise Linux Server release 8.7</p></li>
+<li><p>Red Hat Enterprise Linux Server release 9.0</p></li>
+<li><p>SUSE Linux Enterprise Server 15 SP4</p></li>
+<li><p>Ubuntu 22.04.2</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Intel® Ethernet Controller E810-C for SFP (4x25G)</p>
+<ul>
+<li><p>Firmware version: 4.30 0x80019dcc 1.3415.0</p></li>
+<li><p>Device id (pf/vf): 8086:1593 / 8086:1889</p></li>
+<li><p>Driver version(out-tree): 1.12.4_dirty (ice)</p></li>
+<li><p>Driver version(in-tree): 5.15.0-70-generic (Ubuntu22.04.2)/ 5.14.0-70.13.1.rt21.83.el9_0.x86_64 (RHEL9.0)/ 5.15.107-rt62 (Ubuntu22.04.2)(ice)</p></li>
+<li><p>OS Default DDP: 1.3.35.0</p></li>
+<li><p>COMMS DDP: 1.3.45.0</p></li>
+<li><p>Wireless Edge DDP: 1.3.13.0</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller E810-C for QSFP (2x100G)</p>
+<ul>
+<li><p>Firmware version: 4.30 0x80019dad 1.3415.0</p></li>
+<li><p>Device id (pf/vf): 8086:1592 / 8086:1889</p></li>
+<li><p>Driver version(out-tree): 1.12.4_dirty (ice)</p></li>
+<li><p>Driver version(in-tree): 5.15.55.1-1.cm2-5464b22cac7+ (CBL Mariner 2.0) (ice)</p></li>
+<li><p>OS Default DDP: 1.3.35.0</p></li>
+<li><p>COMMS DDP: 1.3.45.0</p></li>
+<li><p>Wireless Edge DDP: 1.3.13.0</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller E810-XXV for SFP (2x25G)</p>
+<ul>
+<li><p>Firmware version: 4.30 0x80019da5 1.3415.0</p></li>
+<li><p>Device id (pf/vf): 8086:159b / 8086:1889</p></li>
+<li><p>Driver version: 1.12.4_dirty (ice)</p></li>
+<li><p>OS Default DDP: 1.3.35.0</p></li>
+<li><p>COMMS DDP: 1.3.45.0</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Connection E823-C for QSFP</p>
+<ul>
+<li><p>Firmware version: 3.32 0x8001a33d 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:188b / 8086:1889</p></li>
+<li><p>Driver version: 1.12.4_dirty (ice)</p></li>
+<li><p>OS Default DDP: 1.3.35.0</p></li>
+<li><p>COMMS DDP: 1.3.45.0</p></li>
+<li><p>Wireless Edge DDP: 1.3.13.0</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Connection E823-L for QSFP</p>
+<ul>
+<li><p>Firmware version: 3.32 0x8001a66d 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:124c / 8086:1889</p></li>
+<li><p>Driver version: 1.12.4_dirty (ice)</p></li>
+<li><p>OS Default DDP: 1.3.35.0</p></li>
+<li><p>COMMS DDP: 1.3.45.0</p></li>
+<li><p>Wireless Edge DDP: 1.3.13.0</p></li>
+</ul>
+</li>
+<li><p>Intel® 82599ES 10 Gigabit Ethernet Controller</p>
+<ul>
+<li><p>Firmware version: 0x61bf0001</p></li>
+<li><p>Device id (pf/vf): 8086:10fb / 8086:10ed</p></li>
+<li><p>Driver version(out-tree): 5.18.13 (ixgbe)</p></li>
+<li><p>Driver version(in-tree): 5.15.0-70-generic (Ubuntu22.04.2)/ 5.14.0-70.13.1.el9_0.x86_64 (RHEL9.0)(ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter X710-DA4 (4x10G)</p>
+<ul>
+<li><p>Firmware version: 9.20 0x8000d8bd 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:1572 / 8086:154c</p></li>
+<li><p>Driver version(out-tree): 2.23.5 (Fedora 38)(i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Connection X722 for 10GbE SFP+ (2x10G)</p>
+<ul>
+<li><p>Firmware version: 6.20 0x80003d82 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:37d0 / 8086:37cd</p></li>
+<li><p>Driver version(out-tree): 2.22.20 (i40e)</p></li>
+<li><p>Driver version(in-tree): 5.14.0-70.13.1.el9_0.x86_64 (RHEL9.0)(i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Connection X722 for 10GBASE-T</p>
+<ul>
+<li><p>Firmware version: 6.20 0x80003d3e 1.2935.0</p></li>
+<li><p>Device id (pf/vf): 8086:37d2 / 8086:37cd</p></li>
+<li><p>Driver version(out-tree): 2.22.20 (i40e)</p></li>
+<li><p>Driver version(in-tree): 5.14.0-70.13.1.el9_0.x86_64 (RHEL9.0) (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter XXV710-DA2 (2x25G)</p>
+<ul>
+<li><p>Firmware version: 9.20 0x8000d89c 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:158b / 8086:154c</p></li>
+<li><p>Driver version(out-tree): 2.22.20 (i40e)</p></li>
+<li><p>Driver version(in-tree): 5.15.0-71-generic (Ubuntu22.04.2)/5.14.0-70.13.1.el9_0.x86_64 (RHEL9.0)(i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter XL710-QDA2 (2X40G)</p>
+<ul>
+<li><p>Firmware version(PF): 9.20 0x8000d893 1.3353.0</p></li>
+<li><p>Device id (pf/vf): 8086:1583 / 8086:154c</p></li>
+<li><p>Driver version(out-tree): 2.22.20 /2.23.5 (Fedora 38)(i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller I225-LM</p>
+<ul>
+<li><p>Firmware version: 1.3, 0x800000c9</p></li>
+<li><p>Device id (pf): 8086:15f2</p></li>
+<li><p>Driver version(in-tree): 5.15.0-70-generic (Ubuntu22.04.2)(igc)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller I226-LM</p>
+<ul>
+<li><p>Firmware version: 2.14, 0x8000028c</p></li>
+<li><p>Device id (pf): 8086:125b</p></li>
+<li><p>Driver version(in-tree): 5.15.0-71-generic (Ubuntu22.04.2)(igc)</p></li>
+</ul>
+</li>
+<li><p>Intel Corporation Ethernet Connection (16) I219-V</p>
+<ul>
+<li><p>Firmware version: 0.6-4</p></li>
+<li><p>Device id (pf): 8086:1a1f</p></li>
+<li><p>Driver version(in-tree): 5.15.113-rt64 (Ubuntu22.04.2)(e1000)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Intel® platforms with NVIDIA® NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>Intel® Xeon® Gold 6154 CPU &#64; 3.00GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2697A v4 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2697 v3 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2670 0 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 v3 &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2640 &#64; 2.50GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 0 &#64; 2.00GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2620 v4 &#64; 2.10GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux release 9.1 (Plow)</p></li>
+<li><p>Red Hat Enterprise Linux release 8.6 (Ootpa)</p></li>
+<li><p>Red Hat Enterprise Linux release 8.4 (Ootpa)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.9 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.6 (Maipo)</p></li>
+<li><p>Ubuntu 22.04</p></li>
+<li><p>Ubuntu 20.04</p></li>
+<li><p>SUSE Enterprise Linux 15 SP2</p></li>
+</ul>
+</li>
+<li><p>OFED:</p>
+<ul>
+<li><p>MLNX_OFED 23.04-1.1.3.0 and above</p></li>
+</ul>
+</li>
+<li><p>upstream kernel:</p>
+<ul>
+<li><p>Linux 6.4.0 and above</p></li>
+</ul>
+</li>
+<li><p>rdma-core:</p>
+<ul>
+<li><p>rdma-core-46.0 and above</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>NVIDIA® ConnectX®-3 Pro 40G MCX354A-FCC_Ax (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-3 Pro 40G MCX354A-FCCT (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-4 Lx 50G MCX4131A-GCAT (1x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-5 100G MCX516A-CCAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-5 100G MCX556A-EDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-5 Ex EN 100G MCX516A-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:1019</p></li>
+<li><p>Firmware version: 16.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-6 Dx EN 100G MCX623106AN-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:101d</p></li>
+<li><p>Firmware version: 22.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-6 Lx EN 25G MCX631102AN-ADAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x8</p></li>
+<li><p>Device ID: 15b3:101f</p></li>
+<li><p>Firmware version: 26.37.1014 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-7 200G CX713106AE-HEA_QP1_Ax (2x200G)</p>
+<ul>
+<li><p>Host interface: PCI Express 5.0 x16</p></li>
+<li><p>Device ID: 15b3:1021</p></li>
+<li><p>Firmware version: 28.37.1014 and above</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>NVIDIA® BlueField® SmartNIC</p>
+<ul>
+<li><p>NVIDIA® BlueField®-2 SmartNIC MT41686 - MBF2H332A-AEEOT_A1 (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:a2d6</p></li>
+<li><p>Firmware version: 24.37.1300 and above</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® BlueField®-3 P-Series DPU MT41692 - 900-9D3B6-00CV-AAB (2x200G)</p>
+<ul>
+<li><p>Host interface: PCI Express 5.0 x16</p></li>
+<li><p>Device ID: 15b3:a2dc</p></li>
+<li><p>Firmware version: 32.37.1306 and above</p></li>
+</ul>
+</li>
+<li><p>Embedded software:</p>
+<ul>
+<li><p>Ubuntu 22.04</p></li>
+<li><p>MLNX_OFED 23.04-0.5.3.0 and above</p></li>
+<li><p>DOCA_2.0.2 BSP_4.0.3_Ubuntu_22.04-8.23-04</p></li>
+<li><p>DPDK application running on ARM cores</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>IBM Power 9 platforms with NVIDIA® NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>POWER9 2.2 (pvr 004e 1202)</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Ubuntu 20.04</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>NVIDIA® ConnectX®-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.37.1014</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-6 Dx 100G MCX623106AN-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:101d</p></li>
+<li><p>Firmware version: 22.37.1014</p></li>
+</ul>
+</li>
+<li><p>NVIDIA® ConnectX®-7 200G CX713106AE-HEA_QP1_Ax (2x200G)</p>
+<ul>
+<li><p>Host interface: PCI Express 5.0 x16</p></li>
+<li><p>Device ID: 15b3:1021</p></li>
+<li><p>Firmware version: 28.37.1014 and above</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>OFED:</p>
+<ul>
+<li><p>MLNX_OFED 23.04-1.1.3.0</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Release Notes</a><ul>
+      <li>Previous: <a href="release_23_11.html" title="previous chapter"><span class="section-number">1. </span>DPDK Release 23.11</a></li>
+      <li>Next: <a href="release_23_03.html" title="next chapter"><span class="section-number">3. </span>DPDK Release 23.03</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rel_notes/release_23_07.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,215 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>34. IPN3KE Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="35. IXGBE Driver" href="ixgbe.html" />
+    <link rel="prev" title="33. IONIC Driver" href="ionic.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ipn3ke-poll-mode-driver">
+<h1><span class="section-number">34. </span>IPN3KE Poll Mode Driver</h1>
+<p>The ipn3ke PMD (<strong>librte_net_ipn3ke</strong>) provides poll mode driver support
+for Intel® FPGA PAC(Programmable Acceleration Card) N3000 based on
+the Intel Ethernet Controller X710/XXV710 and Intel Arria 10 FPGA.</p>
+<p>In this card, FPGA is an acceleration bridge between network interface
+and the Intel Ethernet Controller. Although both FPGA and Ethernet
+Controllers are connected to CPU with PCIe Gen3x16 Switch, all the
+packet RX/TX is handled by Intel Ethernet Controller. So from application
+point of view the data path is still the legacy Intel Ethernet Controller
+X710/XXV710 PMD. Besides this, users can enable more acceleration
+features by FPGA IP.</p>
+<section id="prerequisites">
+<h2><span class="section-number">34.1. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Identifying your adapter using <a class="reference external" href="http://www.intel.com/support">Intel Support</a> and get the latest NVM/FW images.</p></li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+<li><p>To get better performance on Intel platforms, please follow the “How to get best performance with NICs on Intel platforms”
+section of the <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a>.</p></li>
+</ul>
+</section>
+<section id="configuration">
+<h2><span class="section-number">34.2. </span>Configuration</h2>
+<section id="runtime-configuration">
+<h3><span class="section-number">34.2.1. </span>Runtime Configuration</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">AFU</span> <span class="pre">name</span></code></p>
+<p>AFU name identifies which AFU is used by IPN3KE. The AFU name format is “Port|BDF”,
+Each FPGA can be divided into four blocks at most. “Port” identifies which FPGA block
+the AFU bitstream belongs to, but currently only 0 IPN3KE support. “BDF” means FPGA PCIe BDF.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;ipn3ke_cfg0,afu=0|b3:00.0&#39;
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">FPGA</span> <span class="pre">Acceleration</span> <span class="pre">list</span></code></p>
+<p>For IPN3KE FPGA can provide different bitstream, different bitstream includes different
+Acceleration, so users need to identify which Acceleration is used. Current IPN3KE can
+support TM and Flow Acceleration, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;ipn3ke_cfg0,afu=0|b3:00.0,fpga_acc={tm|flow}&#39;
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">I40e</span> <span class="pre">PF</span> <span class="pre">name</span> <span class="pre">list</span></code></p>
+<p>Users need to bind FPGA LineSidePort to FVL PF. So I40e PF name list should be involved in
+startup command. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev &#39;ipn3ke_cfg0,afu=0|b3:00.0,fpga_acc={tm|flow},i40e_pf={0000:b1:00.0|0000:b1:00.1|0000:b1:00.2|0000:b1:00.3|0000:b5:00.0|0000:b5:00.1|0000:b5:00.2|0000:b5:00.3}&#39;
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">34.3. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="sample-application-notes">
+<h2><span class="section-number">34.4. </span>Sample Application Notes</h2>
+<section id="packet-tx-rx-with-fpga-pass-through-image">
+<h3><span class="section-number">34.4.1. </span>Packet TX/RX with FPGA Pass-through image</h3>
+<p>FPGA Pass-through bitstream is original FPGA Image.</p>
+<p>To start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>, and add I40e PF to FPGA network port:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-15 -n 4 --vdev &#39;ifpga_rawdev_cfg0,ifpga=b3:00.0,port=0&#39; --vdev &#39;ipn3ke_cfg0,afu=0|b3:00.0,i40e_pf={0000:b1:00.0|0000:b1:00.1|0000:b1:00.2|0000:b1:00.3|0000:b5:00.0|0000:b5:00.1|0000:b5:00.2|0000:b5:00.3}&#39; -- -i --no-numa --port-topology=loop</span>
+</pre></div>
+</div>
+</section>
+<section id="hqos-and-flow-acceleration">
+<h3><span class="section-number">34.4.2. </span>HQoS and flow acceleration</h3>
+<p>HQoS and flow acceleration bitstream is used to offloading HQoS and flow classifier.</p>
+<p>To start <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>, and add I40e PF to FPGA network port, enable FPGA HQoS and Flow Acceleration:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-15 -n 4 --vdev &#39;ifpga_rawdev_cfg0,ifpga=b3:00.0,port=0&#39; --vdev &#39;ipn3ke_cfg0,afu=0|b3:00.0,fpga_acc={tm|flow},i40e_pf={0000:b1:00.0|0000:b1:00.1|0000:b1:00.2|0000:b1:00.3|0000:b5:00.0|0000:b5:00.1|0000:b5:00.2|0000:b5:00.3}&#39; -- -i --no-numa --forward-mode=macswap</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="limitations-or-known-issues">
+<h2><span class="section-number">34.5. </span>Limitations or Known issues</h2>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="ionic.html" title="previous chapter"><span class="section-number">33. </span>IONIC Driver</a></li>
+      <li>Next: <a href="ixgbe.html" title="next chapter"><span class="section-number">35. </span>IXGBE Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/ipn3ke.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

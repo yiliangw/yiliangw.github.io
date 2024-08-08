@@ -1,0 +1,398 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>22. L3 Forwarding with Power Management Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="23. Link Status Interrupt Sample Application" href="link_status_intr.html" />
+    <link rel="prev" title="21. L3 Forwarding Graph Sample Application" href="l3_forward_graph.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="l3-forwarding-with-power-management-sample-application">
+<h1><span class="section-number">22. </span>L3 Forwarding with Power Management Sample Application</h1>
+<section id="introduction">
+<h2><span class="section-number">22.1. </span>Introduction</h2>
+<p>The L3 Forwarding with Power Management application is an example of power-aware packet processing using the DPDK.
+The application is based on existing L3 Forwarding sample application,
+with the power management algorithms to control the P-states and
+C-states of the Intel processor via a power management library.</p>
+</section>
+<section id="overview">
+<h2><span class="section-number">22.2. </span>Overview</h2>
+<p>The application demonstrates the use of the Power libraries in the DPDK to implement packet forwarding.
+The initialization and run-time paths are very similar to those of the <a class="reference internal" href="l3_forward.html"><span class="doc">L3 Forwarding Sample Application</span></a>.
+The main difference from the L3 Forwarding sample application is that this application introduces power-aware optimization algorithms
+by leveraging the Power library to control P-state and C-state of processor based on packet load.</p>
+<p>The DPDK includes poll-mode drivers to configure Intel NIC devices and their receive (Rx) and transmit (Tx) queues.
+The design principle of this PMD is to access the Rx and Tx descriptors directly without any interrupts to quickly receive,
+process and deliver packets in the user space.</p>
+<p>In general, the DPDK executes an endless packet processing loop on dedicated IA cores that include the following steps:</p>
+<ul class="simple">
+<li><p>Retrieve input packets through the PMD to poll Rx queue</p></li>
+<li><p>Process each received packet or provide received packets to other processing cores through software queues</p></li>
+<li><p>Send pending output packets to Tx queue through the PMD</p></li>
+</ul>
+<p>In this way, the PMD achieves better performance than a traditional interrupt-mode driver,
+at the cost of keeping cores active and running at the highest frequency,
+hence consuming the maximum power all the time.
+However, during the period of processing light network traffic,
+which happens regularly in communication infrastructure systems due to well-known “tidal effect”,
+the PMD is still busy waiting for network packets, which wastes a lot of power.</p>
+<p>Processor performance states (P-states) are the capability of an Intel processor
+to switch between different supported operating frequencies and voltages.
+If configured correctly, according to system workload, this feature provides power savings.
+CPUFreq is the infrastructure provided by the Linux* kernel to control the processor performance state capability.
+CPUFreq supports a user space governor that enables setting frequency via manipulating the virtual file device from a user space application.
+The Power library in the DPDK provides a set of APIs for manipulating a virtual file device to allow user space application
+to set the CPUFreq governor and set the frequency of specific cores.</p>
+<p>This application includes a P-state power management algorithm to generate a frequency hint to be sent to CPUFreq.
+The algorithm uses the number of received and available Rx packets on recent polls to make a heuristic decision to scale frequency up/down.
+Specifically, some thresholds are checked to see whether a specific core running a DPDK polling thread needs to increase frequency
+a step up based on the near to full trend of polled Rx queues.
+Also, it decreases frequency a step if packet processed per loop is far less than the expected threshold
+or the thread’s sleeping time exceeds a threshold.</p>
+<p>C-States are also known as sleep states.
+They allow software to put an Intel core into a low power idle state from which it is possible to exit via an event, such as an interrupt.
+However, there is a tradeoff between the power consumed in the idle state and the time required to wake up from the idle state (exit latency).
+Therefore, as you go into deeper C-states, the power consumed is lower but the exit latency is increased. Each C-state has a target residency.
+It is essential that when entering into a C-state, the core remains in this C-state for at least as long as the target residency in order
+to fully realize the benefits of entering the C-state.
+CPUIdle is the infrastructure provide by the Linux kernel to control the processor C-state capability.
+Unlike CPUFreq, CPUIdle does not provide a mechanism that allows the application to change C-state.
+It actually has its own heuristic algorithms in kernel space to select target C-state to enter by executing privileged instructions like HLT and MWAIT,
+based on the speculative sleep duration of the core.
+In this application, we introduce a heuristic algorithm that allows packet processing cores to sleep for a short period
+if there is no Rx packet received on recent polls.
+In this way, CPUIdle automatically forces the corresponding cores to enter deeper C-states
+instead of always running to the C0 state waiting for packets.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To fully demonstrate the power saving capability of using C-states,
+it is recommended to enable deeper C3 and C6 states in the BIOS during system boot up.</p>
+</div>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">22.3. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">l3fwd-power</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">22.4. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd_power [EAL options] -- -p PORTMASK [-P]  --config(port,queue,lcore)[,(port,queue,lcore)] [--max-pkt-len PKTLEN] [--no-numa]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul class="simple">
+<li><p>-p PORTMASK: Hexadecimal bitmask of ports to configure</p></li>
+<li><p>-P: Sets all ports to promiscuous mode so that packets are accepted regardless of the packet’s Ethernet MAC destination address.
+Without this option, only packets with the Ethernet MAC destination address set to the Ethernet address of the port are accepted.</p></li>
+<li><p>-u: optional, sets uncore min/max frequency to minimum value.</p></li>
+<li><p>-U: optional, sets uncore min/max frequency to maximum value.</p></li>
+<li><p>-i (frequency index): optional, sets uncore frequency to frequency index value, by setting min and max values to be the same.</p></li>
+<li><p>–config (port,queue,lcore)[,(port,queue,lcore)]: determines which queues from which ports are mapped to which cores.</p></li>
+<li><p>–max-pkt-len: optional, maximum packet length in decimal (64-9600)</p></li>
+<li><p>–no-numa: optional, disables numa awareness</p></li>
+<li><p>–telemetry:  Telemetry mode.</p></li>
+<li><p>–pmd-mgmt: PMD power management mode.</p></li>
+<li><p>–max-empty-polls : Number of empty polls to wait before entering sleep state. Applies to –pmd-mgmt mode only.</p></li>
+<li><p>–pause-duration: Set the duration of the pause callback (microseconds). Applies to –pmd-mgmt mode only.</p></li>
+<li><p>–scale-freq-min: Set minimum frequency for scaling. Applies to –pmd-mgmt mode only.</p></li>
+<li><p>–scale-freq-max: Set maximum frequency for scaling. Applies to –pmd-mgmt mode only.</p></li>
+</ul>
+<p>See <a class="reference internal" href="l3_forward.html"><span class="doc">L3 Forwarding Sample Application</span></a> for details.
+The L3fwd-power example reuses the L3fwd command line options.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">22.5. </span>Explanation</h2>
+<p>The following sections provide some explanation of the sample application code.
+As mentioned in the overview section,
+the initialization and run-time paths are identical to those of the L3 forwarding application.
+The following sections describe aspects that are specific to the L3 Forwarding with Power Management sample application.</p>
+<section id="power-library-initialization">
+<h3><span class="section-number">22.5.1. </span>Power Library Initialization</h3>
+<p>The Power library is initialized in the main routine.
+It changes the P-state governor to userspace for specific cores that are under control.
+The Timer library is also initialized and several timers are created later on,
+responsible for checking if it needs to scale down frequency at run time by checking CPU utilization statistics.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only the power management related initialization is shown.</p>
+</div>
+</section>
+<section id="monitoring-loads-of-rx-queues">
+<h3><span class="section-number">22.5.2. </span>Monitoring Loads of Rx Queues</h3>
+<p>In general, the polling nature of the DPDK prevents the OS power management subsystem from knowing
+if the network load is actually heavy or light.
+In this sample, sampling network load work is done by monitoring received and
+available descriptors on NIC Rx queues in recent polls.
+Based on the number of returned and available Rx descriptors,
+this example implements algorithms to generate frequency scaling hints and speculative sleep duration,
+and use them to control P-state and C-state of processors via the power management library.
+Frequency (P-state) control and sleep state (C-state) control work individually for each logical core,
+and the combination of them contributes to a power efficient packet processing solution when serving light network loads.</p>
+<p>The rte_eth_rx_burst() function and the newly-added rte_eth_rx_queue_count() function are used in the endless packet processing loop
+to return the number of received and available Rx descriptors.
+And those numbers of specific queue are passed to P-state and C-state heuristic algorithms
+to generate hints based on recent network load trends.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only power control related code is shown.</p>
+</div>
+</section>
+<section id="p-state-heuristic-algorithm">
+<h3><span class="section-number">22.5.3. </span>P-State Heuristic Algorithm</h3>
+<p>The power_freq_scaleup_heuristic() function is responsible for generating a frequency hint for the specified logical core
+according to available descriptor number returned from rte_eth_rx_queue_count().
+On every poll for new packets, the length of available descriptor on an Rx queue is evaluated,
+and the algorithm used for frequency hinting is as follows:</p>
+<ul class="simple">
+<li><p>If the size of available descriptors exceeds 96, the maximum frequency is hinted.</p></li>
+<li><p>If the size of available descriptors exceeds 64, a trend counter is incremented by 100.</p></li>
+<li><p>If the length of the ring exceeds 32, the trend counter is incremented by 1.</p></li>
+<li><p>When the trend counter reached 10000 the frequency hint is changed to the next higher frequency.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The assumption is that the Rx queue size is 128 and the thresholds specified above
+must be adjusted accordingly based on actual hardware Rx queue size,
+which are configured via the rte_eth_rx_queue_setup() function.</p>
+</div>
+<p>In general, a thread needs to poll packets from multiple Rx queues.
+Most likely, different queue have different load, so they would return different frequency hints.
+The algorithm evaluates all the hints and then scales up frequency in an aggressive manner
+by scaling up to highest frequency as long as one Rx queue requires.
+In this way, we can minimize any negative performance impact.</p>
+<p>On the other hand, frequency scaling down is controlled in the timer callback function.
+Specifically, if the sleep times of a logical core indicate that it is sleeping more than 25% of the sampling period,
+or if the average packet per iteration is less than expectation, the frequency is decreased by one step.</p>
+</section>
+<section id="c-state-heuristic-algorithm">
+<h3><span class="section-number">22.5.4. </span>C-State Heuristic Algorithm</h3>
+<p>Whenever recent rte_eth_rx_burst() polls return 5 consecutive zero packets,
+an idle counter begins incrementing for each successive zero poll.
+At the same time, the function power_idle_heuristic() is called to generate speculative sleep duration
+in order to force logical to enter deeper sleeping C-state.
+There is no way to control C- state directly, and the CPUIdle subsystem in OS is intelligent enough
+to select C-state to enter based on actual sleep period time of giving logical core.
+The algorithm has the following sleeping behavior depending on the idle counter:</p>
+<ul class="simple">
+<li><p>If idle count less than 100, the counter value is used as a microsecond sleep value through rte_delay_us()
+which execute pause instructions to avoid costly context switch but saving power at the same time.</p></li>
+<li><p>If idle count is between 100 and 999, a fixed sleep interval of 100 μs is used.
+A 100 μs sleep interval allows the core to enter the C1 state while keeping a fast response time in case new traffic arrives.</p></li>
+<li><p>If idle count is greater than 1000, a fixed sleep value of 1 ms is used until the next timer expiration is used.
+This allows the core to enter the C3/C6 states.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The thresholds specified above need to be adjusted for different Intel processors and traffic profiles.</p>
+</div>
+<p>If a thread polls multiple Rx queues and different queue returns different sleep duration values,
+the algorithm controls the sleep time in a conservative manner by sleeping for the least possible time
+in order to avoid a potential performance impact.</p>
+</section>
+</section>
+<section id="telemetry-mode">
+<h2><span class="section-number">22.6. </span>Telemetry Mode</h2>
+<p>The telemetry mode support for <code class="docutils literal notranslate"><span class="pre">l3fwd-power</span></code> is a standalone mode, in this mode
+<code class="docutils literal notranslate"><span class="pre">l3fwd-power</span></code> does simple l3fwding along with calculating empty polls, full polls,
+and busy percentage for each forwarding core. The aggregation of these
+values of all cores is reported as application level telemetry to metric
+library for every 500ms from the main core.</p>
+<p>The busy percentage is calculated by recording the poll_count
+and when the count reaches a defined value the total
+cycles it took is measured and compared with minimum and maximum
+reference cycles and accordingly busy rate is set  to either 0% or
+50% or 100%.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd-power --telemetry -l 1-3 -- -p 0x0f --config=&quot;(0,0,2),(0,1,3)&quot; --telemetry</span>
+</pre></div>
+</div>
+<p>The new stats <code class="docutils literal notranslate"><span class="pre">empty_poll</span></code> , <code class="docutils literal notranslate"><span class="pre">full_poll</span></code> and <code class="docutils literal notranslate"><span class="pre">busy_percent</span></code> can be viewed by running the script
+<code class="docutils literal notranslate"><span class="pre">/usertools/dpdk-telemetry-client.py</span></code> and selecting the menu option <code class="docutils literal notranslate"><span class="pre">Send</span> <span class="pre">for</span> <span class="pre">global</span> <span class="pre">Metrics</span></code>.</p>
+</section>
+<section id="pmd-power-management-mode">
+<h2><span class="section-number">22.7. </span>PMD power management Mode</h2>
+<p>The PMD power management  mode support for <code class="docutils literal notranslate"><span class="pre">l3fwd-power</span></code> is a standalone mode.
+In this mode, <code class="docutils literal notranslate"><span class="pre">l3fwd-power</span></code> does simple l3fwding
+along with enabling the power saving scheme on specific port/queue/lcore.
+Main purpose for this mode is to demonstrate
+how to use the PMD power management API.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./build/examples/dpdk-l3fwd-power -l 1-3 --  --pmd-mgmt -p 0x0f --config=&quot;(0,0,2),(0,1,3)&quot;</span>
+</pre></div>
+</div>
+</section>
+<section id="id1">
+<h2><span class="section-number">22.8. </span>PMD Power Management Mode</h2>
+<p>There is also a traffic-aware operating mode that,
+instead of using explicit power management,
+will use automatic PMD power management.
+This mode is limited to one queue per core,
+and has three available power management schemes:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">monitor</span></code></dt><dd><p>This will use <code class="docutils literal notranslate"><span class="pre">rte_power_monitor()</span></code> function to enter
+a power-optimized state (subject to platform support).</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">pause</span></code></dt><dd><p>This will use <code class="docutils literal notranslate"><span class="pre">rte_power_pause()</span></code> or <code class="docutils literal notranslate"><span class="pre">rte_pause()</span></code>
+to avoid busy looping when there is no traffic.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">scale</span></code></dt><dd><p>This will use frequency scaling routines
+available in the <code class="docutils literal notranslate"><span class="pre">librte_power</span></code> library.
+The reaction time of the scale mode is longer
+than the pause and monitor mode.</p>
+</dd>
+</dl>
+<p>See <a class="reference internal" href="../prog_guide/power_man.html"><span class="doc">Power Management</span></a> chapter
+in the DPDK Programmer’s Guide for more details on PMD power management.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd-power -l 1-3 -- -p 0x0f --config=&quot;(0,0,2),(0,1,3)&quot; --pmd-mgmt=scale</span>
+</pre></div>
+</div>
+</section>
+<section id="setting-uncore-values">
+<h2><span class="section-number">22.9. </span>Setting Uncore Values</h2>
+<p>Uncore frequency can be adjusted through manipulating related sysfs entries
+to adjust the minimum and maximum uncore values.
+This will be set for each package and die on the SKU.
+The driver for enabling this is available from kernel version 5.6 and above.
+Three options are available for setting uncore frequency:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">-u</span></code></dt><dd><p>This will set uncore minimum and maximum frequencies to minimum possible value.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-U</span></code></dt><dd><p>This will set uncore minimum and maximum frequencies to maximum possible value.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">-i</span></code></dt><dd><p>This will allow you to set the specific uncore frequency index that you want,
+by setting the uncore frequency to a frequency pointed by index.
+Frequency index’s are set 100MHz apart from maximum to minimum.
+Frequency index values are in descending order,
+i.e., index 0 is maximum frequency index.</p>
+</dd>
+</dl>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-l3fwd-power -l 1-3 -- -p 0x0f --config=&quot;(0,0,2),(0,1,3)&quot; -i 1</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="l3_forward_graph.html" title="previous chapter"><span class="section-number">21. </span>L3 Forwarding Graph Sample Application</a></li>
+      <li>Next: <a href="link_status_intr.html" title="next chapter"><span class="section-number">23. </span>Link Status Interrupt Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/l3_forward_power_man.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

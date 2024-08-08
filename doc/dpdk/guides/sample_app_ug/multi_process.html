@@ -1,0 +1,388 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>26. Multi-process Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="27. QoS Metering Sample Application" href="qos_metering.html" />
+    <link rel="prev" title="25. Service Cores Sample Application" href="service_cores.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="multi-process-sample-application">
+<span id="multi-process-app"></span><h1><span class="section-number">26. </span>Multi-process Sample Application</h1>
+<p>This chapter describes the example applications for multi-processing that are included in the DPDK.</p>
+<section id="example-applications">
+<h2><span class="section-number">26.1. </span>Example Applications</h2>
+<section id="building-the-sample-applications">
+<h3><span class="section-number">26.1.1. </span>Building the Sample Applications</h3>
+<p>The multi-process example applications are built in the same way as other sample applications,
+and as documented in the <em>DPDK Getting Started Guide</em>.</p>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The applications are located in the <code class="docutils literal notranslate"><span class="pre">multi_process</span></code> sub-directory.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If just a specific multi-process application needs to be built,
+the final make command can be run just in that application’s directory,
+rather than at the top-level multi-process directory.</p>
+</div>
+</section>
+<section id="basic-multi-process-example">
+<h3><span class="section-number">26.1.2. </span>Basic Multi-process Example</h3>
+<p>The examples/simple_mp folder in the DPDK release contains a basic example application to demonstrate how
+two DPDK processes can work together using queues and memory pools to share information.</p>
+<section id="running-the-application">
+<h4><span class="section-number">26.1.2.1. </span>Running the Application</h4>
+<p>To run the application, start one copy of the simple_mp binary in one terminal,
+passing at least two cores in the coremask/corelist, as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-simple_mp -l 0-1 -n 4 --proc-type=primary</span>
+</pre></div>
+</div>
+<p>For the first DPDK process run, the proc-type flag can be omitted or set to auto,
+since all DPDK processes will default to being a primary instance,
+meaning they have control over the hugepage shared memory regions.
+The process should start successfully and display a command prompt as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-simple_mp -l <span class="m">0</span>-1 -n <span class="m">4</span> --proc-type<span class="o">=</span>primary
+<span class="go">EAL: coremask set to 3</span>
+<span class="go">EAL: Detected lcore 0 on socket 0</span>
+<span class="go">EAL: Detected lcore 1 on socket 0</span>
+<span class="go">EAL: Detected lcore 2 on socket 0</span>
+<span class="go">EAL: Detected lcore 3 on socket 0</span>
+<span class="go">...</span>
+
+<span class="go">EAL: Requesting 2 pages of size 1073741824</span>
+<span class="go">EAL: Requesting 768 pages of size 2097152</span>
+<span class="go">EAL: Ask a virtual area of 0x40000000 bytes</span>
+<span class="go">EAL: Virtual area found at 0x7ff200000000 (size = 0x40000000)</span>
+<span class="go">...</span>
+
+<span class="go">EAL: check module finished</span>
+<span class="go">EAL: Main core 0 is ready (tid=54e41820)</span>
+<span class="go">EAL: Core 1 is ready (tid=53b32700)</span>
+
+<span class="go">Starting core 1</span>
+
+<span class="go">simple_mp &gt;</span>
+</pre></div>
+</div>
+<p>To run the secondary process to communicate with the primary process,
+again run the same binary setting at least two cores in the coremask/corelist:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-simple_mp -l 2-3 -n 4 --proc-type=secondary</span>
+</pre></div>
+</div>
+<p>When running a secondary process such as that shown above, the proc-type parameter can again be specified as auto.
+However, omitting the parameter altogether will cause the process to try and start as a primary rather than secondary process.</p>
+<p>Once the process type is specified correctly,
+the process starts up, displaying largely similar status messages to the primary instance as it initializes.
+Once again, you will be presented with a command prompt.</p>
+<p>Once both processes are running, messages can be sent between them using the send command.
+At any stage, either process can be terminated using the quit command.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">EAL: Main core 10 is ready (tid=b5f89820)             EAL: Main core 8 is ready (tid=864a3820)</span>
+<span class="go">EAL: Core 11 is ready (tid=84ffe700)                  EAL: Core 9 is ready (tid=85995700)</span>
+<span class="go">Starting core 11                                      Starting core 9</span>
+<span class="go">simple_mp &gt; send hello_secondary                      simple_mp &gt; core 9: Received &#39;hello_secondary&#39;</span>
+<span class="go">simple_mp &gt; core 11: Received &#39;hello_primary&#39;         simple_mp &gt; send hello_primary</span>
+<span class="go">simple_mp &gt; quit                                      simple_mp &gt; quit</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the primary instance is terminated, the secondary instance must also be shut-down and restarted after the primary.
+This is necessary because the primary instance will clear and reset the shared memory regions on startup,
+invalidating the secondary process’s pointers.
+The secondary process can be stopped and restarted without affecting the primary process.</p>
+</div>
+</section>
+<section id="how-the-application-works">
+<h4><span class="section-number">26.1.2.2. </span>How the Application Works</h4>
+<p>The core of this example application is based on using two queues and a single memory pool in shared memory.
+These three objects are created at startup by the primary process,
+since the secondary process cannot create objects in memory as it cannot reserve memory zones,
+and the secondary process then uses lookup functions to attach to these objects as it starts up.</p>
+<p>Note, however, that the named ring structure used as send_ring in the primary process is the recv_ring in the secondary process.</p>
+<p>Once the rings and memory pools are all available in both the primary and secondary processes,
+the application simply dedicates two threads to sending and receiving messages respectively.
+The receive thread simply dequeues any messages on the receive ring, prints them,
+and frees the buffer space used by the messages back to the memory pool.
+The send thread makes use of the command-prompt library to interactively request user input for messages to send.
+Once a send command is issued by the user, a buffer is allocated from the memory pool, filled in with the message contents,
+then enqueued on the appropriate rte_ring.</p>
+</section>
+</section>
+<section id="symmetric-multi-process-example">
+<h3><span class="section-number">26.1.3. </span>Symmetric Multi-process Example</h3>
+<p>The second example of DPDK multi-process support demonstrates how a set of processes can run in parallel,
+with each process performing the same set of packet- processing operations.
+(Since each process is identical in functionality to the others,
+we refer to this as symmetric multi-processing, to differentiate it from asymmetric multi- processing -
+such as a client-server mode of operation seen in the next example,
+where different processes perform different tasks, yet co-operate to form a packet-processing system.)
+The following diagram shows the data-flow through the application, using two processes.</p>
+<figure class="align-default" id="id5">
+<span id="figure-sym-multi-proc-app"></span><img alt="../_images/sym_multi_proc_app.png" src="../_images/sym_multi_proc_app.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 26.1 </span><span class="caption-text">Example Data Flow in a Symmetric Multi-process Application</span></p>
+</figcaption>
+</figure>
+<p>As the diagram shows, each process reads packets from each of the network ports in use.
+RSS is used to distribute incoming packets on each port to different hardware RX queues.
+Each process reads a different RX queue on each port and so does not contend with any other process for that queue access.
+Similarly, each process writes outgoing packets to a different TX queue on each port.</p>
+<section id="id1">
+<h4><span class="section-number">26.1.3.1. </span>Running the Application</h4>
+<p>As with the simple_mp example, the first instance of the symmetric_mp process must be run as the primary instance,
+though with a number of other application- specific parameters also provided after the EAL arguments.
+These additional parameters are:</p>
+<ul class="simple">
+<li><p>-p &lt;portmask&gt;, where portmask is a hexadecimal bitmask of what ports on the system are to be used.
+For example: -p 3 to use ports 0 and 1 only.</p></li>
+<li><p>–num-procs &lt;N&gt;, where N is the total number of symmetric_mp instances that will be run side-by-side to perform packet processing.
+This parameter is used to configure the appropriate number of receive queues on each network port.</p></li>
+<li><p>–proc-id &lt;n&gt;, where n is a numeric value in the range 0 &lt;= n &lt; N (number of processes, specified above).
+This identifies which symmetric_mp instance is being run, so that each process can read a unique receive queue on each network port.</p></li>
+</ul>
+<p>The secondary symmetric_mp instances must also have these parameters specified,
+and the first two must be the same as those passed to the primary instance, or errors result.</p>
+<p>For example, to run a set of four symmetric_mp instances, running on lcores 1-4,
+all performing level-2 forwarding of packets between ports 0 and 1,
+the following commands can be used (assuming run as root):</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-symmetric_mp -l <span class="m">1</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -p <span class="m">3</span> --num-procs<span class="o">=</span><span class="m">4</span> --proc-id<span class="o">=</span><span class="m">0</span>
+<span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-symmetric_mp -l <span class="m">2</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -p <span class="m">3</span> --num-procs<span class="o">=</span><span class="m">4</span> --proc-id<span class="o">=</span><span class="m">1</span>
+<span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-symmetric_mp -l <span class="m">3</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -p <span class="m">3</span> --num-procs<span class="o">=</span><span class="m">4</span> --proc-id<span class="o">=</span><span class="m">2</span>
+<span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-symmetric_mp -l <span class="m">4</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -p <span class="m">3</span> --num-procs<span class="o">=</span><span class="m">4</span> --proc-id<span class="o">=</span><span class="m">3</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the above example, the process type can be explicitly specified as primary or secondary, rather than auto.
+When using auto, the first process run creates all the memory structures needed for all processes -
+irrespective of whether it has a proc-id of 0, 1, 2 or 3.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For the symmetric multi-process example, since all processes work in the same manner,
+once the hugepage shared memory and the network ports are initialized,
+it is not necessary to restart all processes if the primary instance dies.
+Instead, that process can be restarted as a secondary,
+by explicitly setting the proc-type to secondary on the command line.
+(All subsequent instances launched will also need this explicitly specified,
+as auto-detection will detect no primary processes running and therefore attempt to re-initialize shared memory.)</p>
+</div>
+</section>
+<section id="id2">
+<h4><span class="section-number">26.1.3.2. </span>How the Application Works</h4>
+<p>The initialization calls in both the primary and secondary instances are the same for the most part,
+calling the rte_eal_init(), 1 G and 10 G driver initialization and then probing devices.
+Thereafter, the initialization done depends on whether the process is configured as a primary or secondary instance.</p>
+<p>In the primary instance, a memory pool is created for the packet mbufs and the network ports to be used are initialized -
+the number of RX and TX queues per port being determined by the num-procs parameter passed on the command-line.
+The structures for the initialized network ports are stored in shared memory and
+therefore will be accessible by the secondary process as it initializes.</p>
+<p>In the secondary instance, rather than initializing the network ports, the port information exported by the primary process is used,
+giving the secondary process access to the hardware and software rings for each network port.
+Similarly, the memory pool of mbufs is accessed by doing a lookup for it by name:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">mp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">proc_type</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">RTE_PROC_SECONDARY</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">rte_mempool_lookup</span><span class="p">(</span><span class="n">_SMP_MBUF_POOL</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">rte_mempool_create</span><span class="p">(</span><span class="n">_SMP_MBUF_POOL</span><span class="p">,</span><span class="w"> </span><span class="n">NB_MBUFS</span><span class="p">,</span><span class="w"> </span><span class="n">MBUF_SIZE</span><span class="p">,</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Once this initialization is complete, the main loop of each process, both primary and secondary,
+is exactly the same - each process reads from each port using the queue corresponding to its proc-id parameter,
+and writes to the corresponding transmit queue on the output port.</p>
+</section>
+</section>
+<section id="client-server-multi-process-example">
+<h3><span class="section-number">26.1.4. </span>Client-Server Multi-process Example</h3>
+<p>The third example multi-process application included with the DPDK shows how one can
+use a client-server type multi-process design to do packet processing.
+In this example, a single server process performs the packet reception from the ports being used and
+distributes these packets using round-robin ordering among a set of client  processes,
+which perform the actual packet processing.
+In this case, the client applications just perform level-2 forwarding of packets by sending each packet out on a different network port.</p>
+<p>The following diagram shows the data-flow through the application, using two client processes.</p>
+<figure class="align-default" id="id6">
+<span id="figure-client-svr-sym-multi-proc-app"></span><img alt="../_images/client_svr_sym_multi_proc_app.png" src="../_images/client_svr_sym_multi_proc_app.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 26.2 </span><span class="caption-text">Example Data Flow in a Client-Server Symmetric Multi-process Application</span></p>
+</figcaption>
+</figure>
+<section id="id3">
+<h4><span class="section-number">26.1.4.1. </span>Running the Application</h4>
+<p>The server process must be run initially as the primary process to set up all memory structures for use by the clients.
+In addition to the EAL parameters, the application- specific parameters are:</p>
+<ul class="simple">
+<li><p>-p &lt;portmask &gt;, where portmask is a hexadecimal bitmask of what ports on the system are to be used.
+For example: -p 3 to use ports 0 and 1 only.</p></li>
+<li><p>-n &lt;num-clients&gt;, where the num-clients parameter is the number of client processes that will process the packets received
+by the server application.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In the server process, a single thread, the main thread, that is, the lowest numbered lcore in the coremask/corelist, performs all packet I/O.
+If a coremask/corelist is specified with more than a single lcore bit set in it,
+an additional lcore will be used for a thread to periodically print packet count statistics.</p>
+</div>
+<p>Since the server application stores configuration data in shared memory, including the network ports to be used,
+the only application parameter needed by a client process is its client instance ID.
+Therefore, to run a server application on lcore 1 (with lcore 2 printing statistics) along with two client processes running on lcores 3 and 4,
+the following commands could be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-mp_server -l <span class="m">1</span>-2 -n <span class="m">4</span> -- -p <span class="m">3</span> -n <span class="m">2</span>
+<span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-mp_client -l <span class="m">3</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -n <span class="m">0</span>
+<span class="gp"># </span>./&lt;build_dir&gt;/examples/dpdk-mp_client -l <span class="m">4</span> -n <span class="m">4</span> --proc-type<span class="o">=</span>auto -- -n <span class="m">1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the server application dies and needs to be restarted, all client applications also need to be restarted,
+as there is no support in the server application for it to run as a secondary process.
+Any client processes that need restarting can be restarted without affecting the server process.</p>
+</div>
+</section>
+<section id="id4">
+<h4><span class="section-number">26.1.4.2. </span>How the Application Works</h4>
+<p>The server process performs the network port and data structure initialization much as the symmetric multi-process application does when run as primary.
+One additional enhancement in this sample application is that the server process stores its port configuration data in a memory zone in hugepage shared memory.
+This eliminates the need for the client processes to have the portmask parameter passed into them on the command line,
+as is done for the symmetric multi-process application, and therefore eliminates mismatched parameters as a potential source of errors.</p>
+<p>In the same way that the server process is designed to be run as a primary process instance only,
+the client processes are designed to be run as secondary instances only.
+They have no code to attempt to create shared memory objects.
+Instead, handles to all needed rings and memory pools are obtained via calls to rte_ring_lookup() and rte_mempool_lookup().
+The network ports for use by the processes are obtained by loading the network port drivers and probing the PCI bus,
+which will, as in the symmetric multi-process example,
+automatically get access to the network ports using the settings already configured by the primary/server process.</p>
+<p>Once all applications are initialized, the server operates by reading packets from each network port in turn and
+distributing those packets to the client queues (software rings, one for each client process) in round-robin order.
+On the client side, the packets are read from the rings in as big of bursts as possible, then routed out to a different network port.
+The routing used is very simple. All packets received on the first NIC port are transmitted back out on the second port and vice versa.
+Similarly, packets are routed between the 3rd and 4th network ports and so on.
+The sending of packets is done by writing the packets directly to the network ports; they are not transferred back via the server process.</p>
+<p>In both the server and the client processes, outgoing packets are buffered before being sent,
+so as to allow the sending of multiple packets in a single burst to improve efficiency.
+For example, the client process will buffer packets to send,
+until either the buffer is full or until we receive no further packets from the server.</p>
+</section>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="service_cores.html" title="previous chapter"><span class="section-number">25. </span>Service Cores Sample Application</a></li>
+      <li>Next: <a href="qos_metering.html" title="next chapter"><span class="section-number">27. </span>QoS Metering Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/multi_process.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

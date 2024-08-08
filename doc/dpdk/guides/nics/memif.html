@@ -1,0 +1,836 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>37. Memif Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="38. NVIDIA MLX4 Ethernet Driver" href="mlx4.html" />
+    <link rel="prev" title="36. MANA poll mode driver library" href="mana.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="memif-poll-mode-driver">
+<h1><span class="section-number">37. </span>Memif Poll Mode Driver</h1>
+<p>Shared memory packet interface (memif) PMD allows for DPDK and any other client
+using memif (DPDK, VPP, libmemif) to communicate using shared memory. Memif is
+Linux only.</p>
+<p>The created device transmits packets in a raw format. It can be used with
+Ethernet mode, IP mode, or Punt/Inject. At this moment, only Ethernet mode is
+supported in DPDK memif implementation.</p>
+<p>Memif works in two roles: server and client. Client connects to server over an
+existing socket. It is also a producer of shared memory file and initializes
+the shared memory. Each interface can be connected to one peer interface
+at same time. The peer interface is identified by id parameter. Server
+creates the socket and listens for any client connection requests. The socket
+may already exist on the system. Be sure to remove any such sockets, if you
+are creating a server interface, or you will see an “Address already in use”
+error. Function <code class="docutils literal notranslate"><span class="pre">rte_pmd_memif_remove()</span></code>, which removes memif interface,
+will also remove a listener socket, if it is not being used by any other
+interface.</p>
+<p>The method to enable one or more interfaces is to use the
+<code class="docutils literal notranslate"><span class="pre">--vdev=net_memif0</span></code> option on the DPDK application command line. Each
+<code class="docutils literal notranslate"><span class="pre">--vdev=net_memif1</span></code> option given will create an interface named net_memif0,
+net_memif1, and so on. Memif uses unix domain socket to transmit control
+messages. Each memif has a unique id per socket. This id is used to identify
+peer interface. If you are connecting multiple
+interfaces using same socket, be sure to specify unique ids <code class="docutils literal notranslate"><span class="pre">id=0</span></code>, <code class="docutils literal notranslate"><span class="pre">id=1</span></code>,
+etc. Note that if you assign a socket to a server interface it becomes a
+listener socket. Listener socket can not be used by a client interface on same
+client.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-number">Table 37.2 </span><span class="caption-text"><strong>Memif configuration options</strong></span></caption>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Description</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Valid value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>id=0</p></td>
+<td><p>Used to identify peer interface</p></td>
+<td><p>0</p></td>
+<td><p>uint32_t</p></td>
+</tr>
+<tr class="row-odd"><td><p>role=server</p></td>
+<td><p>Set memif role</p></td>
+<td><p>client</p></td>
+<td><p>server|client</p></td>
+</tr>
+<tr class="row-even"><td><p>bsize=1024</p></td>
+<td><p>Size of single packet buffer</p></td>
+<td><p>2048</p></td>
+<td><p>uint16_t</p></td>
+</tr>
+<tr class="row-odd"><td><p>rsize=11</p></td>
+<td><p>Log2 of ring size. If rsize is 10, actual ring size is 1024</p></td>
+<td><p>10</p></td>
+<td><p>1-14</p></td>
+</tr>
+<tr class="row-even"><td><p>socket=/tmp/memif.sock</p></td>
+<td><p>Socket filename</p></td>
+<td><p>/tmp/memif.sock</p></td>
+<td><p>string len 108</p></td>
+</tr>
+<tr class="row-odd"><td><p>socket-abstract=no</p></td>
+<td><p>Set usage of abstract socket address</p></td>
+<td><p>yes</p></td>
+<td><p>yes|no</p></td>
+</tr>
+<tr class="row-even"><td><p>owner-uid=1000</p></td>
+<td><p>Set socket listener owner uid. Only relevant to server with socket-abstract=no</p></td>
+<td><p>unchanged</p></td>
+<td><p>uid_t</p></td>
+</tr>
+<tr class="row-odd"><td><p>owner-gid=1000</p></td>
+<td><p>Set socket listener owner gid. Only relevant to server with socket-abstract=no</p></td>
+<td><p>unchanged</p></td>
+<td><p>gid_t</p></td>
+</tr>
+<tr class="row-even"><td><p>mac=01:23:45:ab:cd:ef</p></td>
+<td><p>Mac address</p></td>
+<td><p>01:ab:23:cd:45:ef</p></td>
+<td></td>
+</tr>
+<tr class="row-odd"><td><p>secret=abc123</p></td>
+<td><p>Secret is an optional security option, which if specified, must be matched by peer</p></td>
+<td></td>
+<td><p>string len 24</p></td>
+</tr>
+<tr class="row-even"><td><p>zero-copy=yes</p></td>
+<td><p>Enable/disable zero-copy client mode. Only relevant to client, requires ‘–single-file-segments’ eal argument</p></td>
+<td><p>no</p></td>
+<td><p>yes|no</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Connection establishment</strong></p>
+<p>In order to create memif connection, two memif interfaces, each in separate
+process, are needed. One interface in <code class="docutils literal notranslate"><span class="pre">server</span></code> role and other in
+<code class="docutils literal notranslate"><span class="pre">client</span></code> role. It is not possible to connect two interfaces in a single
+process. Each interface can be connected to one interface at same time,
+identified by matching id parameter.</p>
+<p>Memif driver uses unix domain socket to exchange required information between
+memif interfaces. Socket file path is specified at interface creation see
+<em>Memif configuration options</em> table above. If socket is used by <code class="docutils literal notranslate"><span class="pre">server</span></code>
+interface, it’s marked as listener socket (in scope of current process) and
+listens to connection requests from other processes. One socket can be used by
+multiple interfaces. One process can have <code class="docutils literal notranslate"><span class="pre">client</span></code> and <code class="docutils literal notranslate"><span class="pre">server</span></code> interfaces
+at the same time, provided each role is assigned unique socket.</p>
+<p>For detailed information on memif control messages, see: net/memif/memif.h.</p>
+<p>Client interface attempts to make a connection on assigned socket. Process
+listening on this socket will extract the connection request and create a new
+connected socket (control channel). Then it sends the ‘hello’ message
+(<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_HELLO</span></code>), containing configuration boundaries. Client interface
+adjusts its configuration accordingly, and sends ‘init’ message
+(<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_INIT</span></code>). This message among others contains interface id. Driver
+uses this id to find server interface, and assigns the control channel to this
+interface. If such interface is found, ‘ack’ message (<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_ACK</span></code>) is
+sent. Client interface sends ‘add region’ message (<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_ADD_REGION</span></code>) for
+every region allocated. Server responds to each of these messages with ‘ack’
+message. Same behavior applies to rings. Client sends ‘add ring’ message
+(<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_ADD_RING</span></code>) for every initialized ring. Server again responds to
+each message with ‘ack’ message. To finalize the connection, client interface
+sends ‘connect’ message (<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_CONNECT</span></code>). Upon receiving this message
+server maps regions to its address space, initializes rings and responds with
+‘connected’ message (<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_CONNECTED</span></code>). Disconnect
+(<code class="docutils literal notranslate"><span class="pre">MEMIF_MSG_TYPE_DISCONNECT</span></code>) can be sent by both server and client interfaces at
+any time, due to driver error or if the interface is being deleted.</p>
+<p>Files</p>
+<ul class="simple">
+<li><p>net/memif/memif.h <em>- control messages definitions</em></p></li>
+<li><p>net/memif/memif_socket.h</p></li>
+<li><p>net/memif/memif_socket.c</p></li>
+</ul>
+<section id="shared-memory">
+<h2><span class="section-number">37.1. </span>Shared memory</h2>
+<p><strong>Shared memory format</strong></p>
+<p>Client is producer and server is consumer. Memory regions, are mapped shared memory files,
+created by memif client and provided to server at connection establishment.
+Regions contain rings and buffers. Rings and buffers can also be separated into multiple
+regions. For no-zero-copy, rings and buffers are stored inside single memory
+region to reduce the number of opened files.</p>
+<p>region n (no-zero-copy):</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 12%" />
+<col style="width: 12%" />
+<col style="width: 18%" />
+<col style="width: 3%" />
+<col style="width: 55%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td colspan="2"><p>Rings</p></td>
+<td colspan="3"><p>Buffers</p></td>
+</tr>
+<tr class="row-even"><td><p>C2S rings</p></td>
+<td><p>S2C rings</p></td>
+<td><p>packet buffer 0</p></td>
+<td><p>.</p></td>
+<td><p>pb ((1 &lt;&lt; pmd-&gt;run.log2_ring_size)*(c2s + s2c))-1</p></td>
+</tr>
+</tbody>
+</table>
+<p>C2S OR S2C Rings:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 21%" />
+<col style="width: 21%" />
+<col style="width: 59%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>ring 0</p></td>
+<td><p>ring 1</p></td>
+<td><p>ring num_c2s_rings - 1</p></td>
+</tr>
+</tbody>
+</table>
+<p>ring 0:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 75%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>ring header</p></td>
+<td><p>(1 &lt;&lt; pmd-&gt;run.log2_ring_size) * desc</p></td>
+</tr>
+</tbody>
+</table>
+<p>Descriptors are assigned packet buffers in order of rings creation. If we have one ring
+in each direction and ring size is 1024, then first 1024 buffers will belong to C2S ring and
+last 1024 will belong to S2C ring. In case of zero-copy, buffers are dequeued and
+enqueued as needed.</p>
+<p><strong>Descriptor format</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 6%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+<col style="width: 1%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td rowspan="2"><p>Quad</p>
+<p>Word</p>
+</td>
+<td><p>6</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>3</p></td>
+<td><p>3</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>2</p></td>
+<td><p>1</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>6</p></td>
+<td><p>5</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>0</p></td>
+</tr>
+<tr class="row-odd"><td><p>0</p></td>
+<td colspan="32"><p>length</p></td>
+<td colspan="16"><p>region</p></td>
+<td colspan="16"><p>flags</p></td>
+</tr>
+<tr class="row-even"><td><p>1</p></td>
+<td colspan="32"><p>metadata</p></td>
+<td colspan="32"><p>offset</p></td>
+</tr>
+<tr class="row-odd"><td rowspan="2"></td>
+<td><p>6</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>3</p></td>
+<td><p>3</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>2</p></td>
+<td><p>1</p></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td><p>0</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Flags field - flags (Quad Word 0, bits 0:15)</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 17%" />
+<col style="width: 79%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Bits</p></th>
+<th class="head"><p>Name</p></th>
+<th class="head"><p>Functionality</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>MEMIF_DESC_FLAG_NEXT</p></td>
+<td><p>Is chained buffer. When set, the packet is divided into multiple buffers. May not be contiguous.</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Region index - region (Quad Word 0, 16:31)</strong></p>
+<p>Index of memory region, the buffer is located in.</p>
+<p><strong>Data length - length (Quad Word 0, 32:63)</strong></p>
+<p>Length of transmitted/received data.</p>
+<p><strong>Data Offset - offset (Quad Word 1, 0:31)</strong></p>
+<p>Data start offset from memory region address. <em>.regions[desc-&gt;region].addr + desc-&gt;offset</em></p>
+<p><strong>Metadata - metadata (Quad Word 1, 32:63)</strong></p>
+<p>Buffer metadata.</p>
+<p>Files</p>
+<ul class="simple">
+<li><p>net/memif/memif.h <em>- descriptor and ring definitions</em></p></li>
+<li><p>net/memif/rte_eth_memif.c <em>- eth_memif_rx() eth_memif_tx()</em></p></li>
+</ul>
+</section>
+<section id="zero-copy-client">
+<h2><span class="section-number">37.2. </span>Zero-copy client</h2>
+<p>Zero-copy client can be enabled with memif configuration option ‘zero-copy=yes’. This option
+is only relevant to client and requires eal argument ‘–single-file-segments’.
+This limitation is in place, because it is too expensive to identify memseg
+for each packet buffer, resulting in worse performance than with zero-copy disabled.
+With single file segments we can calculate offset from the beginning of the file
+for each packet buffer.</p>
+<p><strong>Shared memory format</strong></p>
+<p>Region 0 is created by memif driver and contains rings. Client interface exposes DPDK memory (memseg).
+Instead of using memfd_create() to create new shared file, existing memsegs are used.
+Server interface functions the same as with zero-copy disabled.</p>
+<p>region 0:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 50%" />
+<col style="width: 50%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td colspan="2"><p>Rings</p></td>
+</tr>
+<tr class="row-even"><td><p>C2S rings</p></td>
+<td><p>S2C rings</p></td>
+</tr>
+</tbody>
+</table>
+<p>region n:</p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 100%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>Buffers</p></td>
+</tr>
+<tr class="row-even"><td><p>memseg</p></td>
+</tr>
+</tbody>
+</table>
+<p>Buffers are dequeued and enqueued as needed. Offset descriptor field is calculated at tx.
+Only single file segments mode (EAL option –single-file-segments) is supported, as calculating
+offset from multiple segments is too expensive.</p>
+<section id="example-testpmd">
+<h3><span class="section-number">37.2.1. </span>Example: testpmd</h3>
+<p>In this example we run two instances of testpmd application and transmit packets over memif.</p>
+<p>First create <code class="docutils literal notranslate"><span class="pre">server</span></code> interface:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># ./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-1 --proc-type=primary --file-prefix=pmd1 --vdev=net_memif,role=server -- -i
+</pre></div>
+</div>
+<p>Now create <code class="docutils literal notranslate"><span class="pre">client</span></code> interface (server must be already running so the client will connect):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># ./&lt;build_dir&gt;/app/dpdk-testpmd -l 2-3 --proc-type=primary --file-prefix=pmd2 --vdev=net_memif -- -i
+</pre></div>
+</div>
+<p>You can also enable <code class="docutils literal notranslate"><span class="pre">zero-copy</span></code> on <code class="docutils literal notranslate"><span class="pre">client</span></code> interface:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># ./&lt;build_dir&gt;/app/dpdk-testpmd -l 2-3 --proc-type=primary --file-prefix=pmd2 --vdev=net_memif,zero-copy=yes --single-file-segments -- -i
+</pre></div>
+</div>
+<p>Start forwarding packets:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Client:
+    testpmd&gt; start
+
+Server:
+    testpmd&gt; start tx_first
+</pre></div>
+</div>
+<p>Show status:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; show port stats 0
+</pre></div>
+</div>
+<p>For more details on testpmd please refer to <a class="reference internal" href="../testpmd_app_ug/index.html"><span class="doc">Testpmd Application User Guide</span></a>.</p>
+</section>
+<section id="example-testpmd-and-vpp">
+<h3><span class="section-number">37.2.2. </span>Example: testpmd and VPP</h3>
+<p>For information on how to get and run VPP please see <a class="reference external" href="https://wiki.fd.io/view/VPP">https://wiki.fd.io/view/VPP</a>.</p>
+<p>Start VPP in interactive mode (should be by default). Create memif server interface in VPP:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>vpp# create interface memif id 0 server no-zero-copy
+vpp# set interface state memif0/0 up
+vpp# set interface ip address memif0/0 192.168.1.1/24
+</pre></div>
+</div>
+<p>To see socket filename use show memif command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>vpp# show memif
+sockets
+ id  listener    filename
+  0   yes (1)     /run/vpp/memif.sock
+...
+</pre></div>
+</div>
+<p>Now create memif interface by running testpmd with these command line options:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># ./dpdk-testpmd --vdev=net_memif,socket=/run/vpp/memif.sock -- -i
+</pre></div>
+</div>
+<p>Testpmd should now create memif client interface and try to connect to server.
+In testpmd set forward option to icmpecho and start forwarding:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set fwd icmpecho
+testpmd&gt; start
+</pre></div>
+</div>
+<p>Send ping from VPP:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>vpp# ping 192.168.1.2
+64 bytes from 192.168.1.2: icmp_seq=2 ttl=254 time=36.2918 ms
+64 bytes from 192.168.1.2: icmp_seq=3 ttl=254 time=23.3927 ms
+64 bytes from 192.168.1.2: icmp_seq=4 ttl=254 time=24.2975 ms
+64 bytes from 192.168.1.2: icmp_seq=5 ttl=254 time=17.7049 ms
+</pre></div>
+</div>
+</section>
+<section id="example-testpmd-memif-loopback">
+<h3><span class="section-number">37.2.3. </span>Example: testpmd memif loopback</h3>
+<p>In this example we will create 2 memif ports connected into loopback.
+The situation is analogous to cross connecting 2 ports of the NIC by cable.</p>
+<p>To set the loopback, just use the same socket and id with different roles:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># ./dpdk-testpmd --vdev=net_memif0,role=server,id=0 --vdev=net_memif1,role=client,id=0 -- -i
+</pre></div>
+</div>
+<p>Then start the communication:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; start tx_first
+</pre></div>
+</div>
+<p>Finally we can check port stats to see the traffic:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; show port stats all
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="mana.html" title="previous chapter"><span class="section-number">36. </span>MANA poll mode driver library</a></li>
+      <li>Next: <a href="mlx4.html" title="next chapter"><span class="section-number">38. </span>NVIDIA MLX4 Ethernet Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/memif.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

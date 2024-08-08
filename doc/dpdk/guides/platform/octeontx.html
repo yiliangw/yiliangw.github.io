@@ -1,0 +1,252 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. OCTEON TX Board Support Package &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Contributor’s Guidelines" href="../contributing/index.html" />
+    <link rel="prev" title="5. NVIDIA MLX5 Common Driver" href="mlx5.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="octeon-tx-board-support-package">
+<h1><span class="section-number">6. </span>OCTEON TX Board Support Package</h1>
+<p>This doc has information about steps to setup OCTEON TX platform
+and information about common offload hw block drivers of
+<strong>Cavium OCTEON TX</strong> SoC family.</p>
+<p>More information about SoC can be found at <a class="reference external" href="http://www.cavium.com/OCTEON-TX_ARM_Processors.html">Cavium, Inc Official Website</a>.</p>
+<section id="common-offload-hw-block-drivers">
+<h2><span class="section-number">6.1. </span>Common Offload HW Block Drivers</h2>
+<ol class="arabic simple">
+<li><p><strong>Crypto Driver</strong>
+See <a class="reference internal" href="../cryptodevs/octeontx.html"><span class="doc">Cavium OCTEON TX Crypto Poll Mode Driver</span></a> for octeontx crypto driver
+information.</p></li>
+<li><p><strong>Eventdev Driver</strong>
+See <a class="reference internal" href="../eventdevs/octeontx.html"><span class="doc">OCTEON TX SSOVF Eventdev Driver</span></a> for octeontx ssovf eventdev driver
+information.</p></li>
+<li><p><strong>Mempool Driver</strong>
+See <a class="reference internal" href="../mempool/octeontx.html"><span class="doc">OCTEON TX FPAVF Mempool Driver</span></a> for octeontx fpavf mempool driver
+information.</p></li>
+</ol>
+</section>
+<section id="steps-to-setup-platform">
+<h2><span class="section-number">6.2. </span>Steps To Setup Platform</h2>
+<p>There are three main pre-prerequisites for setting up Platform drivers on
+OCTEON TX compatible board:</p>
+<ol class="arabic">
+<li><p><strong>OCTEON TX Linux kernel PF driver for Network acceleration HW blocks</strong></p>
+<p>The OCTEON TX Linux kernel drivers (includes the required PF driver for the
+Platform drivers) are available on Github at <a class="reference external" href="https://github.com/caviumnetworks/octeontx-kmod">octeontx-kmod</a>
+along with build, install and dpdk usage instructions.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The PF driver and the required microcode for the crypto offload block will be
+available with OCTEON TX SDK only. So for using crypto offload, follow the steps
+mentioned in <a class="reference internal" href="#setup-platform-using-octeon-tx-sdk"><span class="std std-ref">Setup Platform Using OCTEON TX SDK</span></a>.</p>
+</div>
+</li>
+<li><p><strong>ARM64 Tool Chain</strong></p>
+<p>For example, the <em>aarch64</em> Linaro Toolchain, which can be obtained from
+<a class="reference external" href="https://releases.linaro.org/components/toolchain/binaries/4.9-2017.01/aarch64-linux-gnu">here</a>.</p>
+</li>
+<li><p><strong>Rootfile system</strong></p>
+<p>Any <em>aarch64</em> supporting filesystem can be used. For example,
+Ubuntu 15.10 (Wily) or 16.04 LTS (Xenial) userland which can be obtained
+from <a class="reference external" href="http://cdimage.ubuntu.com/ubuntu-base/releases/16.04/release/ubuntu-base-16.04.1-base-arm64.tar.gz">http://cdimage.ubuntu.com/ubuntu-base/releases/16.04/release/ubuntu-base-16.04.1-base-arm64.tar.gz</a>.</p>
+<p>As an alternative method, Platform drivers can also be executed using images provided
+as part of SDK from Cavium. The SDK includes all the above prerequisites necessary
+to bring up a OCTEON TX board. Please refer <a class="reference internal" href="#setup-platform-using-octeon-tx-sdk"><span class="std std-ref">Setup Platform Using OCTEON TX SDK</span></a>.</p>
+</li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html"><span class="doc">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ol>
+</section>
+<section id="setup-platform-using-octeon-tx-sdk">
+<span id="id1"></span><h2><span class="section-number">6.3. </span>Setup Platform Using OCTEON TX SDK</h2>
+<p>The OCTEON TX platform drivers can be compiled either natively on
+<strong>OCTEON TX</strong> <sup>®</sup> board or cross-compiled on an x86 based platform.</p>
+<p>The <strong>OCTEON TX</strong> <sup>®</sup> board must be running the linux kernel based on
+OCTEON TX SDK 6.2.0 patch 3. In this, the PF drivers for all hardware
+offload blocks are already built in.</p>
+<section id="native-compilation">
+<h3><span class="section-number">6.3.1. </span>Native Compilation</h3>
+<p>If the kernel and modules are cross-compiled and copied to the target board,
+some intermediate binaries required for native build would be missing on the
+target board. To make sure all the required binaries are available in the
+native architecture, the linux sources need to be compiled once natively.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd /lib/modules/$(uname -r)/source</span>
+<span class="go">make menuconfig</span>
+<span class="go">make</span>
+</pre></div>
+</div>
+<p>The above steps would rebuild the modules and the required intermediate binaries.
+Once the target is ready for native compilation, the OCTEON TX platform
+drivers can be compiled with the following steps,</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup build -Dexamples=&lt;application&gt;</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<p>The example applications can be compiled using the following:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup build -Dexamples=&lt;application&gt;</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-compilation">
+<h3><span class="section-number">6.3.2. </span>Cross Compilation</h3>
+<p>The DPDK applications can be cross-compiled on any x86 based platform. The
+OCTEON TX SDK need to be installed on the build system. The SDK package will
+provide the required toolchain etc.</p>
+<p>Refer to <a class="reference internal" href="../linux_gsg/cross_build_dpdk_for_arm64.html"><span class="doc">Cross compiling DPDK for aarch64 and aarch32</span></a> for generic arm64 details.</p>
+<p>The following steps can be used to perform cross-compilation with OCTEON TX
+SDK 6.2.0 patch 3:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;sdk_install_dir&gt;</span>
+<span class="go">source env-setup</span>
+</pre></div>
+</div>
+<p>The above steps will prepare build system with required toolchain.
+Now this build system can be used to build applications for <strong>OCTEON TX</strong> <sup>®</sup> platforms.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;dpdk directory&gt;</span>
+<span class="go">meson setup build --cross-file config/arm/arm64_thunderx_linux_gcc</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<p>The example applications can be compiled using the following:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;dpdk directory&gt;</span>
+<span class="go">meson setup build --cross-file config/arm/arm64_thunderx_linux_gcc -Dexamples=&lt;application&gt;</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>By default, meson cross compilation uses <code class="docutils literal notranslate"><span class="pre">aarch64-linux-gnu-gcc</span></code> toolchain,
+if OCTEON TX SDK 6.2.0 patch 3 is available then it can be used by
+overriding the c, cpp, ar, strip <code class="docutils literal notranslate"><span class="pre">binaries</span></code> attributes to respective thunderx
+toolchain binaries in <code class="docutils literal notranslate"><span class="pre">config/arm/arm64_thunderx_linux_gcc</span></code> file.</p>
+</div>
+<p>SDK and related information can be obtained from: <a class="reference external" href="https://support.cavium.com/">Cavium support site</a>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Platform Specific Guides</a><ul>
+      <li>Previous: <a href="mlx5.html" title="previous chapter"><span class="section-number">5. </span>NVIDIA MLX5 Common Driver</a></li>
+      <li>Next: <a href="../contributing/index.html" title="next chapter">Contributor’s Guidelines</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/platform/octeontx.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

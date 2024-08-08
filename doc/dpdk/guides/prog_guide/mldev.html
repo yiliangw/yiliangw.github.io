@@ -1,0 +1,306 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>23. Machine Learning Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="24. DMA Device Library" href="dmadev.html" />
+    <link rel="prev" title="22. RegEx Device Library" href="regexdev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="machine-learning-device-library">
+<h1><span class="section-number">23. </span>Machine Learning Device Library</h1>
+<p>The MLDEV library provides a Machine Learning device framework for the management and
+provisioning of hardware and software ML poll mode drivers,
+defining an API which support a number of ML operations
+including device handling and inference processing.
+The ML model creation and training is outside of the scope of this library.</p>
+<p>The ML framework is built on the following model:</p>
+<figure class="align-default" id="id1">
+<span id="figure-mldev-work-flow"></span><img alt="../_images/mldev_flow.svg" src="../_images/mldev_flow.svg" /><figcaption>
+<p><span class="caption-number">Fig. 23.1 </span><span class="caption-text">Work flow of inference on MLDEV</span></p>
+</figcaption>
+</figure>
+<dl class="simple">
+<dt>ML Device</dt><dd><p>A hardware or software-based implementation of ML device API
+for running inferences using a pre-trained ML model.</p>
+</dd>
+<dt>ML Model</dt><dd><p>An ML model is an algorithm trained over a dataset.
+A model consists of procedure/algorithm and data/pattern
+required to make predictions on live data.
+Once the model is created and trained outside of the DPDK scope,
+the model can be loaded via <code class="docutils literal notranslate"><span class="pre">rte_ml_model_load()</span></code>
+and then start it using <code class="docutils literal notranslate"><span class="pre">rte_ml_model_start()</span></code> API function.
+The <code class="docutils literal notranslate"><span class="pre">rte_ml_model_params_update()</span></code> can be used to update the model parameters
+such as weights and bias without unloading the model using <code class="docutils literal notranslate"><span class="pre">rte_ml_model_unload()</span></code>.</p>
+</dd>
+<dt>ML Inference</dt><dd><p>ML inference is the process of feeding data to the model
+via <code class="docutils literal notranslate"><span class="pre">rte_ml_enqueue_burst()</span></code> API function
+and use <code class="docutils literal notranslate"><span class="pre">rte_ml_dequeue_burst()</span></code> API function
+to get the calculated outputs / predictions from the started model.</p>
+</dd>
+</dl>
+<section id="design-principles">
+<h2><span class="section-number">23.1. </span>Design Principles</h2>
+<p>The MLDEV library follows the same basic principles as those used in DPDK’s
+Ethernet Device framework and the Crypto framework.
+The MLDEV framework provides a generic Machine Learning device framework
+which supports both physical (hardware) and virtual (software) ML devices
+as well as an ML API to manage and configure ML devices.
+The API also supports performing ML inference operations
+through ML poll mode driver.</p>
+</section>
+<section id="device-operations">
+<h2><span class="section-number">23.2. </span>Device Operations</h2>
+<section id="device-creation">
+<h3><span class="section-number">23.2.1. </span>Device Creation</h3>
+<p>Physical ML devices are discovered during the PCI probe/enumeration,
+through the EAL functions which are executed at DPDK initialization,
+based on their PCI device identifier, each unique PCI BDF (bus/bridge, device, function).
+ML physical devices, like other physical devices in DPDK can be allowed or blocked
+using the EAL command line options.</p>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">23.2.2. </span>Device Identification</h3>
+<p>Each device, whether virtual or physical is uniquely designated by two identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the ML device
+in all functions exported by the MLDEV API.</p></li>
+<li><p>A device name used to designate the ML device in console messages,
+for administration or debugging purposes.</p></li>
+</ul>
+</section>
+<section id="device-features-and-capabilities">
+<h3><span class="section-number">23.2.3. </span>Device Features and Capabilities</h3>
+<p>ML devices may support different feature set.
+In order to get the supported PMD feature <code class="docutils literal notranslate"><span class="pre">rte_ml_dev_info_get()</span></code> API
+which return the info of the device and its supported features.</p>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">23.2.4. </span>Device Configuration</h3>
+<p>The configuration of each ML device includes the following operations:</p>
+<ul class="simple">
+<li><p>Allocation of resources, including hardware resources if a physical device.</p></li>
+<li><p>Resetting the device into a well-known default state.</p></li>
+<li><p>Initialization of statistics counters.</p></li>
+</ul>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_ml_dev_configure()</span></code> API is used to configure a ML device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_ml_dev_configure</span><span class="p">(</span><span class="kt">int16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ml_dev_config</span><span class="w"> </span><span class="o">*</span><span class="n">cfg</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_ml_dev_config</span></code> structure is used to pass the configuration parameters
+for the ML device, for example number of queue pairs, maximum number of models,
+maximum size of model and so on.</p>
+</section>
+<section id="configuration-of-queue-pairs">
+<h3><span class="section-number">23.2.5. </span>Configuration of Queue Pairs</h3>
+<p>Each ML device can be configured with number of queue pairs.
+Each queue pair is configured using <code class="docutils literal notranslate"><span class="pre">rte_ml_dev_queue_pair_setup()</span></code></p>
+</section>
+<section id="logical-cores-memory-and-queues-pair-relationships">
+<h3><span class="section-number">23.2.6. </span>Logical Cores, Memory and Queues Pair Relationships</h3>
+<p>Multiple logical cores should never share the same queue pair
+for enqueuing operations or dequeueing operations on the same ML device
+since this would require global locks and hinder performance.</p>
+</section>
+<section id="configuration-of-machine-learning-models">
+<h3><span class="section-number">23.2.7. </span>Configuration of Machine Learning models</h3>
+<p>Pre-trained ML models that are built using external ML compiler / training frameworks
+are used to perform inference operations.
+These models are configured on an ML device in a two-stage process
+that includes loading the model on an ML device,
+and starting the model to accept inference operations.
+Inference operations can be queued for a model
+only when the model is in started state.
+Model load stage assigns a Model ID,
+which is unique for the model in a driver’s context.
+Model ID is used during all subsequent slow-path and fast-path operations.</p>
+<p>Model loading and start is done
+through the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_load()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_ml_model_start()</span></code> functions.</p>
+<p>Similarly stop and unloading are done
+through <code class="docutils literal notranslate"><span class="pre">rte_ml_model_stop()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_ml_model_unload()</span></code> functions.</p>
+<p>Stop and unload functions would release the resources allocated for the models.
+Inference tasks cannot be queued for a model that is stopped.</p>
+<p>Detailed information related to the model can be retrieved from the driver
+using the function <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info_get()</span></code>.
+Model information is accessible to the application
+through the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info</span></code> structure.
+Information available to the user would include the details related to
+the inputs and outputs, and the maximum batch size supported by the model.</p>
+<p>User can optionally update the model parameters such as weights and bias,
+without unloading the model, through the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_params_update()</span></code> function.
+A model should be in stopped state to update the parameters.
+Model has to be started in order to enqueue inference requests after parameters update.</p>
+</section>
+<section id="enqueue-dequeue">
+<h3><span class="section-number">23.2.8. </span>Enqueue / Dequeue</h3>
+<p>The burst enqueue API uses a ML device identifier and a queue pair identifier
+to specify the device queue pair to schedule the processing on.
+The <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> parameter is the number of operations to process
+which are supplied in the <code class="docutils literal notranslate"><span class="pre">ops</span></code> array of <code class="docutils literal notranslate"><span class="pre">rte_ml_op</span></code> structures.
+The enqueue function returns the number of operations it enqueued for processing,
+a return value equal to <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> means that all packets have been enqueued.</p>
+<p>The dequeue API uses the same format as the enqueue API of processed
+but the <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> and <code class="docutils literal notranslate"><span class="pre">ops</span></code> parameters are now used to specify
+the max processed operations the user wishes to retrieve
+and the location in which to store them.
+The API call returns the actual number of processed operations returned;
+this can never be larger than <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_ml_op</span></code> provides the required information to the driver
+to queue an ML inference task.
+ML op specifies the model to be used and the number of batches
+to be executed in the inference task.
+Input and output buffer information is specified through
+the structure <code class="docutils literal notranslate"><span class="pre">rte_ml_buff_seg</span></code>, which supports segmented data.
+Input is provided through the <code class="docutils literal notranslate"><span class="pre">rte_ml_op::input</span></code>
+and output through <code class="docutils literal notranslate"><span class="pre">rte_ml_op::output</span></code>.
+Data pointed in each op, should not be released until the dequeue of that op.</p>
+</section>
+<section id="quantize-and-dequantize">
+<h3><span class="section-number">23.2.9. </span>Quantize and Dequantize</h3>
+<p>Inference operations performed with lower precision types would improve
+the throughput and efficiency of the inference execution
+with a minimal loss of accuracy, which is within the tolerance limits.
+Quantization and dequantization is the process of converting data
+from a higher precision type to a lower precision type and vice-versa.
+ML library provides the functions <code class="docutils literal notranslate"><span class="pre">rte_ml_io_quantize()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_ml_io_dequantize()</span></code>
+to enable data type conversions.
+User needs to provide the address of the quantized and dequantized data buffers
+to the functions, along the number of the batches in the buffers.</p>
+<p>For quantization, the dequantized data is assumed to be
+of the type <code class="docutils literal notranslate"><span class="pre">dtype</span></code> provided by the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info::input</span></code>
+and the data is converted to <code class="docutils literal notranslate"><span class="pre">qtype</span></code> provided by the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info::input</span></code>.</p>
+<p>For dequantization, the quantized data is assumed to be
+of the type <code class="docutils literal notranslate"><span class="pre">qtype</span></code> provided by the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info::output</span></code>
+and the data is converted to <code class="docutils literal notranslate"><span class="pre">dtype</span></code> provided by the <code class="docutils literal notranslate"><span class="pre">rte_ml_model_info::output</span></code>.</p>
+<p>Size of the buffers required for the input and output can be calculated
+using the functions <code class="docutils literal notranslate"><span class="pre">rte_ml_io_input_size_get()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_ml_io_output_size_get()</span></code>.
+These functions would get the buffer sizes for both quantized and dequantized data
+for the given number of batches.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="regexdev.html" title="previous chapter"><span class="section-number">22. </span>RegEx Device Library</a></li>
+      <li>Next: <a href="dmadev.html" title="next chapter"><span class="section-number">24. </span>DMA Device Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/mldev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

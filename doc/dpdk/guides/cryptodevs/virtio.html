@@ -1,0 +1,221 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>23. Virtio Crypto Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="24. ZUC Crypto Poll Mode Driver" href="zuc.html" />
+    <link rel="prev" title="22. UADK Crypto Poll Mode Driver" href="uadk.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="virtio-crypto-poll-mode-driver">
+<h1><span class="section-number">23. </span>Virtio Crypto Poll Mode Driver</h1>
+<p>The virtio crypto PMD provides poll mode driver support for the virtio crypto
+device.</p>
+<section id="features">
+<h2><span class="section-number">23.1. </span>Features</h2>
+<p>The virtio crypto PMD has support for:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_CBC</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">23.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Only supports the session-oriented API implementation (session-less APIs are
+not supported).</p></li>
+<li><p>Only supports modern mode since virtio crypto conforms to virtio-1.0.</p></li>
+<li><p>Only has two types of queues: data queue and control queue. These two queues
+only support indirect buffers to communication with the virtio backend.</p></li>
+<li><p>Only supports AES_CBC cipher only algorithm and AES_CBC with HMAC_SHA1
+chaining algorithm since the vhost crypto backend only these algorithms
+are supported.</p></li>
+<li><p>Does not support Link State interrupt.</p></li>
+<li><p>Does not support runtime configuration.</p></li>
+</ul>
+</section>
+<section id="virtio-crypto-pmd-rx-tx-callbacks">
+<h2><span class="section-number">23.3. </span>Virtio crypto PMD Rx/Tx Callbacks</h2>
+<p>Rx callbacks:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">virtio_crypto_pkt_rx_burst</span></code></p></li>
+</ul>
+<p>Tx callbacks:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">virtio_crypto_pkt_tx_burst</span></code></p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">23.4. </span>Installation</h2>
+<p>Quick instructions are as follows:</p>
+<p>Firstly run DPDK vhost crypto sample as a server side and build QEMU with
+vhost crypto enabled.
+QEMU can then be started using the following parameters:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">qemu-system-x86_64 \</span>
+<span class="go">[...] \</span>
+<span class="go">    -chardev socket,id=charcrypto0,path=/path/to/your/socket \</span>
+<span class="go">    -object cryptodev-vhost-user,id=cryptodev0,chardev=charcrypto0 \</span>
+<span class="go">    -device virtio-crypto-pci,id=crypto0,cryptodev=cryptodev0</span>
+<span class="go">[...]</span>
+</pre></div>
+</div>
+<p>Secondly bind the uio_pci_generic driver for the virtio-crypto device.
+For example, 0000:00:04.0 is the domain, bus, device and function
+number of the virtio-crypto device:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe uio_pci_generic</span>
+<span class="go">echo -n 0000:00:04.0 &gt; /sys/bus/pci/drivers/virtio-pci/unbind</span>
+<span class="go">echo &quot;1af4 1054&quot; &gt; /sys/bus/pci/drivers/uio_pci_generic/new_id</span>
+</pre></div>
+</div>
+<p>Finally the front-end virtio crypto PMD can be installed.</p>
+</section>
+<section id="tests">
+<h2><span class="section-number">23.5. </span>Tests</h2>
+<p>The unit test cases can be tested as below:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">reserve enough huge pages</span>
+<span class="go">cd to &lt;build_dir&gt;</span>
+<span class="go">meson test cryptodev_virtio_autotest</span>
+</pre></div>
+</div>
+<p>The performance can be tested as below:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">reserve enough huge pages</span>
+<span class="go">cd to &lt;build_dir&gt;</span>
+
+<span class="go">./app/dpdk-test-crypto-perf -l 0,1 -- --devtype crypto_virtio \</span>
+<span class="go">    --ptest throughput --optype cipher-then-auth --cipher-algo aes-cbc \</span>
+<span class="go">    --cipher-op encrypt --cipher-key-sz 16 --auth-algo sha1-hmac \</span>
+<span class="go">    --auth-op generate --auth-key-sz 64 --digest-sz 12 \</span>
+<span class="go">    --total-ops 100000000 --burst-sz 64 --buffer-sz 2048</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="uadk.html" title="previous chapter"><span class="section-number">22. </span>UADK Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="zuc.html" title="next chapter"><span class="section-number">24. </span>ZUC Crypto Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/virtio.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

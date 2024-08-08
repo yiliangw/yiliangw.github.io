@@ -1,0 +1,525 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>20. L3 Forwarding Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="21. L3 Forwarding Graph Sample Application" href="l3_forward_graph.html" />
+    <link rel="prev" title="19. L2 Forwarding MACsec Sample Application" href="l2_forward_macsec.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="l3-forwarding-sample-application">
+<h1><span class="section-number">20. </span>L3 Forwarding Sample Application</h1>
+<p>The L3 Forwarding application is a simple example of packet processing using
+DPDK to demonstrate usage of poll and event mode packet I/O mechanism.
+The application performs L3 forwarding.</p>
+<section id="overview">
+<h2><span class="section-number">20.1. </span>Overview</h2>
+<p>The application demonstrates the use of the hash, LPM, FIB and ACL libraries in DPDK
+to implement packet forwarding using poll or event mode PMDs for packet I/O.
+The initialization and run-time paths are very similar to those of the
+<a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a> and <a class="reference internal" href="l2_forward_event.html"><span class="doc">L2 Forwarding Eventdev Sample Application</span></a>.
+The main difference from the L2 Forwarding sample application is that optionally
+packet can be Rx/Tx from/to eventdev instead of port directly and forwarding
+decision is made based on information read from the input packet.</p>
+<p>Eventdev can optionally use S/W or H/W (if supported by platform) scheduler
+implementation for packet I/O based on run time parameters.</p>
+<p>The lookup method is hash-based, LPM-based, FIB-based or ACL-based
+and is selected at run time.
+When the selected lookup method is hash-based,
+a hash object is used to emulate the flow classification stage.
+The hash object is used in correlation with a flow table to map each input packet to its flow at runtime.</p>
+<p>The hash lookup key is represented by a DiffServ 5-tuple composed of the following fields read from the input packet:
+Source IP Address, Destination IP Address, Protocol, Source Port and Destination Port.
+The ID of the output interface for the input packet is read from the identified flow table entry.
+The set of flows used by the application is statically configured and loaded into the hash at initialization time.
+When the selected lookup method is LPM or FIB based,
+an LPM or FIB object is used to emulate the forwarding stage for IPv4 packets.
+The LPM or FIB object is used as the routing table
+to identify the next hop for each input packet at runtime.</p>
+<p>The LPM and FIB lookup keys are represented by the destination IP address field
+read from the input packet.
+The ID of the output interface for the input packet is the next hop
+returned by the LPM or FIB lookup.
+The set of LPM and FIB rules used by the application is statically configured
+and loaded into the LPM or FIB object at initialization time.</p>
+<p>For ACL, the ACL library is used to perform both ACL and route entry lookup.
+When packets are received from a port,
+the application extracts the necessary information
+from the TCP/IP header of the received packet
+and performs a lookup in the rule database to figure out
+whether the packets should be dropped (in the ACL range)
+or forwarded to desired ports.
+For ACL, the application implements packet classification
+for the IPv4/IPv6 5-tuple syntax specifically.
+The 5-tuple syntax consists of a source IP address, a destination IP address,
+a source port, a destination port and a protocol identifier.</p>
+<p>In the sample application, hash-based, LPM-based, FIB-based and ACL-based forwarding supports
+both IPv4 and IPv6.
+During the initialization phase route rules for IPv4 and IPv6 are read from rule files.</p>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">20.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">l3fwd</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">20.3. </span>Running the Application</h2>
+<p>The application has a number of command line options:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./dpdk-l3fwd [EAL options] -- -p PORTMASK
+                         --rule_ipv4=FILE
+                         --rule_ipv6=FILE
+                         [-P]
+                         [--lookup LOOKUP_METHOD]
+                         --config(port,queue,lcore)[,(port,queue,lcore)]
+                         [--eth-dest=X,MM:MM:MM:MM:MM:MM]
+                         [--max-pkt-len PKTLEN]
+                         [--no-numa]
+                         [--hash-entry-num]
+                         [--ipv6]
+                         [--parse-ptype]
+                         [--per-port-pool]
+                         [--mode]
+                         [--eventq-sched]
+                         [--event-eth-rxqs]
+                         [--event-vector [--event-vector-size SIZE] [--event-vector-tmo NS]]
+                         [-E]
+                         [-L]
+</pre></div>
+</div>
+<p>Where,</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-p</span> <span class="pre">PORTMASK:</span></code> Hexadecimal bitmask of ports to configure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rule_ipv4=FILE:</span></code> specify the ipv4 rules entries file.
+Each rule occupies one line.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rule_ipv6=FILE:</span></code> specify the ipv6 rules entries file.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-P:</span></code> Optional, sets all ports to promiscuous mode so that packets are accepted regardless of the packet’s Ethernet MAC destination address.
+Without this option, only packets with the Ethernet MAC destination address set to the Ethernet address of the port are accepted.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--lookup:</span></code> Optional, select the lookup method.
+Accepted options:
+<code class="docutils literal notranslate"><span class="pre">em</span></code> (Exact Match),
+<code class="docutils literal notranslate"><span class="pre">lpm</span></code> (Longest Prefix Match),
+<code class="docutils literal notranslate"><span class="pre">fib</span></code> (Forwarding Information Base),
+<code class="docutils literal notranslate"><span class="pre">acl</span></code> (Access Control List).
+Default is <code class="docutils literal notranslate"><span class="pre">lpm</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--config</span> <span class="pre">(port,queue,lcore)[,(port,queue,lcore)]:</span></code> Determines which queues from which ports are mapped to which cores.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--eth-dest=X,MM:MM:MM:MM:MM:MM:</span></code> Optional, ethernet destination for port X.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--max-pkt-len:</span></code> Optional, maximum packet length in decimal (64-9600).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--no-numa:</span></code> Optional, disables numa awareness.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hash-entry-num:</span></code> Optional, specifies the hash entry number in hexadecimal to be setup.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ipv6:</span></code> Optional, set if running ipv6 packets.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--parse-ptype:</span></code> Optional, set to use software to analyze packet type. Without this option, hardware will check the packet type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--per-port-pool:</span></code> Optional, set to use independent buffer pools per port. Without this option, single buffer pool is used for all ports.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mode:</span></code> Optional, Packet transfer mode for I/O, poll or eventdev.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--eventq-sched:</span></code> Optional, Event queue synchronization method, Ordered, Atomic or Parallel. Only valid if –mode=eventdev.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--event-eth-rxqs:</span></code> Optional, Number of ethernet RX queues per device. Only valid if –mode=eventdev.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--event-vector:</span></code> Optional, Enable event vectorization. Only valid if –mode=eventdev.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--event-vector-size:</span></code> Optional, Max vector size if event vectorization is enabled.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--event-vector-tmo:</span></code> Optional, Max timeout to form vector in nanoseconds if event vectorization is enabled.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--alg=&lt;val&gt;:</span></code> optional, ACL classify method to use, one of:
+<code class="docutils literal notranslate"><span class="pre">scalar|sse|avx2|neon|altivec|avx512x16|avx512x32</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-E:</span></code> Optional, enable exact match,
+legacy flag, please use <code class="docutils literal notranslate"><span class="pre">--lookup=em</span></code> instead.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-L:</span></code> Optional, enable longest prefix match,
+legacy flag, please use <code class="docutils literal notranslate"><span class="pre">--lookup=lpm</span></code> instead.</p></li>
+</ul>
+<p>For example, consider a dual processor socket platform with 8 physical cores, where cores 0-7 and 16-23 appear on socket 0,
+while cores 8-15 and 24-31 appear on socket 1.</p>
+<p>To enable L3 forwarding between two ports, assuming that both ports are in the same socket, using two cores, cores 1 and 2,
+(which are in the same socket too), use the following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd -l 1,2 -n 4 -- -p 0x3 --config=&quot;(0,0,1),(1,0,2)&quot; --rule_ipv4=&quot;rule_ipv4.cfg&quot; --rule_ipv6=&quot;rule_ipv6.cfg&quot;</span>
+</pre></div>
+</div>
+<p>In this command:</p>
+<ul class="simple">
+<li><p>The -l option enables cores 1, 2</p></li>
+<li><p>The -p option enables ports 0 and 1</p></li>
+<li><p>The –config option enables one queue on each port and maps each (port,queue) pair to a specific core.
+The following table shows the mapping in this example:</p></li>
+</ul>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 54%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><strong>Port</strong></p></td>
+<td><p><strong>Queue</strong></p></td>
+<td><p><strong>lcore</strong></p></td>
+<td><p><strong>Description</strong></p></td>
+</tr>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>1</p></td>
+<td><p>Map queue 0 from port 0 to lcore 1.</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>2</p></td>
+<td><p>Map queue 0 from port 1 to lcore 2.</p></td>
+</tr>
+</tbody>
+</table>
+<ul class="simple">
+<li><p>The -rule_ipv4 option specifies the reading of IPv4 rules sets from the rule_ipv4.cfg file</p></li>
+<li><p>The -rule_ipv6 option specifies the reading of IPv6 rules sets from the rule_ipv6.cfg file.</p></li>
+</ul>
+<p>To use eventdev mode with sync method <strong>ordered</strong> on above mentioned environment,
+Following is the sample command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd -l 0-3 -n 4 -a &lt;event device&gt; -- -p 0x3 --eventq-sched=ordered --rule_ipv4=&quot;rule_ipv4.cfg&quot; --rule_ipv6=&quot;rule_ipv6.cfg&quot;</span>
+</pre></div>
+</div>
+<p>or</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd -l 0-3 -n 4 -a &lt;event device&gt; \</span>
+<span class="go">            -- -p 0x03 --mode=eventdev --eventq-sched=ordered --rule_ipv4=&quot;rule_ipv4.cfg&quot; --rule_ipv6=&quot;rule_ipv6.cfg&quot;</span>
+</pre></div>
+</div>
+<p>In this command:</p>
+<ul class="simple">
+<li><p>-a option allows the event device supported by platform.
+The syntax used to indicate this device may vary based on platform.</p></li>
+<li><p>The –mode option defines PMD to be used for packet I/O.</p></li>
+<li><p>The –eventq-sched option enables synchronization menthod of event queue so that packets will be scheduled accordingly.</p></li>
+</ul>
+<p>If application uses S/W scheduler, it uses following DPDK services:</p>
+<ul class="simple">
+<li><p>Software scheduler</p></li>
+<li><p>Rx adapter service function</p></li>
+<li><p>Tx adapter service function</p></li>
+</ul>
+<p>Application needs service cores to run above mentioned services. Service cores
+must be provided as EAL parameters along with the –vdev=event_sw0 to enable S/W
+scheduler. Following is the sample command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l3fwd -l 0-7 -s 0xf0000 -n 4 --vdev event_sw0 -- -p 0x3 --mode=eventdev --eventq-sched=ordered --rule_ipv4=&quot;rule_ipv4.cfg&quot; --rule_ipv6=&quot;rule_ipv6.cfg&quot;</span>
+</pre></div>
+</div>
+<p>In case of eventdev mode, <em>–config</em> option is not used for ethernet port
+configuration. Instead each ethernet port will be configured with mentioned
+setup:</p>
+<ul class="simple">
+<li><p>Single Rx/Tx queue</p></li>
+<li><p>Each Rx queue will be connected to event queue via Rx adapter.</p></li>
+<li><p>Each Tx queue will be connected via Tx adapter.</p></li>
+</ul>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running applications and
+the Environment Abstraction Layer (EAL) options.</p>
+</section>
+<section id="explanation">
+<span id="l3-fwd-explanation"></span><h2><span class="section-number">20.4. </span>Explanation</h2>
+<p>The following sections provide some explanation of the sample application code. As mentioned in the overview section,
+the initialization and run-time paths are very similar to those of the <a class="reference internal" href="l2_forward_real_virtual.html"><span class="doc">L2 Forwarding Sample Application (in Real and Virtualized Environments)</span></a> and <a class="reference internal" href="l2_forward_event.html"><span class="doc">L2 Forwarding Eventdev Sample Application</span></a>.
+The following sections describe aspects that are specific to the L3 Forwarding sample application.</p>
+<section id="parse-rules-from-file">
+<h3><span class="section-number">20.4.1. </span>Parse Rules from File</h3>
+<p>The application parses the rules from the file and adds them to the appropriate route table by calling the appropriate function.
+It ignores empty and comment lines, and parses and validates the rules it reads.
+If errors are detected, the application exits with messages to identify the errors encountered.</p>
+<p>The format of the route rules differs based on which lookup method is being used.
+Therefore, the code only decreases the priority number with each rule it parses.
+Route rules are mandatory.
+To read data from the specified file successfully, the application assumes the following:</p>
+<ul class="simple">
+<li><p>Each rule occupies a single line.</p></li>
+<li><p>Only the following four rule line types are valid in this application:</p></li>
+<li><p>Route rule line, which starts with a leading character ‘R’</p></li>
+<li><p>Comment line, which starts with a leading character ‘#’</p></li>
+<li><p>ACL rule line, which starts with a leading character ‘&#64;’</p></li>
+<li><p>Empty line, which consists of a space, form-feed (’f’), newline (’n’),
+carriage return (’r’), horizontal tab (’t’), or vertical tab (’v’).</p></li>
+</ul>
+<p>Other lines types are considered invalid.</p>
+<ul class="simple">
+<li><p>Rules are organized in descending order of priority,
+which means rules at the head of the file always have a higher priority than those further down in the file.</p></li>
+<li><p>A typical IPv4 LPM/FIB rule line should have a format as shown below:</p></li>
+</ul>
+<p>R&lt;destination_ip&gt;/&lt;ip_mask_length&gt;&lt;output_port_number&gt;</p>
+<ul class="simple">
+<li><p>A typical IPv4 EM rule line should have a format as shown below:</p></li>
+</ul>
+<p>R&lt;destination_ip&gt;&lt;source_ip&gt;&lt;destination_port&gt;&lt;source_port&gt;&lt;protocol&gt;&lt;output_port_number&gt;</p>
+<ul class="simple">
+<li><p>A typical IPv4 ACL rule line should have a format as shown below:</p></li>
+</ul>
+<figure class="align-default" id="id1">
+<span id="figure-ipv4-acl-rule"></span><img alt="../_images/ipv4_acl_rule.png" src="../_images/ipv4_acl_rule.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 20.1 </span><span class="caption-text">A typical IPv4 ACL rule</span></p>
+</figcaption>
+</figure>
+<p>IPv4 addresses are specified in CIDR format as specified in RFC 4632.
+For LPM/FIB/ACL they consist of the dot notation for the address
+and a prefix length separated by ‘/’.
+For example, 192.168.0.34/32, where the address is 192.168.0.34 and the prefix length is 32.
+For EM they consist of just the dot notation for the address and no prefix length.
+For example, 192.168.0.34, where the Address is 192.168.0.34.
+EM also includes ports which are specified as a single number which represents a single port.</p>
+<p>The application parses the rules from the file,
+it ignores empty and comment lines,
+and parses and validates the rules it reads.
+If errors are detected, the application exits
+with messages to identify the errors encountered.
+The ACL rules save the index to the specific rules in the userdata field,
+while route rules save the forwarding port number.</p>
+</section>
+<section id="hash-initialization">
+<h3><span class="section-number">20.4.2. </span>Hash Initialization</h3>
+<p>The hash object is created and loaded with the pre-configured entries read from a global array,
+and then generate the expected 5-tuple as key to keep consistence with those of real flow
+for the convenience to execute hash performance test on 4M/8M/16M flows.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Hash initialization will setup both ipv4 and ipv6 hash table,
+and populate the either table depending on the value of variable ipv6.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Value of global variable ipv6 can be specified with –ipv6 in the command line.
+Value of global variable hash_entry_number,
+which is used to specify the total hash entry number for all used ports in hash performance test,
+can be specified with –hash-entry-num VALUE in command line, being its default value 4.</p>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#if (APP_LOOKUP_METHOD == APP_LOOKUP_EXACT_MATCH)</span>
+
+<span class="w">    </span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="w">    </span><span class="nf">setup_hash</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">socketid</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="c1">// ...</span>
+
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ipv6</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="cm">/* populate the ipv4 hash */</span><span class="w"></span>
+<span class="w">            </span><span class="n">populate_ipv4_flow_into_table</span><span class="p">(</span><span class="w"></span>
+<span class="w">                </span><span class="n">ipv4_l3fwd_em_lookup_struct</span><span class="p">[</span><span class="n">socketid</span><span class="p">]);</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="cm">/* populate the ipv6 hash */</span><span class="w"></span>
+<span class="w">            </span><span class="n">populate_ipv6_flow_into_table</span><span class="p">(</span><span class="w"></span>
+<span class="w">                </span><span class="n">ipv6_l3fwd_em_lookup_struct</span><span class="p">[</span><span class="n">socketid</span><span class="p">]);</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="cp">#endif</span>
+</pre></div>
+</div>
+</section>
+<section id="lpm-initialization">
+<h3><span class="section-number">20.4.3. </span>LPM Initialization</h3>
+<p>The LPM object is created and loaded with the pre-configured entries read from a global array.</p>
+</section>
+<section id="fib-initialization">
+<h3><span class="section-number">20.4.4. </span>FIB Initialization</h3>
+<p>The FIB object is created and loaded with the pre-configured entries
+read from a global array.
+The abridged code snippet below shows the FIB initialization for IPv4,
+the full setup function including the IPv6 setup can be seen in the app code.</p>
+</section>
+<section id="acl-initialization">
+<h3><span class="section-number">20.4.5. </span>ACL Initialization</h3>
+<p>For each supported ACL rule format (IPv4 5-tuple, IPv6 6-tuple),
+the application creates a separate context handler
+from the ACL library for each CPU socket on the board
+and adds parsed rules into that context.</p>
+<p>Note, that for each supported rule type,
+the application needs to calculate the expected offset of the fields
+from the start of the packet.
+That’s why only packets with fixed IPv4/ IPv6 header are supported.
+That allows to perform ACL classify straight over incoming packet buffer -
+no extra protocol field retrieval need to be performed.</p>
+<p>Subsequently, the application checks whether NUMA is enabled.
+If it is, the application records the socket IDs of the CPU cores involved in the task.</p>
+<p>Finally, the application creates contexts handler from the ACL library,
+adds rules parsed from the file into the database and build an ACL trie.
+It is important to note that the application creates an independent copy
+of each database for each socket CPU involved in the task
+to reduce the time for remote memory access.</p>
+</section>
+<section id="packet-forwarding-for-hash-based-lookups">
+<h3><span class="section-number">20.4.6. </span>Packet Forwarding for Hash-based Lookups</h3>
+<p>For each input packet, the packet forwarding operation is done by the l3fwd_simple_forward()
+or simple_ipv4_fwd_4pkts() function for IPv4 packets or the simple_ipv6_fwd_4pkts() function for IPv6 packets.
+The l3fwd_simple_forward() function provides the basic functionality for both IPv4 and IPv6 packet forwarding
+for any number of burst packets received,
+and the packet forwarding decision (that is, the identification of the output interface for the packet)
+for hash-based lookups is done by the  get_ipv4_dst_port() or get_ipv6_dst_port() function.
+The get_ipv4_dst_port() function is shown below:</p>
+<p>The get_ipv6_dst_port() function is similar to the get_ipv4_dst_port() function.</p>
+<p>The simple_ipv4_fwd_4pkts() and simple_ipv6_fwd_4pkts() function are optimized for continuous 4 valid ipv4 and ipv6 packets,
+they leverage the multiple buffer optimization to boost the performance of forwarding packets with the exact match on hash table.
+The key code snippet of simple_ipv4_fwd_4pkts() is shown below:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kr">inline</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">simple_ipv4_fwd_4pkts</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="o">*</span><span class="w"> </span><span class="n">m</span><span class="p">[</span><span class="mi">4</span><span class="p">],</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">portid</span><span class="p">,</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">lcore_conf</span><span class="w"> </span><span class="o">*</span><span class="n">qconf</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="c1">// ...</span>
+
+<span class="w">    </span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_loadu_si128</span><span class="p">((</span><span class="w"> </span><span class="n">m128i</span><span class="o">*</span><span class="p">)(</span><span class="n">rte_pktmbuf_mtod</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">offsetof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv4_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">time_to_live</span><span class="p">)));</span><span class="w"></span>
+<span class="w">    </span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_loadu_si128</span><span class="p">((</span><span class="w"> </span><span class="n">m128i</span><span class="o">*</span><span class="p">)(</span><span class="n">rte_pktmbuf_mtod</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">offsetof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv4_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">time_to_live</span><span class="p">)));</span><span class="w"></span>
+<span class="w">    </span><span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_loadu_si128</span><span class="p">((</span><span class="w"> </span><span class="n">m128i</span><span class="o">*</span><span class="p">)(</span><span class="n">rte_pktmbuf_mtod</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">offsetof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv4_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">time_to_live</span><span class="p">)));</span><span class="w"></span>
+<span class="w">    </span><span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_loadu_si128</span><span class="p">((</span><span class="w"> </span><span class="n">m128i</span><span class="o">*</span><span class="p">)(</span><span class="n">rte_pktmbuf_mtod</span><span class="p">(</span><span class="n">m</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_hdr</span><span class="p">)</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">offsetof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ipv4_hdr</span><span class="p">,</span><span class="w"> </span><span class="n">time_to_live</span><span class="p">)));</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">xmm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_and_si128</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="n">mask0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">key</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">xmm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_and_si128</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="n">mask0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">key</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">xmm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_and_si128</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="w"> </span><span class="n">mask0</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">key</span><span class="p">[</span><span class="mi">3</span><span class="p">].</span><span class="n">xmm</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">_mm_and_si128</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span><span class="w"> </span><span class="n">mask0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">key_array</span><span class="p">[</span><span class="mi">4</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="o">&amp;</span><span class="n">key</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">key</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">key</span><span class="p">[</span><span class="mi">2</span><span class="p">],</span><span class="o">&amp;</span><span class="n">key</span><span class="p">[</span><span class="mi">3</span><span class="p">]};</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">rte_hash_lookup_bulk</span><span class="p">(</span><span class="n">qconf</span><span class="o">-&gt;</span><span class="n">ipv4_lookup_struct</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">key_array</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="n">ret</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">dst_port</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="n">portid</span><span class="o">:</span><span class="n">ipv4_l3fwd_out_if</span><span class="p">[</span><span class="n">ret</span><span class="p">[</span><span class="mi">0</span><span class="p">]];</span><span class="w"></span>
+<span class="w">    </span><span class="n">dst_port</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="n">portid</span><span class="o">:</span><span class="n">ipv4_l3fwd_out_if</span><span class="p">[</span><span class="n">ret</span><span class="p">[</span><span class="mi">1</span><span class="p">]];</span><span class="w"></span>
+<span class="w">    </span><span class="n">dst_port</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="n">portid</span><span class="o">:</span><span class="n">ipv4_l3fwd_out_if</span><span class="p">[</span><span class="n">ret</span><span class="p">[</span><span class="mi">2</span><span class="p">]];</span><span class="w"></span>
+<span class="w">    </span><span class="n">dst_port</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">?</span><span class="w"> </span><span class="n">portid</span><span class="o">:</span><span class="n">ipv4_l3fwd_out_if</span><span class="p">[</span><span class="n">ret</span><span class="p">[</span><span class="mi">3</span><span class="p">]];</span><span class="w"></span>
+
+<span class="w">    </span><span class="c1">// ...</span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The simple_ipv6_fwd_4pkts() function is similar to the simple_ipv4_fwd_4pkts() function.</p>
+<p>Known issue: IP packets with extensions or IP packets which are not TCP/UDP cannot work well at this mode.</p>
+</section>
+<section id="packet-forwarding-for-lpm-based-lookups">
+<h3><span class="section-number">20.4.7. </span>Packet Forwarding for LPM-based Lookups</h3>
+<p>For each input packet, the packet forwarding operation is done by the l3fwd_simple_forward() function,
+but the packet forwarding decision (that is, the identification of the output interface for the packet)
+for LPM-based lookups is done by the get_ipv4_dst_port() function below:</p>
+</section>
+<section id="packet-forwarding-for-fib-based-lookups">
+<h3><span class="section-number">20.4.8. </span>Packet Forwarding for FIB-based Lookups</h3>
+<p>The FIB library was designed to process multiple packets at once,
+it does not have separate functions for single and bulk lookups.
+<code class="docutils literal notranslate"><span class="pre">rte_fib_lookup_bulk</span></code> is used for IPv4 lookups
+and <code class="docutils literal notranslate"><span class="pre">rte_fib6_lookup_bulk</span></code> for IPv6.
+Various examples of these functions being used
+can be found in the sample app code.</p>
+</section>
+<section id="eventdev-driver-initialization">
+<h3><span class="section-number">20.4.9. </span>Eventdev Driver Initialization</h3>
+<p>Eventdev driver initialization is same as L2 forwarding eventdev application.
+Refer <a class="reference internal" href="l2_forward_event.html"><span class="doc">L2 Forwarding Eventdev Sample Application</span></a> for more details.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="l2_forward_macsec.html" title="previous chapter"><span class="section-number">19. </span>L2 Forwarding MACsec Sample Application</a></li>
+      <li>Next: <a href="l3_forward_graph.html" title="next chapter"><span class="section-number">21. </span>L3 Forwarding Graph Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/l3_forward.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

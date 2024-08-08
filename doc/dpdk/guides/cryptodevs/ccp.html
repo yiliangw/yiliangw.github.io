@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>7. AMD CCP Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="8. Chacha20-poly1305 Crypto Poll Mode Driver" href="chacha20_poly1305.html" />
+    <link rel="prev" title="6. NXP CAAM JOB RING (caam_jr)" href="caam_jr.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="amd-ccp-poll-mode-driver">
+<h1><span class="section-number">7. </span>AMD CCP Poll Mode Driver</h1>
+<p>This code provides the initial implementation of the ccp poll mode driver.
+The CCP poll mode driver library (<strong>librte_crypto_ccp</strong>) implements support for
+AMD’s cryptographic co-processor (CCP). The CCP PMD is a virtual crypto
+poll mode driver which schedules crypto operations to one or more available
+CCP hardware engines on the platform. The CCP PMD provides poll mode crypto
+driver support for the following hardware accelerator devices:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>AMD Cryptographic Co-processor (0x1456)
+AMD Cryptographic Co-processor (0x1468)
+</pre></div>
+</div>
+<section id="features">
+<h2><span class="section-number">7.1. </span>Features</h2>
+<p>CCP crypto PMD has support for:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_ECB</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CBC</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_CMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_224</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_256</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_384</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_512</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA3_512_HMAC</span></code></p></li>
+</ul>
+<p>AEAD algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_AES_GCM</span></code></p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">7.2. </span>Installation</h2>
+<p>To compile ccp PMD, openssl packages have to be installed in the build
+environment.</p>
+<p>For Ubuntu 16.04 LTS use below to install openssl in the build system:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo apt-get install openssl</span>
+</pre></div>
+</div>
+<p>This code was verified on Ubuntu 16.04.</p>
+</section>
+<section id="initialization">
+<h2><span class="section-number">7.3. </span>Initialization</h2>
+<p>Bind the CCP devices to <code class="docutils literal notranslate"><span class="pre">vfio_pci</span></code> or <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> (see <a class="reference internal" href="../linux_gsg/linux_drivers.html#linux-gsg-binding-kernel"><span class="std std-ref">Binding and Unbinding Network Ports to/from the Kernel Modules</span></a>)
+before running the CCP PMD stack.</p>
+<p>To use the PMD in an application, user must:</p>
+<ul class="simple">
+<li><p>Call rte_vdev_init(“crypto_ccp”) within the application.</p></li>
+<li><p>Use –vdev=”crypto_ccp” in the EAL options, which will call rte_vdev_init() internally.</p></li>
+</ul>
+<p>The following parameters (all optional) can be provided in the previous two calls:</p>
+<ul class="simple">
+<li><p>socket_id: Specify the socket where the memory for the device is going to be allocated.
+(by default, socket_id will be the socket where the core that is creating the PMD is running on).</p></li>
+<li><p>max_nb_queue_pairs: Specify the maximum number of queue pairs in the device.</p></li>
+<li><p>max_nb_sessions: Specify the maximum number of sessions that can be created (2048 by default).</p></li>
+<li><p>ccp_auth_opt: Specify authentication operations to perform on CPU using openssl APIs.</p></li>
+</ul>
+<p>To validate ccp PMD, l2fwd-crypto example can be used with following command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./&lt;build_dir&gt;/examples/dpdk-l2fwd-crypto -l 1 -n 4 --vdev &quot;crypto_ccp&quot; -- -p 0x1</span>
+<span class="go">--chain CIPHER_HASH --cipher_op ENCRYPT --cipher_algo aes-cbc</span>
+<span class="go">--cipher_key 00:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:0f</span>
+<span class="go">--cipher_iv 00:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:ff</span>
+<span class="go">--auth_op GENERATE --auth_algo sha1-hmac</span>
+<span class="go">--auth_key 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+<span class="go">:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+<span class="go">:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+</pre></div>
+</div>
+<p>The CCP PMD also supports computing authentication over CPU with cipher offloaded to CCP.
+To enable this feature, pass an additional argument as ccp_auth_opt=1 to –vdev parameters as
+following:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./&lt;build_dir&gt;/examples/dpdk-l2fwd-crypto -l 1 -n 4 --vdev &quot;crypto_ccp,ccp_auth_opt=1&quot; -- -p 0x1</span>
+<span class="go">--chain CIPHER_HASH --cipher_op ENCRYPT --cipher_algo aes-cbc</span>
+<span class="go">--cipher_key 00:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:0f</span>
+<span class="go">--cipher_iv 00:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:ff</span>
+<span class="go">--auth_op GENERATE --auth_algo sha1-hmac</span>
+<span class="go">--auth_key 11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+<span class="go">:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+<span class="go">:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11:11</span>
+</pre></div>
+</div>
+</section>
+<section id="limitations">
+<h2><span class="section-number">7.4. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Chained mbufs are not supported.</p></li>
+<li><p>MD5_HMAC is supported only for CPU based authentication.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="caam_jr.html" title="previous chapter"><span class="section-number">6. </span>NXP CAAM JOB RING (caam_jr)</a></li>
+      <li>Next: <a href="chacha20_poly1305.html" title="next chapter"><span class="section-number">8. </span>Chacha20-poly1305 Crypto Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/ccp.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

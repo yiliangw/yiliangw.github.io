@@ -1,0 +1,217 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. IFCVF vDPA driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. NVIDIA MLX5 vDPA Driver" href="mlx5.html" />
+    <link rel="prev" title="1. Overview of vDPA Drivers Features" href="features_overview.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ifcvf-vdpa-driver">
+<h1><span class="section-number">4. </span>IFCVF vDPA driver</h1>
+<p>The IFCVF vDPA (vhost data path acceleration) driver provides support for the
+Intel FPGA 100G VF (IFCVF). IFCVF’s datapath is virtio ring compatible, it
+works as a HW vhost backend which can send/receive packets to/from virtio
+directly by DMA. Besides, it supports dirty page logging and device state
+report/restore, this driver enables its vDPA functionality.</p>
+<section id="ifcvf-vdpa-implementation">
+<h2><span class="section-number">4.1. </span>IFCVF vDPA Implementation</h2>
+<p>IFCVF’s vendor ID and device ID are same as that of virtio net pci device,
+with its specific subsystem vendor ID and device ID. To let the device be
+probed by IFCVF driver, adding “vdpa=1” parameter helps to specify that this
+device is to be used in vDPA mode, rather than polling mode, virtio PMD will
+skip when it detects this message. If no this parameter specified, device
+will not be used as a vDPA device, and it will be driven by virtio PMD.</p>
+<p>Different VF devices serve different virtio frontends which are in different
+VMs, so each VF needs to have its own DMA address translation service. During
+the driver probe a new container is created for this device, with this
+container vDPA driver can program DMA remapping table with the VM’s memory
+region information.</p>
+<p>The device argument “sw-live-migration=1” will configure the driver into SW
+assisted live migration mode. In this mode, the driver will set up a SW relay
+thread when LM happens, this thread will help device to log dirty pages. Thus
+this mode does not require HW to implement a dirty page logging function block,
+but will consume some percentage of CPU resource depending on the network
+throughput. If no this parameter specified, driver will rely on device’s logging
+capability.</p>
+<section id="key-ifcvf-vdpa-driver-ops">
+<h3><span class="section-number">4.1.1. </span>Key IFCVF vDPA driver ops</h3>
+<ul>
+<li><p>ifcvf_dev_config:
+Enable VF data path with virtio information provided by vhost lib, including
+IOMMU programming to enable VF DMA to VM’s memory, VFIO interrupt setup to
+route HW interrupt to virtio driver, create notify relay thread to translate
+virtio driver’s kick to a MMIO write onto HW, HW queues configuration.</p>
+<p>This function gets called to set up HW data path backend when virtio driver
+in VM gets ready.</p>
+</li>
+<li><p>ifcvf_dev_close:
+Revoke all the setup in ifcvf_dev_config.</p>
+<p>This function gets called when virtio driver stops device in VM.</p>
+</li>
+</ul>
+</section>
+<section id="to-create-a-vhost-port-with-ifc-vf">
+<h3><span class="section-number">4.1.2. </span>To create a vhost port with IFC VF</h3>
+<ul class="simple">
+<li><p>Create a vhost socket and assign a VF’s device ID to this socket via
+vhost API. When QEMU vhost connection gets ready, the assigned VF will
+get configured automatically.</p></li>
+</ul>
+</section>
+</section>
+<section id="features">
+<h2><span class="section-number">4.2. </span>Features</h2>
+<p>Features of the IFCVF driver are:</p>
+<ul class="simple">
+<li><p>Compatibility with virtio 0.95 and 1.0.</p></li>
+<li><p>SW assisted vDPA live migration.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">4.3. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Platform with IOMMU feature. IFC VF needs address translation service to
+Rx/Tx directly with virtio driver in VM.</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">4.4. </span>Limitations</h2>
+<section id="dependency-on-vfio-pci">
+<h3><span class="section-number">4.4.1. </span>Dependency on vfio-pci</h3>
+<p>vDPA driver needs to setup VF MSIX interrupts, each queue’s interrupt vector
+is mapped to a callfd associated with a virtio ring. Currently only vfio-pci
+allows multiple interrupts, so the IFCVF driver is dependent on vfio-pci.</p>
+</section>
+<section id="live-migration-with-virtio-net-f-guest-announce">
+<h3><span class="section-number">4.4.2. </span>Live Migration with VIRTIO_NET_F_GUEST_ANNOUNCE</h3>
+<p>IFC VF doesn’t support RARP packet generation, virtio frontend supporting
+VIRTIO_NET_F_GUEST_ANNOUNCE feature can help to do that.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">vDPA Device Drivers</a><ul>
+      <li>Previous: <a href="features_overview.html" title="previous chapter"><span class="section-number">1. </span>Overview of vDPA Drivers Features</a></li>
+      <li>Next: <a href="mlx5.html" title="next chapter"><span class="section-number">5. </span>NVIDIA MLX5 vDPA Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/vdpadevs/ifc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

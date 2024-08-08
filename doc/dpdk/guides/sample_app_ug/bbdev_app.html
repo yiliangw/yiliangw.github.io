@@ -1,0 +1,230 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>46. Loop-back Sample Application using Baseband Device (bbdev) &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="47. NTB Sample Application" href="ntb.html" />
+    <link rel="prev" title="45. IPsec Security Gateway Sample Application" href="ipsec_secgw.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="loop-back-sample-application-using-baseband-device-bbdev">
+<h1><span class="section-number">46. </span>Loop-back Sample Application using Baseband Device (bbdev)</h1>
+<p>The baseband sample application is a simple example of packet processing using
+the Data Plane Development Kit (DPDK) for baseband workloads using Wireless
+Device abstraction library.</p>
+<section id="overview">
+<h2><span class="section-number">46.1. </span>Overview</h2>
+<p>The Baseband device sample application performs a loop-back operation using a
+baseband device capable of transceiving data packets.
+A packet is received on an ethernet port -&gt; enqueued for downlink baseband
+operation -&gt; dequeued from the downlink baseband device -&gt; enqueued for uplink
+baseband operation -&gt; dequeued from the baseband device -&gt; then the received
+packet is compared with the baseband operations output. Then it’s looped back to
+the ethernet port.</p>
+<ul class="simple">
+<li><p>The MAC header is preserved in the packet</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">46.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Only one baseband device and one ethernet port can be used.</p></li>
+</ul>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">46.3. </span>Compiling the Application</h2>
+<p>DPDK needs to be built with <code class="docutils literal notranslate"><span class="pre">baseband_turbo_sw</span></code> PMD enabled along
+with <code class="docutils literal notranslate"><span class="pre">FLEXRAN</span> <span class="pre">SDK</span></code> Libraries. Refer to <em>SW Turbo Poll Mode Driver</em>
+documentation for more details on this.</p>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">46.4. </span>Running the Application</h2>
+<p>The application accepts a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-bbdev <span class="o">[</span>EAL options<span class="o">]</span> -- <span class="o">[</span>-e ENCODING_CORES<span class="o">]</span> /
+<span class="go">[-d DECODING_CORES] [-p ETH_PORT_ID] [-b BBDEV_ID]</span>
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">e</span> <span class="pre">ENCODING_CORES</span></code>: hexmask for encoding lcores (default = 0x2)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">DECODING_CORES</span></code>: hexmask for decoding lcores (default = 0x4)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">p</span> <span class="pre">ETH_PORT_ID</span></code>: ethernet port ID (default = 0)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">b</span> <span class="pre">BBDEV_ID</span></code>: BBDev ID (default = 0)</p></li>
+</ul>
+<p>The application requires that baseband devices is capable of performing
+the specified baseband operation are available on application initialization.
+This means that HW baseband device/s must be bound to a DPDK driver or
+a SW baseband device/s (virtual BBdev) must be created (using –vdev).</p>
+<p>To run the application in linux environment with the turbo_sw baseband device
+using the allow option for pci device running on 1 encoding lcore and 1 decoding lcore
+issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-bbdev --vdev<span class="o">=</span><span class="s1">&#39;baseband_turbo_sw&#39;</span> -a &lt;NIC0PCIADDR&gt; <span class="se">\</span>
+-c 0x38 --socket-mem<span class="o">=</span><span class="m">2</span>,2 --file-prefix<span class="o">=</span>bbdev -- -e 0x10 -d 0x20
+</pre></div>
+</div>
+<p>where, NIC0PCIADDR is the PCI address of the Rx port</p>
+<p>This command creates one virtual bbdev devices <code class="docutils literal notranslate"><span class="pre">baseband_turbo_sw</span></code> where the
+device gets linked to a corresponding ethernet port as allowed by
+the parameter -a.
+3 cores are allocated to the application, and assigned as:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>core 3 is the main and used to print the stats live on screen,</p></li>
+<li><p>core 4 is the encoding lcore performing Rx and Turbo Encode operations</p></li>
+<li><p>core 5 is the downlink lcore performing Turbo Decode, validation and Tx
+operations</p></li>
+</ul>
+</div></blockquote>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running
+applications and the Environment Abstraction Layer (EAL) options.</p>
+</section>
+<section id="using-packet-generator-with-baseband-device-sample-application">
+<h2><span class="section-number">46.5. </span>Using Packet Generator with baseband device sample application</h2>
+<p>To allow the bbdev sample app to do the loopback, an influx of traffic is required.
+This can be done by using DPDK Pktgen to burst traffic on two ethernet ports, and
+it will print the transmitted along with the looped-back traffic on Rx ports.
+Executing the command below will generate traffic on the two allowed ethernet
+ports.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./pktgen-3.4.0/app/x86_64-native-linux-gcc/pktgen -c 0x3 <span class="se">\</span>
+--socket-mem<span class="o">=</span><span class="m">1</span>,1 --file-prefix<span class="o">=</span>pg -a &lt;NIC1PCIADDR&gt; -- -m <span class="m">1</span>.0 -P
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-c</span> <span class="pre">COREMASK</span></code>: A hexadecimal bitmask of cores to run on</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--socket-mem</span></code>: Memory to allocate on specific sockets (use comma separated values)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--file-prefix</span></code>: Prefix for hugepage filenames</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-a</span> <span class="pre">&lt;NIC1PCIADDR&gt;</span></code>: Add a PCI device in allow list. The argument format is &lt;[domain:]bus:devid.func&gt;.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-m</span> <span class="pre">&lt;string&gt;</span></code>: Matrix for mapping ports to logical cores.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-P</span></code>: PROMISCUOUS mode</p></li>
+</ul>
+<p>Refer to <em>The Pktgen Application</em> documents for general information on running
+Pktgen with DPDK applications.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="ipsec_secgw.html" title="previous chapter"><span class="section-number">45. </span>IPsec Security Gateway Sample Application</a></li>
+      <li>Next: <a href="ntb.html" title="next chapter"><span class="section-number">47. </span>NTB Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/bbdev_app.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

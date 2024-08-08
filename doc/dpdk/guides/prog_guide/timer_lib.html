@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>29. Timer Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="30. Hash Library" href="hash_lib.html" />
+    <link rel="prev" title="28. Link Bonding Poll Mode Driver Library" href="link_bonding_poll_mode_drv_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="timer-library">
+<span id="id1"></span><h1><span class="section-number">29. </span>Timer Library</h1>
+<p>The Timer library provides a timer service to DPDK execution units to enable execution of callback functions asynchronously.
+Features of the library are:</p>
+<ul class="simple">
+<li><p>Timers can be periodic (multi-shot) or single (one-shot).</p></li>
+<li><p>Timers can be loaded from one core and executed on another. It has to be specified in the call to rte_timer_reset().</p></li>
+<li><p>Timers provide high precision (depends on the call frequency to rte_timer_manage() that checks timer expiration for the local core).</p></li>
+<li><p>If not required in the application, timers can be disabled at compilation time by not calling the rte_timer_manage() to increase performance.</p></li>
+</ul>
+<p>The timer library uses the rte_get_timer_cycles() function that uses the High Precision Event Timer (HPET)
+or the CPUs Time Stamp Counter (TSC) to provide a reliable time reference.</p>
+<p>This library provides an interface to add, delete and restart a timer. The API is based on BSD callout() with a few differences.
+Refer to the <a class="reference external" href="http://www.daemon-systems.org/man/callout.9.html">callout manual</a>.</p>
+<section id="implementation-details">
+<h2><span class="section-number">29.1. </span>Implementation Details</h2>
+<p>Timers are tracked on a per-lcore basis,
+with all pending timers for a core being maintained in order of timer expiry in a skiplist data structure.
+The skiplist used has ten levels and each entry in the table appears in each level with probability ¼^level.
+This means that all entries are present in level 0, 1 in every 4 entries is present at level 1,
+one in every 16 at level 2 and so on up to level 9.
+This means that adding and removing entries from the timer list for a core can be done in log(n) time,
+up to 4^10 entries, that is, approximately 1,000,000 timers per lcore.</p>
+<p>A timer structure contains a special field called status,
+which is a union of a timer state (stopped, pending, running, config) and an owner (lcore id).
+Depending on the timer state, we know if a timer is present in a list or not:</p>
+<ul class="simple">
+<li><p>STOPPED: no owner, not in a list</p></li>
+<li><p>CONFIG: owned by a core, must not be modified by another core, maybe in a list or not, depending on previous state</p></li>
+<li><p>PENDING: owned by a core, present in a list</p></li>
+<li><p>RUNNING: owned by a core, must not be modified by another core, present in a list</p></li>
+</ul>
+<p>Resetting or stopping a timer while it is in a CONFIG or RUNNING state is not allowed.
+When modifying the state of a timer,
+a Compare And Swap instruction should be used to guarantee that the status (state+owner) is modified atomically.</p>
+<p>Inside the rte_timer_manage() function,
+the skiplist is used as a regular list by iterating along the level 0 list, which contains all timer entries,
+until an entry which has not yet expired has been encountered.
+To improve performance in the case where there are entries in the timer list but none of those timers have yet expired,
+the expiry time of the first list entry is maintained within the per-core timer list structure itself.
+On 64-bit platforms, this value can be checked without the need to take a lock on the overall structure.
+(Since expiry times are maintained as 64-bit values,
+a check on the value cannot be done on 32-bit platforms without using either a compare-and-swap (CAS) instruction or using a lock,
+so this additional check is skipped in favor of checking as normal once the lock has been taken.)
+On both 64-bit and 32-bit platforms,
+a call to rte_timer_manage() returns without taking a lock in the case where the timer list for the calling core is empty.</p>
+</section>
+<section id="use-cases">
+<h2><span class="section-number">29.2. </span>Use Cases</h2>
+<p>The timer library is used for periodic calls, such as garbage collectors, or some state machines (ARP, bridging, and so on).</p>
+</section>
+<section id="references">
+<h2><span class="section-number">29.3. </span>References</h2>
+<ul class="simple">
+<li><p><a class="reference external" href="http://www.daemon-systems.org/man/callout.9.html">callout manual</a>
+- The callout facility that provides timers with a mechanism to execute a function at a given time.</p></li>
+<li><p><a class="reference external" href="http://en.wikipedia.org/wiki/HPET">HPET</a>
+- Information about the High Precision Event Timer (HPET).</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="link_bonding_poll_mode_drv_lib.html" title="previous chapter"><span class="section-number">28. </span>Link Bonding Poll Mode Driver Library</a></li>
+      <li>Next: <a href="hash_lib.html" title="next chapter"><span class="section-number">30. </span>Hash Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/timer_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

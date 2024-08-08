@@ -1,0 +1,361 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>69. Writing Efficient Code &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="70. Link Time Optimization" href="lto.html" />
+    <link rel="prev" title="68. Performance Optimization Guidelines" href="perf_opt_guidelines.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="writing-efficient-code">
+<h1><span class="section-number">69. </span>Writing Efficient Code</h1>
+<p>This chapter provides some tips for developing efficient code using the DPDK.
+For additional and more general information,
+please refer to the <em>Intel® 64 and IA-32 Architectures Optimization Reference Manual</em>
+which is a valuable reference to writing efficient code.</p>
+<section id="memory">
+<h2><span class="section-number">69.1. </span>Memory</h2>
+<p>This section describes some key memory considerations when developing applications in the DPDK environment.</p>
+<section id="memory-copy-do-not-use-libc-in-the-data-plane">
+<h3><span class="section-number">69.1.1. </span>Memory Copy: Do not Use libc in the Data Plane</h3>
+<p>Many libc functions are available in the DPDK, via the Linux* application environment.
+This can ease the porting of applications and the development of the configuration plane.
+However, many of these functions are not designed for performance.
+Functions such as memcpy() or strcpy() should not be used in the data plane.
+To copy small structures, the preference is for a simpler technique that can be optimized by the compiler.
+Refer to the <em>VTune™ Performance Analyzer Essentials</em> publication from Intel Press for recommendations.</p>
+<p>For specific functions that are called often,
+it is also a good idea to provide a self-made optimized function, which should be declared as static inline.</p>
+<p>The DPDK API provides an optimized rte_memcpy() function.</p>
+</section>
+<section id="memory-allocation">
+<h3><span class="section-number">69.1.2. </span>Memory Allocation</h3>
+<p>Other functions of libc, such as malloc(), provide a flexible way to allocate and free memory.
+In some cases, using dynamic allocation is necessary,
+but it is really not advised to use malloc-like functions in the data plane because
+managing a fragmented heap can be costly and the allocator may not be optimized for parallel allocation.</p>
+<p>If you really need dynamic allocation in the data plane, it is better to use a memory pool of fixed-size objects.
+This API is provided by librte_mempool.
+This data structure provides several services that increase performance, such as memory alignment of objects,
+lockless access to objects, NUMA awareness, bulk get/put and per-lcore cache.
+The rte_malloc () function uses a similar concept to mempools.</p>
+</section>
+<section id="concurrent-access-to-the-same-memory-area">
+<h3><span class="section-number">69.1.3. </span>Concurrent Access to the Same Memory Area</h3>
+<p>Read-Write (RW) access operations by several lcores to the same memory area can generate a lot of data cache misses,
+which are very costly.
+It is often possible to use per-lcore variables, for example, in the case of statistics.
+There are at least two solutions for this:</p>
+<ul class="simple">
+<li><p>Use RTE_PER_LCORE variables. Note that in this case, data on lcore X is not available to lcore Y.</p></li>
+<li><p>Use a table of structures (one per lcore). In this case, each structure must be cache-aligned.</p></li>
+</ul>
+<p>Read-mostly variables can be shared among lcores without performance losses if there are no RW variables in the same cache line.</p>
+</section>
+<section id="numa">
+<h3><span class="section-number">69.1.4. </span>NUMA</h3>
+<p>On a NUMA system, it is preferable to access local memory since remote memory access is slower.
+In the DPDK, the memzone, ring, rte_malloc and mempool APIs provide a way to create a pool on a specific socket.</p>
+<p>Sometimes, it can be a good idea to duplicate data to optimize speed.
+For read-mostly variables that are often accessed,
+it should not be a problem to keep them in one socket only, since data will be present in cache.</p>
+</section>
+<section id="distribution-across-memory-channels">
+<h3><span class="section-number">69.1.5. </span>Distribution Across Memory Channels</h3>
+<p>Modern memory controllers have several memory channels that can load or store data in parallel.
+Depending on the memory controller and its configuration,
+the number of channels and the way the memory is distributed across the channels varies.
+Each channel has a bandwidth limit,
+meaning that if all memory access operations are done on the first channel only, there is a potential bottleneck.</p>
+<p>By default, the  <a class="reference internal" href="mempool_lib.html#mempool-library"><span class="std std-ref">Mempool Library</span></a> spreads the addresses of objects among memory channels.</p>
+</section>
+<section id="locking-memory-pages">
+<h3><span class="section-number">69.1.6. </span>Locking memory pages</h3>
+<p>The underlying operating system is allowed to load/unload memory pages at its own discretion.
+These page loads could impact the performance, as the process is on hold when the kernel fetches them.</p>
+<p>To avoid these you could pre-load, and lock them into memory with the <code class="docutils literal notranslate"><span class="pre">mlockall()</span></code> call.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mlockall</span><span class="p">(</span><span class="n">MCL_CURRENT</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="n">MCL_FUTURE</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">NOTICE</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;mlockall() failed with error </span><span class="se">\&quot;</span><span class="s">%s</span><span class="se">\&quot;\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">strerror</span><span class="p">(</span><span class="n">errno</span><span class="p">));</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="communication-between-lcores">
+<h2><span class="section-number">69.2. </span>Communication Between lcores</h2>
+<p>To provide a message-based communication between lcores,
+it is advised to use the DPDK ring API, which provides a lockless ring implementation.</p>
+<p>The ring supports bulk and burst access,
+meaning that it is possible to read several elements from the ring with only one costly atomic operation
+(see <a class="reference internal" href="ring_lib.html"><span class="doc">Ring Library</span></a>).
+Performance is greatly improved when using bulk access operations.</p>
+<p>The code algorithm that dequeues messages may be something similar to the following:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="w"> </span><span class="cp">#define MAX_BULK 32</span>
+
+<span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/* Process as many elements as can be dequeued. */</span><span class="w"></span>
+<span class="w">     </span><span class="n">count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_ring_dequeue_burst</span><span class="p">(</span><span class="n">ring</span><span class="p">,</span><span class="w"> </span><span class="n">obj_table</span><span class="p">,</span><span class="w"> </span><span class="n">MAX_BULK</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+<span class="w">     </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">unlikely</span><span class="p">(</span><span class="n">count</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">))</span><span class="w"></span>
+<span class="w">         </span><span class="k">continue</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">     </span><span class="n">my_process_bulk</span><span class="p">(</span><span class="n">obj_table</span><span class="p">,</span><span class="w"> </span><span class="n">count</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="pmd">
+<h2><span class="section-number">69.3. </span>PMD</h2>
+<p>The DPDK Poll Mode Driver (PMD) is also able to work in bulk/burst mode,
+allowing the factorization of some code for each call in the send or receive function.</p>
+<p>Avoid partial writes.
+When PCI devices write to system memory through DMA,
+it costs less if the write operation is on a full cache line as opposed to part of it.
+In the PMD code, actions have been taken to avoid partial writes as much as possible.</p>
+<section id="lower-packet-latency">
+<h3><span class="section-number">69.3.1. </span>Lower Packet Latency</h3>
+<p>Traditionally, there is a trade-off between throughput and latency.
+An application can be tuned to achieve a high throughput,
+but the end-to-end latency of an average packet will typically increase as a result.
+Similarly, the application can be tuned to have, on average,
+a low end-to-end latency, at the cost of lower throughput.</p>
+<p>In order to achieve higher throughput,
+the DPDK attempts to aggregate the cost of processing each packet individually by processing packets in bursts.</p>
+<p>Using the testpmd application as an example,
+the burst size can be set on the command line to a value of 32 (also the default value).
+This allows the application to request 32 packets at a time from the PMD.
+The testpmd application then immediately attempts to transmit all the packets that were received,
+in this case, all 32 packets.</p>
+<p>The packets are not transmitted until the tail pointer is updated on the corresponding TX queue of the network port.
+This behavior is desirable when tuning for high throughput because
+the cost of tail pointer updates to both the RX and TX queues can be spread
+across 32 packets,
+effectively hiding the relatively slow MMIO cost of writing to the PCIe* device.
+However, this is not very desirable when tuning for low latency because
+the first packet that was received must also wait for another 31 packets to be received.
+It cannot be transmitted until the other 31 packets have also been processed because
+the NIC will not know to transmit the packets until the TX tail pointer has been updated,
+which is not done until all 32 packets have been processed for transmission.</p>
+<p>To consistently achieve low latency, even under heavy system load,
+the application developer should avoid processing packets in bunches.
+The testpmd application can be configured from the command line to use a burst value of 1.
+This will allow a single packet to be processed at a time, providing lower latency,
+but with the added cost of lower throughput.</p>
+</section>
+</section>
+<section id="locks-and-atomic-operations">
+<h2><span class="section-number">69.4. </span>Locks and Atomic Operations</h2>
+<p>This section describes some key considerations when using locks and atomic
+operations in the DPDK environment.</p>
+<section id="locks">
+<h3><span class="section-number">69.4.1. </span>Locks</h3>
+<p>On x86, atomic operations imply a lock prefix before the instruction,
+causing the processor’s LOCK# signal to be asserted during execution of the following instruction.
+This has a big impact on performance in a multicore environment.</p>
+<p>Performance can be improved by avoiding lock mechanisms in the data plane.
+It can often be replaced by other solutions like per-lcore variables.
+Also, some locking techniques are more efficient than others.
+For instance, the Read-Copy-Update (RCU) algorithm can frequently replace simple rwlocks.</p>
+</section>
+<section id="atomic-operations-use-c11-atomic-builtins">
+<h3><span class="section-number">69.4.2. </span>Atomic Operations: Use C11 Atomic Builtins</h3>
+<p>DPDK generic rte_atomic operations are implemented by __sync builtins. These
+__sync builtins result in full barriers on aarch64, which are unnecessary
+in many use cases. They can be replaced by __atomic builtins that conform to
+the C11 memory model and provide finer memory order control.</p>
+<p>So replacing the rte_atomic operations with __atomic builtins might improve
+performance for aarch64 machines.</p>
+<p>Some typical optimization cases are listed below:</p>
+<section id="atomicity">
+<h4><span class="section-number">69.4.2.1. </span>Atomicity</h4>
+<p>Some use cases require atomicity alone, the ordering of the memory operations
+does not matter. For example, the packet statistics counters need to be
+incremented atomically but do not need any particular memory ordering.
+So, RELAXED memory ordering is sufficient.</p>
+</section>
+<section id="one-way-barrier">
+<h4><span class="section-number">69.4.2.2. </span>One-way Barrier</h4>
+<p>Some use cases allow for memory reordering in one way while requiring memory
+ordering in the other direction.</p>
+<p>For example, the memory operations before the spinlock lock are allowed to
+move to the critical section, but the memory operations in the critical section
+are not allowed to move above the lock. In this case, the full memory barrier
+in the compare-and-swap operation can be replaced with ACQUIRE memory order.
+On the other hand, the memory operations after the spinlock unlock are allowed
+to move to the critical section, but the memory operations in the critical
+section are not allowed to move below the unlock. So the full barrier in the
+store operation can use RELEASE memory order.</p>
+</section>
+<section id="reader-writer-concurrency">
+<h4><span class="section-number">69.4.2.3. </span>Reader-Writer Concurrency</h4>
+<p>Lock-free reader-writer concurrency is one of the common use cases in DPDK.</p>
+<p>The payload or the data that the writer wants to communicate to the reader,
+can be written with RELAXED memory order. However, the guard variable should
+be written with RELEASE memory order. This ensures that the store to guard
+variable is observable only after the store to payload is observable.</p>
+<p>Correspondingly, on the reader side, the guard variable should be read
+with ACQUIRE memory order. The payload or the data the writer communicated,
+can be read with RELAXED memory order. This ensures that, if the store to
+guard variable is observable, the store to payload is also observable.</p>
+</section>
+</section>
+</section>
+<section id="coding-considerations">
+<h2><span class="section-number">69.5. </span>Coding Considerations</h2>
+<section id="inline-functions">
+<h3><span class="section-number">69.5.1. </span>Inline Functions</h3>
+<p>Small functions can be declared as static inline in the header file.
+This avoids the cost of a call instruction (and the associated context saving).
+However, this technique is not always efficient; it depends on many factors including the compiler.</p>
+</section>
+<section id="branch-prediction">
+<h3><span class="section-number">69.5.2. </span>Branch Prediction</h3>
+<p>The Intel® C/C++ Compiler (icc)/gcc built-in helper functions likely() and unlikely()
+allow the developer to indicate if a code branch is likely to be taken or not.
+For instance:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">likely</span><span class="p">(</span><span class="n">x</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">1</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="n">do_stuff</span><span class="p">();</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="setting-the-target-cpu-type">
+<h2><span class="section-number">69.6. </span>Setting the Target CPU Type</h2>
+<p>The DPDK supports CPU microarchitecture-specific optimizations by means of RTE_MACHINE option.
+The degree of optimization depends on the compiler’s ability to optimize for a specific microarchitecture,
+therefore it is preferable to use the latest compiler versions whenever possible.</p>
+<p>If the compiler version does not support the specific feature set (for example, the Intel® AVX instruction set),
+the build process gracefully degrades to whatever latest feature set is supported by the compiler.</p>
+<p>Since the build and runtime targets may not be the same,
+the resulting binary also contains a platform check that runs before the
+main() function and checks if the current machine is suitable for running the binary.</p>
+<p>Along with compiler optimizations,
+a set of preprocessor defines are automatically added to the build process (regardless of the compiler version).
+These defines correspond to the instruction sets that the target CPU should be able to support.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="perf_opt_guidelines.html" title="previous chapter"><span class="section-number">68. </span>Performance Optimization Guidelines</a></li>
+      <li>Next: <a href="lto.html" title="next chapter"><span class="section-number">70. </span>Link Time Optimization</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/writing_efficient_code.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

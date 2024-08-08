@@ -1,0 +1,335 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Design &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. ABI Policy" href="abi_policy.html" />
+    <link rel="prev" title="1. DPDK Coding Style" href="coding_style.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="design">
+<h1><span class="section-number">2. </span>Design</h1>
+<section id="environment-or-architecture-specific-sources">
+<h2><span class="section-number">2.1. </span>Environment or Architecture-specific Sources</h2>
+<p>In DPDK and DPDK applications, some code is specific to an architecture (i686, x86_64) or to an executive environment (freebsd or linux) and so on.
+As far as is possible, all such instances of architecture or env-specific code should be provided via standard APIs in the EAL.</p>
+<p>By convention, a file is common if it is not located in a directory indicating that it is specific.
+For instance, a file located in a subdir of “x86_64” directory is specific to this architecture.
+A file located in a subdir of “linux” is specific to this execution environment.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Code in DPDK libraries and applications should be generic.
+The correct location for architecture or executive environment specific code is in the EAL.</p>
+</div>
+<p>When absolutely necessary, there are several ways to handle specific code:</p>
+<ul>
+<li><p>Use a <code class="docutils literal notranslate"><span class="pre">#ifdef</span></code> with a build definition macro in the C code.
+This can be done when the differences are small and they can be embedded in the same C file:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#ifdef RTE_ARCH_I686</span>
+<span class="n">toto</span><span class="p">();</span><span class="w"></span>
+<span class="cp">#else</span>
+<span class="n">titi</span><span class="p">();</span><span class="w"></span>
+<span class="cp">#endif</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use build definition macros and conditions in the Meson build file. This is done when the differences are more significant.
+In this case, the code is split into two separate files that are architecture or environment specific.
+This should only apply inside the EAL library.</p></li>
+</ul>
+<section id="per-architecture-sources">
+<h3><span class="section-number">2.1.1. </span>Per Architecture Sources</h3>
+<p>The following macro options can be used:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_ARCH</span></code> is a string that contains the name of the architecture.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_ARCH_I686</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_X86_64</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_X86_X32</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_PPC_64</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_RISCV</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_LOONGARCH</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_ARM</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_ARMv7</span></code> or <code class="docutils literal notranslate"><span class="pre">RTE_ARCH_ARM64</span></code> are defined only if we are building for those architectures.</p></li>
+</ul>
+</section>
+<section id="per-execution-environment-sources">
+<h3><span class="section-number">2.1.2. </span>Per Execution Environment Sources</h3>
+<p>The following macro options can be used:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_EXEC_ENV</span></code> is a string that contains the name of the executive environment.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_EXEC_ENV_FREEBSD</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_EXEC_ENV_LINUX</span></code> or <code class="docutils literal notranslate"><span class="pre">RTE_EXEC_ENV_WINDOWS</span></code> are defined only if we are building for this execution environment.</p></li>
+</ul>
+</section>
+</section>
+<section id="mbuf-features">
+<h2><span class="section-number">2.2. </span>Mbuf features</h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code> structure must be kept small (128 bytes).</p>
+<p>In order to add new features without wasting buffer space for unused features,
+some fields and flags can be registered dynamically in a shared area.
+The “dynamic” mbuf area is the default choice for the new features.</p>
+<p>The “dynamic” area is eating the remaining space in mbuf,
+and some existing “static” fields may need to become “dynamic”.</p>
+<p>Adding a new static field or flag must be an exception matching many criteria
+like (non exhaustive): wide usage, performance, size.</p>
+</section>
+<section id="runtime-information-logging-tracing-and-telemetry">
+<h2><span class="section-number">2.3. </span>Runtime Information - Logging, Tracing and Telemetry</h2>
+<p>It is often desirable to provide information to the end-user
+as to what is happening to the application at runtime.
+DPDK provides a number of built-in mechanisms to provide this introspection:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="coding_style.html#dynamic-logging"><span class="std std-ref">Logging</span></a></p></li>
+<li><p><a class="reference internal" href="../prog_guide/trace_lib.html"><span class="doc">Tracing</span></a></p></li>
+<li><p><a class="reference internal" href="../prog_guide/telemetry_lib.html"><span class="doc">Telemetry</span></a></p></li>
+</ul>
+<p>Each of these has its own strengths and suitabilities for use within DPDK components.</p>
+<p>Below are some guidelines for when each should be used:</p>
+<ul class="simple">
+<li><p>For reporting error conditions, or other abnormal runtime issues, <em>logging</em> should be used.
+Depending on the severity of the issue, the appropriate log level, for example,
+<code class="docutils literal notranslate"><span class="pre">ERROR</span></code>, <code class="docutils literal notranslate"><span class="pre">WARNING</span></code> or <code class="docutils literal notranslate"><span class="pre">NOTICE</span></code>, should be used.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Drivers of all classes, including both bus and device drivers,
+should not output any log information if the hardware they support is not present.
+This is to avoid any changes in output for existing users when a new driver is added to DPDK.</p>
+</div>
+<ul class="simple">
+<li><p>For component initialization, or other cases where a path through the code
+is only likely to be taken once,
+either <em>logging</em> at <code class="docutils literal notranslate"><span class="pre">DEBUG</span></code> level or <em>tracing</em> may be used, or potentially both.
+In the latter case, tracing can provide basic information as to the code path taken,
+with debug-level logging providing additional details on internal state,
+not possible to emit via tracing.</p></li>
+<li><p>For a component’s data-path, where a path is to be taken multiple times within a short timeframe,
+<em>tracing</em> should be used.
+Since DPDK tracing uses <a class="reference external" href="https://diamon.org/ctf/">Common Trace Format</a> for its tracing logs,
+post-analysis can be done using a range of external tools.</p></li>
+<li><p>For numerical or statistical data generated by a component, for example, per-packet statistics,
+<em>telemetry</em> should be used.</p></li>
+<li><p>For any data where the data may need to be gathered at any point in the execution
+to help assess the state of the application component,
+for example, core configuration, device information, <em>telemetry</em> should be used.
+Telemetry callbacks should not modify any program state, but be “read-only”.</p></li>
+</ul>
+<p>Many libraries also include a <code class="docutils literal notranslate"><span class="pre">rte_&lt;libname&gt;_dump()</span></code> function as part of their API,
+writing verbose internal details to a given file-handle.
+New libraries are encouraged to provide such functions where it makes sense to do so,
+as they provide an additional application-controlled mechanism
+to get details of the internals of a DPDK component.</p>
+</section>
+<section id="library-statistics">
+<h2><span class="section-number">2.4. </span>Library Statistics</h2>
+<section id="description">
+<h3><span class="section-number">2.4.1. </span>Description</h3>
+<p>This document describes the guidelines for DPDK library-level statistics counter
+support. This includes guidelines for turning library statistics on and off and
+requirements for preventing ABI changes when implementing statistics.</p>
+</section>
+<section id="mechanism-to-allow-the-application-to-turn-library-statistics-on-and-off">
+<h3><span class="section-number">2.4.2. </span>Mechanism to allow the application to turn library statistics on and off</h3>
+<p>Having runtime support for enabling/disabling library statistics is recommended,
+as build-time options should be avoided. However, if build-time options are used,
+for example as in the table library, the options can be set using c_args.
+When this flag is set, all the counters supported by current library are
+collected for all the instances of every object type provided by the library.
+When this flag is cleared, none of the counters supported by the current library
+are collected for any instance of any object type provided by the library:</p>
+</section>
+<section id="prevention-of-abi-changes-due-to-library-statistics-support">
+<h3><span class="section-number">2.4.3. </span>Prevention of ABI changes due to library statistics support</h3>
+<p>The layout of data structures and prototype of functions that are part of the
+library API should not be affected by whether the collection of statistics
+counters is turned on or off for the current library. In practical terms, this
+means that space should always be allocated in the API data structures for
+statistics counters and the statistics related API functions are always built
+into the code, regardless of whether the statistics counter collection is turned
+on or off for the current library.</p>
+<p>When the collection of statistics counters for the current library is turned
+off, the counters retrieved through the statistics related API functions should
+have a default value of zero.</p>
+</section>
+<section id="motivation-to-allow-the-application-to-turn-library-statistics-on-and-off">
+<h3><span class="section-number">2.4.4. </span>Motivation to allow the application to turn library statistics on and off</h3>
+<p>It is highly recommended that each library provides statistics counters to allow
+an application to monitor the library-level run-time events. Typical counters
+are: number of packets received/dropped/transmitted, number of buffers
+allocated/freed, number of occurrences for specific events, etc.</p>
+<p>However, the resources consumed for library-level statistics counter collection
+have to be spent out of the application budget and the counters collected by
+some libraries might not be relevant to the current application. In order to
+avoid any unwanted waste of resources and/or performance impacts, the
+application should decide at build time whether the collection of library-level
+statistics counters should be turned on or off for each library individually.</p>
+<p>Library-level statistics counters can be relevant or not for specific
+applications:</p>
+<ul class="simple">
+<li><p>For Application A, counters maintained by Library X are always relevant and
+the application needs to use them to implement certain features, such as traffic
+accounting, logging, application-level statistics, etc. In this case,
+the application requires that collection of statistics counters for Library X is
+always turned on.</p></li>
+<li><p>For Application B, counters maintained by Library X are only useful during the
+application debug stage and are not relevant once debug phase is over. In this
+case, the application may decide to turn on the collection of Library X
+statistics counters during the debug phase and at a later stage turn them off.</p></li>
+<li><p>For Application C, counters maintained by Library X are not relevant at all.
+It might be that the application maintains its own set of statistics counters
+that monitor a different set of run-time events (e.g. number of connection
+requests, number of active users, etc). It might also be that the application
+uses multiple libraries (Library X, Library Y, etc) and it is interested in the
+statistics counters of Library Y, but not in those of Library X. In this case,
+the application may decide to turn the collection of statistics counters off for
+Library X and on for Library Y.</p></li>
+</ul>
+<p>The statistics collection consumes a certain amount of CPU resources (cycles,
+cache bandwidth, memory bandwidth, etc) that depends on:</p>
+<ul class="simple">
+<li><p>Number of libraries used by the current application that have statistics
+counters collection turned on.</p></li>
+<li><p>Number of statistics counters maintained by each library per object type
+instance (e.g. per port, table, pipeline, thread, etc).</p></li>
+<li><p>Number of instances created for each object type supported by each library.</p></li>
+<li><p>Complexity of the statistics logic collection for each counter: when only
+some occurrences of a specific event are valid, additional logic is typically
+needed to decide whether the current occurrence of the event should be counted
+or not. For example, in the event of packet reception, when only TCP packets
+with destination port within a certain range should be recorded, conditional
+branches are usually required. When processing a burst of packets that have been
+validated for header integrity, counting the number of bits set in a bitmask
+might be needed.</p></li>
+</ul>
+</section>
+</section>
+<section id="pf-and-vf-considerations">
+<h2><span class="section-number">2.5. </span>PF and VF Considerations</h2>
+<p>The primary goal of DPDK is to provide a userspace dataplane. Managing VFs from
+a PF driver is a control plane feature and developers should generally rely on
+the Linux Kernel for that.</p>
+<p>Developers should work with the Linux Kernel community to get the required
+functionality upstream. PF functionality should only be added to DPDK for
+testing and prototyping purposes while the kernel work is ongoing. It should
+also be marked with an “EXPERIMENTAL” tag. If the functionality isn’t
+upstreamable then a case can be made to maintain the PF functionality in DPDK
+without the EXPERIMENTAL tag.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="coding_style.html" title="previous chapter"><span class="section-number">1. </span>DPDK Coding Style</a></li>
+      <li>Next: <a href="abi_policy.html" title="next chapter"><span class="section-number">3. </span>ABI Policy</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/design.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

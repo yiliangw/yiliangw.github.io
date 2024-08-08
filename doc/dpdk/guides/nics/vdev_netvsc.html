@@ -1,0 +1,216 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>57. VDEV_NETVSC driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="58. Poll Mode Driver that wraps vhost library" href="vhost.html" />
+    <link rel="prev" title="56. TXGBE Poll Mode Driver" href="txgbe.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="vdev-netvsc-driver">
+<h1><span class="section-number">57. </span>VDEV_NETVSC driver</h1>
+<p>The VDEV_NETVSC driver (<strong>librte_net_vdev_netvsc</strong>) provides support for NetVSC
+interfaces and associated SR-IOV virtual function (VF) devices found in
+Linux virtual machines running on Microsoft <a class="reference external" href="https://docs.microsoft.com/en-us/windows-hardware/drivers/network/overview-of-hyper-v">Hyper-V</a> (including Azure)
+platforms.</p>
+<section id="implementation-details">
+<h2><span class="section-number">57.1. </span>Implementation details</h2>
+<p>Each instance of this driver effectively needs to drive two devices: the
+NetVSC interface proper and its SR-IOV VF (referred to as “physical” from
+this point on) counterpart sharing the same MAC address.</p>
+<p>Physical devices are part of the host system and cannot be maintained during
+VM migration. From a VM standpoint they appear as hot-plug devices that come
+and go without prior notice.</p>
+<p>When the physical device is present, egress and most of the ingress traffic
+flows through it; only multicasts and other hypervisor control still flow
+through NetVSC. Otherwise, NetVSC acts as a fallback for all traffic.</p>
+<p>To avoid unnecessary code duplication and ensure maximum performance,
+handling of physical devices is left to their original PMDs; this virtual
+device driver (also known as <em>vdev</em>) manages other PMDs as summarized by the
+following block diagram:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>        .------------------.
+        | DPDK application |
+        `--------+---------&#39;
+                 |
+          .------+------.
+          | DPDK ethdev |
+          `------+------&#39;       Control
+                 |                 |
+    .------------+------------.    v    .--------------------.
+    |       failsafe PMD      +---------+ vdev_netvsc driver |
+    `--+-------------------+--&#39;         `--------------------&#39;
+       |                   |
+       |          .........|.........
+       |          :        |        :
+  .----+----.     :   .----+----.   :
+  | tap PMD |     :   | any PMD |   :
+  `----+----&#39;     :   `----+----&#39;   : &lt;-- Hot-pluggable
+       |          :        |        :
+.------+-------.  :  .-----+-----.  :
+| NetVSC-based |  :  | SR-IOV VF |  :
+|   netdevice  |  :  |   device  |  :
+`--------------&#39;  :  `-----------&#39;  :
+                  :.................:
+</pre></div>
+</div>
+<p>This driver implementation may be temporary and should be improved or removed
+either when hot-plug will be fully supported in EAL and bus drivers or when
+a new NetVSC driver will be integrated.</p>
+</section>
+<section id="runtime-configuration">
+<h2><span class="section-number">57.2. </span>Runtime Configuration</h2>
+<p>This driver is invoked automatically in Hyper-V VM systems unless the user
+invoked it by command line using <code class="docutils literal notranslate"><span class="pre">--vdev=net_vdev_netvsc</span></code> EAL option.</p>
+<p>The following device parameters are supported:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">iface</span></code> [string]</p>
+<p>Provide a specific NetVSC interface (netdevice) name to attach this driver
+to. Can be provided multiple times for additional instances.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mac</span></code> [string]</p>
+<p>Same as <code class="docutils literal notranslate"><span class="pre">iface</span></code> except a suitable NetVSC interface is located using its
+MAC address.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">force</span></code> [int]</p>
+<p>If nonzero, forces the use of specified interfaces even if not detected as
+NetVSC.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ignore</span></code> [int]</p>
+<p>If nonzero, ignores the driver running (actually used to disable the
+auto-detection in Hyper-V VM).</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Not specifying either <code class="docutils literal notranslate"><span class="pre">iface</span></code> or <code class="docutils literal notranslate"><span class="pre">mac</span></code> makes this driver attach itself to
+all unrouted NetVSC interfaces found on the system.
+Specifying the device makes this driver attach itself to the device
+regardless the device routes.</p>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="txgbe.html" title="previous chapter"><span class="section-number">56. </span>TXGBE Poll Mode Driver</a></li>
+      <li>Next: <a href="vhost.html" title="next chapter"><span class="section-number">58. </span>Poll Mode Driver that wraps vhost library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/vdev_netvsc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

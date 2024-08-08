@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. Log Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. Command-line Library" href="cmdline.html" />
+    <link rel="prev" title="4. Environment Abstraction Layer" href="env_abstraction_layer.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="log-library">
+<h1><span class="section-number">5. </span>Log Library</h1>
+<p>The DPDK Log library provides the logging functionality for other DPDK libraries and drivers.
+By default, in a Linux application, logs are sent to syslog and also to the console.
+On FreeBSD and Windows applications, logs are sent only to the console.
+However, the log function can be overridden by the user to use a different logging mechanism.</p>
+<section id="log-levels">
+<h2><span class="section-number">5.1. </span>Log Levels</h2>
+<p>Log messages from apps and libraries are reported with a given level of severity.
+These levels, specified in <code class="docutils literal notranslate"><span class="pre">rte_log.h</span></code> are (from most to least important):</p>
+<ol class="arabic simple">
+<li><p>Emergency</p></li>
+<li><p>Alert</p></li>
+<li><p>Critical</p></li>
+<li><p>Error</p></li>
+<li><p>Warning</p></li>
+<li><p>Notice</p></li>
+<li><p>Information</p></li>
+<li><p>Debug</p></li>
+</ol>
+<p>At runtime, only messages of a configured level or above (i.e. of higher importance)
+will be emitted by the application to the log output.
+That level can be configured either by the application calling the relevant APIs from the logging library,
+or by the user passing the <code class="docutils literal notranslate"><span class="pre">--log-level</span></code> parameter to the EAL via the application.</p>
+<section id="setting-global-log-level">
+<h3><span class="section-number">5.1.1. </span>Setting Global Log Level</h3>
+<p>To adjust the global log level for an application,
+just pass a numeric level or a level name to the <code class="docutils literal notranslate"><span class="pre">--log-level</span></code> EAL parameter.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/path/to/app --log-level=error
+
+/path/to/app --log-level=debug
+
+/path/to/app --log-level=5   # warning
+</pre></div>
+</div>
+<p>Within an application, the log level can be similarly set using the <code class="docutils literal notranslate"><span class="pre">rte_log_set_global_level</span></code> API.</p>
+</section>
+<section id="setting-log-level-for-a-component">
+<h3><span class="section-number">5.1.2. </span>Setting Log Level for a Component</h3>
+<p>In some cases, for example, for debugging purposes,
+it may be desirable to increase or decrease the log level for only a specific component, or set of components.
+To facilitate this, the <code class="docutils literal notranslate"><span class="pre">--log-level</span></code> argument also accepts an, optionally wildcarded, component name,
+along with the desired level for that component.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/path/to/app --log-level=lib.eal:crit
+
+/path/to/app --log-level=lib.*:warning
+</pre></div>
+</div>
+<p>Within an application, the same result can be got using the <code class="docutils literal notranslate"><span class="pre">rte_log_set_level_pattern()</span></code> or <code class="docutils literal notranslate"><span class="pre">rte_log_set_level_regex()</span></code> APIs.</p>
+</section>
+</section>
+<section id="using-logging-apis-to-generate-log-messages">
+<h2><span class="section-number">5.2. </span>Using Logging APIs to Generate Log Messages</h2>
+<p>To output log messages, <code class="docutils literal notranslate"><span class="pre">rte_log()</span></code> API function should be used.
+As well as the log message, <code class="docutils literal notranslate"><span class="pre">rte_log()</span></code> takes two additional parameters:</p>
+<ul class="simple">
+<li><p>The log level</p></li>
+<li><p>The log component type</p></li>
+</ul>
+<p>The log level is a numeric value as discussed above.
+The component type is a unique id that identifies the particular DPDK component to the logging system.
+To get this id, each component needs to register itself at startup,
+using the macro <code class="docutils literal notranslate"><span class="pre">RTE_LOG_REGISTER_DEFAULT</span></code>.
+This macro takes two parameters, with the second being the default log level for the component.
+The first parameter, called “type”, the name of the “logtype”, or “component type” variable used in the component.
+This variable will be defined by the macro, and should be passed as the second parameter in calls to <code class="docutils literal notranslate"><span class="pre">rte_log()</span></code>.
+In general, most DPDK components define their own logging macros to simplify the calls to the log APIs.
+They do this by:</p>
+<ul class="simple">
+<li><p>Hiding the component type parameter inside the macro so it never needs to be passed explicitly.</p></li>
+<li><p>Using the log-level definitions given in <code class="docutils literal notranslate"><span class="pre">rte_log.h</span></code> to allow short textual names to be used in
+place of the numeric log levels.</p></li>
+</ul>
+<p>The following code is taken from <code class="docutils literal notranslate"><span class="pre">rte_dmadev.c</span></code> and shows the log registration,
+and subsequent definition of a shortcut logging macro.
+It can be used as a template for any new components using DPDK logging.</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="n">RTE_LOG_REGISTER_DEFAULT</span><span class="p">(</span><span class="n">rte_dma_logtype</span><span class="p">,</span><span class="w"> </span><span class="n">INFO</span><span class="p">);</span><span class="w"></span>
+<span class="cp">#define RTE_DMA_LOG(level, ...) \</span>
+<span class="cp">        rte_log(RTE_LOG_ ## level, rte_dma_logtype, RTE_FMT(&quot;dma: &quot; \</span>
+<span class="cp">                RTE_FMT_HEAD(__VA_ARGS__,) &quot;\n&quot;, RTE_FMT_TAIL(__VA_ARGS__,)))</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Because the log registration macro provides the logtype variable definition,
+it should be placed near the top of the C file using it.
+If not, the logtype variable should be defined as an “extern int” near the top of the file.</p>
+<p>Similarly, if logging is to be done by multiple files in a component,
+only one file should register the logtype via the macro,
+and the logtype should be defined as an “extern int” in a common header file.
+Any component-specific logging macro should similarly be defined in that header.</p>
+</div>
+<p>Throughout the dmadev library, all logging calls are therefore of the form:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="n">RTE_DMA_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Name can&#39;t be NULL&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">RTE_DMA_LOG</span><span class="p">(</span><span class="n">WARNING</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Device %d already started&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">dev_id</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="env_abstraction_layer.html" title="previous chapter"><span class="section-number">4. </span>Environment Abstraction Layer</a></li>
+      <li>Next: <a href="cmdline.html" title="next chapter"><span class="section-number">6. </span>Command-line Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/log_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

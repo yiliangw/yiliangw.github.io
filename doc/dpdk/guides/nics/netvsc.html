@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>42. Netvsc poll mode driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="43. NFB poll mode driver library" href="nfb.html" />
+    <link rel="prev" title="41. MVPP2 Poll Mode Driver" href="mvpp2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="netvsc-poll-mode-driver">
+<h1><span class="section-number">42. </span>Netvsc poll mode driver</h1>
+<p>The Netvsc Poll Mode driver (PMD) provides support for the paravirtualized
+network device for Microsoft Hyper-V. It can be used with
+Window Server 2008/2012/2016, Windows 10.
+The device offers multi-queue support (if kernel and host support it),
+checksum and segmentation offloads.</p>
+<section id="features-and-limitations-of-hyper-v-pmd">
+<h2><span class="section-number">42.1. </span>Features and Limitations of Hyper-V PMD</h2>
+<p>In this release, the hyper PMD provides the basic functionality of packet reception and transmission.</p>
+<ul class="simple">
+<li><p>It supports merge-able buffers per packet when receiving packets and scattered buffer per packet
+when transmitting packets. The packet size supported is from 64 to 65536.</p></li>
+<li><p>The PMD supports multicast packets and promiscuous mode subject to restrictions on the host.
+In order to this to work, the guest network configuration on Hyper-V must be configured to allow MAC address
+spoofing.</p></li>
+<li><p>The device has only a single MAC address.
+Hyper-V driver does not support MAC or VLAN filtering because the Hyper-V host does not support it.</p></li>
+<li><p>VLAN tags are always stripped and presented in mbuf tci field.</p></li>
+<li><p>The Hyper-V driver does not use or support interrupts. Link state change
+callback is done via change events in the packet ring.</p></li>
+<li><p>The maximum number of queues is limited by the host (currently 64).
+When used with 4.16 kernel only a single queue is available.</p></li>
+<li><p>This driver supports SR-IOV network acceleration.
+If SR-IOV is enabled then the driver will transparently manage the interface,
+and send and receive packets using the VF path.
+The VDEV_NETVSC and FAILSAFE drivers are <em>not</em> used when using netvsc PMD.</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">42.2. </span>Installation</h2>
+<p>The Netvsc PMD is a standalone driver, similar to virtio and vmxnet3.
+Using Netvsc PMD requires that the associated VMBUS device be bound to the userspace
+I/O device driver for Hyper-V (uio_hv_generic). By default, all netvsc devices
+will be bound to the Linux kernel driver; in order to use netvsc PMD the
+device must first be overridden.</p>
+<p>The first step is to identify the network device to override.
+VMBUS uses Universal Unique Identifiers
+(<a class="reference external" href="https://en.wikipedia.org/wiki/Universally_unique_identifier">UUID</a>) to identify devices on the bus similar to how PCI uses Domain:Bus:Function.
+The UUID associated with a Linux kernel network device can be determined
+by looking at the sysfs information. To find the UUID for eth1 and
+store it in a shell variable:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">DEV_UUID=$(basename $(readlink /sys/class/net/eth1/device))</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>There are several possible ways to assign the UIO device driver for a device.
+The easiest way (but only on 4.18 or later)
+is to use the <a class="reference external" href="https://gitlab.com/driverctl/driverctl">driverctl Device Driver control utility</a> to override
+the normal kernel device.</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">driverctl -b vmbus set-override $DEV_UUID uio_hv_generic</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Any settings done with driverctl are by default persistent and will be reapplied
+on reboot.</p>
+<p>On older kernels, the same effect can be had by manual sysfs bind and unbind
+operations:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">NET_UUID=&quot;f8615163-df3e-46c5-913f-f2d2f965ed0e&quot;</span>
+<span class="go">modprobe uio_hv_generic</span>
+<span class="go">echo $NET_UUID &gt; /sys/bus/vmbus/drivers/uio_hv_generic/new_id</span>
+<span class="go">echo $DEV_UUID &gt; /sys/bus/vmbus/drivers/hv_netvsc/unbind</span>
+<span class="go">echo $DEV_UUID &gt; /sys/bus/vmbus/drivers/uio_hv_generic/bind</span>
+</pre></div>
+</div>
+</div></blockquote>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The dpdk-devbind.py script can not be used since it only handles PCI devices.</p>
+</div>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">42.3. </span>Prerequisites</h2>
+<p>The following prerequisites apply:</p>
+<ul class="simple">
+<li><p>Linux kernel support for UIO on vmbus is done with the uio_hv_generic driver.
+Full support of multiple queues requires the 4.17 kernel. It is possible
+to use the netvsc PMD with 4.16 kernel but it is limited to a single queue.</p></li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h2><span class="section-number">42.4. </span>Runtime Configuration</h2>
+<p>The user can specify below argument in devargs.</p>
+<ol class="arabic">
+<li><p><code class="docutils literal notranslate"><span class="pre">latency</span></code>:</p>
+<p>A netvsc device uses a mailbox page to indicate to the host that there
+is something in the transmit queue. The host scans this page at a
+periodic interval. This parameter allows adjusting the value that
+is used by the host. Smaller values improve transmit latency, and larger
+values save CPU cycles. This parameter is in microseconds.
+If the value is too large or too small it will be
+ignored by the host. (Default: 50)</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_copybreak</span></code>:</p>
+<p>The rx_copybreak sets the threshold where the driver uses an external
+mbuf to avoid having to copy data. Setting 0 for copybreak will cause
+driver to always create an external mbuf. Setting a value greater than
+the MTU would prevent it from ever making an external mbuf and always
+copy. The default value is 256 (bytes).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_copybreak</span></code>:</p>
+<p>The tx_copybreak sets the threshold where the driver aggregates
+multiple small packets into one request. If tx_copybreak is 0 then
+each packet goes as a VMBus request (no copying). If tx_copybreak is
+set larger than the MTU, then all packets smaller than the chunk size
+of the VMBus send buffer will be copied; larger packets always have to
+go as a single direct request. The default value is 512 (bytes).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_extmbuf_enable</span></code>:
+The rx_extmbuf_enable is used to control if netvsc should use external
+mbuf for receiving packets. The default value is 0. (netvsc doesn’t use
+external mbuf, it always allocates mbuf and copy received data to mbuf)
+A non-zero value tells netvsc to attach external buffers to mbuf on
+receiving packets, thus avoid copying memory. Use of external buffers
+requires the application is able to read data from external mbuf.</p></li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="mvpp2.html" title="previous chapter"><span class="section-number">41. </span>MVPP2 Poll Mode Driver</a></li>
+      <li>Next: <a href="nfb.html" title="next chapter"><span class="section-number">43. </span>NFB poll mode driver library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/netvsc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

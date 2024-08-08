@@ -1,0 +1,804 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. DPDK Documentation Guidelines &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. DPDK Unit Testing Guidelines" href="unit_test.html" />
+    <link rel="prev" title="4. ABI Versioning" href="abi_versioning.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-documentation-guidelines">
+<span id="doc-guidelines"></span><h1><span class="section-number">5. </span>DPDK Documentation Guidelines</h1>
+<p>This document outlines the guidelines for writing the DPDK Guides and API documentation in RST and Doxygen format.</p>
+<p>It also explains the structure of the DPDK documentation and how to build it.</p>
+<section id="structure-of-the-documentation">
+<h2><span class="section-number">5.1. </span>Structure of the Documentation</h2>
+<p>The DPDK source code repository contains input files to build the API documentation and User Guides.</p>
+<p>The main directories that contain files related to documentation are shown below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lib
+|-- acl
+|-- cfgfile
+|-- cmdline
+|-- eal
+|   |-- ...
+...
+doc
+|-- api
++-- guides
+    |-- freebsd_gsg
+    |-- linux_gsg
+    |-- prog_guide
+    |-- sample_app_ug
+    |-- guidelines
+    |-- testpmd_app_ug
+    |-- rel_notes
+    |-- nics
+    |-- ...
+</pre></div>
+</div>
+<p>The API documentation is built from <a class="reference external" href="http://www.doxygen.nl">Doxygen</a> comments in the header files.
+These files are mainly in the <code class="docutils literal notranslate"><span class="pre">lib/*</span></code> directories although some of the Poll Mode Drivers in <code class="docutils literal notranslate"><span class="pre">drivers/net</span></code>
+are also documented with Doxygen.</p>
+<p>The configuration files that are used to control the Doxygen output are in the <code class="docutils literal notranslate"><span class="pre">doc/api</span></code> directory.</p>
+<p>The user guides such as <em>The Programmers Guide</em> and the <em>FreeBSD</em> and <em>Linux Getting Started</em> Guides are generated
+from RST markup text files using the <a class="reference external" href="http://sphinx-doc.org">Sphinx</a> Documentation Generator.</p>
+<p>These files are included in the <code class="docutils literal notranslate"><span class="pre">doc/guides/</span></code> directory.
+The output is controlled by the <code class="docutils literal notranslate"><span class="pre">doc/guides/conf.py</span></code> file.</p>
+</section>
+<section id="role-of-the-documentation">
+<h2><span class="section-number">5.2. </span>Role of the Documentation</h2>
+<p>The following items outline the roles of the different parts of the documentation and when they need to be updated or
+added to by the developer.</p>
+<ul>
+<li><p><strong>Release Notes</strong></p>
+<p>The Release Notes document which features have been added in the current and previous releases of DPDK and highlight
+any known issues.
+The Releases Notes also contain notifications of features that will change ABI compatibility in the next release.</p>
+<p>Developers should include updates to the Release Notes with patch sets that relate to any of the following sections:</p>
+<ul class="simple">
+<li><p>New Features</p></li>
+<li><p>Resolved Issues (see below)</p></li>
+<li><p>Known Issues</p></li>
+<li><p>API Changes</p></li>
+<li><p>ABI Changes</p></li>
+<li><p>Shared Library Versions</p></li>
+</ul>
+<p>Resolved Issues should only include issues from previous releases that have been resolved in the current release.
+Issues that are introduced and then fixed within a release cycle do not have to be included here.</p>
+<p>Refer to the Release Notes from the previous DPDK release for the correct format of each section.</p>
+</li>
+<li><p><strong>API documentation</strong></p>
+<p>The API documentation explains how to use the public DPDK functions.
+The <a class="reference external" href="https://doc.dpdk.org/api/">API index page</a> shows the generated API documentation with related groups of functions.</p>
+<p>The API documentation should be updated via Doxygen comments when new functions are added.</p>
+</li>
+<li><p><strong>Getting Started Guides</strong></p>
+<p>The Getting Started Guides show how to install and configure DPDK and how to run DPDK based applications on different OSes.</p>
+<p>A Getting Started Guide should be added when DPDK is ported to a new OS.</p>
+</li>
+<li><p><strong>The Programmers Guide</strong></p>
+<p>The Programmers Guide explains how the API components of DPDK such as the EAL, Memzone, Rings and the Hash Library work.
+It also describes some of the higher level functionality such as Packet Distributor and Packet Framework.
+It also shows the build system and explains how to add applications.</p>
+<p>The Programmers Guide should be expanded when new functionality is added to DPDK.</p>
+</li>
+<li><p><strong>App Guides</strong></p>
+<p>The app guides document the DPDK applications in the <code class="docutils literal notranslate"><span class="pre">app</span></code> directory such as <code class="docutils literal notranslate"><span class="pre">testpmd</span></code>.</p>
+<p>The app guides should be updated if functionality is changed or added.</p>
+</li>
+<li><p><strong>Sample App Guides</strong></p>
+<p>The sample app guides document the DPDK example applications in the examples directory.
+Generally they demonstrate a major feature such as L2 or L3 Forwarding, Multi Process or Power Management.
+They explain the purpose of the sample application, how to run it and step through some of the code to explain the
+major functionality.</p>
+<p>A new sample application should be accompanied by a new sample app guide.
+The guide for the Skeleton Forwarding app is a good starting reference.</p>
+</li>
+<li><p><strong>Network Interface Controller Drivers</strong></p>
+<p>The NIC Drivers document explains the features of the individual Poll Mode Drivers, such as software requirements,
+configuration and initialization.</p>
+<p>New documentation should be added for new Poll Mode Drivers.</p>
+</li>
+<li><p><strong>Guidelines</strong></p>
+<p>The guideline documents record community process, expectations and design directions.</p>
+<p>They can be extended, amended or discussed by submitting a patch and getting community approval.</p>
+</li>
+</ul>
+</section>
+<section id="building-the-documentation">
+<h2><span class="section-number">5.3. </span>Building the Documentation</h2>
+<section id="dependencies">
+<h3><span class="section-number">5.3.1. </span>Dependencies</h3>
+<p>The following dependencies must be installed to build the documentation:</p>
+<ul class="simple">
+<li><p>Doxygen.</p></li>
+<li><p>Sphinx (also called python-sphinx).</p></li>
+</ul>
+<p><a class="reference external" href="http://www.doxygen.nl">Doxygen</a> generates documentation from commented source code.
+It can be installed as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Ubuntu/Debian.
+<span class="go">sudo apt-get -y install doxygen</span>
+
+<span class="gp"># </span>Red Hat/Fedora.
+<span class="go">sudo dnf     -y install doxygen</span>
+</pre></div>
+</div>
+<p><a class="reference external" href="http://sphinx-doc.org">Sphinx</a> is a Python documentation tool for converting RST files to HTML.
+For full support with figure and table captioning the latest version of Sphinx can be installed as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>Ubuntu/Debian.
+<span class="go">sudo apt-get -y install python3-sphinx python3-sphinx-rtd-theme</span>
+
+<span class="gp"># </span>Red Hat/Fedora.
+<span class="go">sudo dnf     -y install python3-sphinx python3-sphinx_rtd_theme</span>
+</pre></div>
+</div>
+<p>For further information on getting started with Sphinx see the
+<a class="reference external" href="http://www.sphinx-doc.org/en/master/usage/quickstart.html">Sphinx Getting Started</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>To get full support for Figure and Table numbering it is best to install Sphinx 1.3.1 or later.</p>
+</div>
+</section>
+<section id="build-commands">
+<h3><span class="section-number">5.3.2. </span>Build commands</h3>
+<p>The documentation is built using the standard DPDK build system.</p>
+<p>To build the documentation:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ninja -C build doc
+</pre></div>
+</div>
+<p>See <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">Compiling the DPDK Target from Source</span></a> for more detail on compiling DPDK with meson.</p>
+<p>The output is generated in the directory <code class="docutils literal notranslate"><span class="pre">build/doc/</span></code>, with:</p>
+<ul class="simple">
+<li><p>HTML versions of the guide docs, e.g. Getting Started Guides, Programmers Guide, in <code class="docutils literal notranslate"><span class="pre">build/doc/guides/html</span></code></p></li>
+<li><p>HTML version of the API documentation in <code class="docutils literal notranslate"><span class="pre">build/doc/api/html</span></code></p></li>
+<li><p>Man-page version of the API documentation in <code class="docutils literal notranslate"><span class="pre">build/doc/api/man</span></code>.
+If not installing DPDK system-wise, these pages can be accessed by adding this directory to the <code class="docutils literal notranslate"><span class="pre">MANPATH</span></code> environment variable.
+For example:</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export MANPATH=:/path/to/build/doc/api/man</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Make sure to fix any Sphinx or Doxygen warnings when adding or updating documentation.</p>
+</div>
+</section>
+</section>
+<section id="document-guidelines">
+<h2><span class="section-number">5.4. </span>Document Guidelines</h2>
+<p>Here are some guidelines in relation to the style of the documentation:</p>
+<ul>
+<li><p>Document the obvious as well as the obscure since it won’t always be obvious to the reader.
+For example an instruction like “Set up 64 2MB Hugepages” is better when followed by a sample commandline or a link to
+the appropriate section of the documentation.</p></li>
+<li><p>Use American English spellings throughout.
+This can be checked using the <code class="docutils literal notranslate"><span class="pre">aspell</span></code> utility:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>aspell --lang=en_US --check doc/guides/sample_app_ug/mydoc.rst
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="rst-guidelines">
+<h2><span class="section-number">5.5. </span>RST Guidelines</h2>
+<p>The RST (reStructuredText) format is a plain text markup format
+that can be converted to HTML or other formats.
+It is most closely associated with Python but it can be used to document any language.
+It is used in DPDK to document everything apart from the API.</p>
+<p>The Sphinx documentation contains a very useful <a class="reference external" href="http://sphinx-doc.org/rest.html#rst-primer">RST Primer</a> which is a
+good place to learn the minimal set of syntax required to format a document.</p>
+<p>The official <a class="reference external" href="http://docutils.sourceforge.net/rst.html">reStructuredText</a> website contains the specification for the
+RST format and also examples of how to use it.
+However, for most developers the RST Primer is a better resource.</p>
+<p>The most common guidelines for writing RST text are detailed in the
+<a class="reference external" href="https://docs.python.org/devguide/documenting.html">Documenting Python</a> guidelines.
+The additional guidelines below reiterate or expand upon those guidelines.</p>
+<section id="line-length-and-wrapping">
+<h3><span class="section-number">5.5.1. </span>Line Length and Wrapping</h3>
+<ul>
+<li><p>Documentation lines should be less than 100 characters.</p></li>
+<li><p>Each sentence should start on a new line.
+Multiple sentences, which are not separated by a blank line,
+are joined automatically into paragraphs.</p></li>
+<li><p>Wrap sentences at punctuation points, for example, at a comma.
+If no punctuation, put the newline at a logical point in the sentence,
+for example, at the end of a clause before an “and” or “but”.</p></li>
+<li><p>Lines in literal blocks should be less than 80 characters
+since they are not wrapped by the document formatters.</p>
+<p>Long literal command lines can be shown wrapped with backslashes. For
+example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-testpmd -l 2-3 -n 4 \
+        --vdev=virtio_user0,path=/dev/vhost-net,queues=2,queue_size=1024 \
+        -- -i --tx-offloads=0x0000002c --enable-lro --txq=2 --rxq=2 \
+        --txd=1024 --rxd=1024
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="whitespace">
+<h3><span class="section-number">5.5.2. </span>Whitespace</h3>
+<ul class="simple">
+<li><p>Standard RST indentation is 3 spaces.
+Code can be indented 4 spaces, especially if it is copied from source files.</p></li>
+<li><p>No tabs.
+Convert tabs in embedded code to 4 or 8 spaces.</p></li>
+<li><p>No trailing whitespace.</p></li>
+<li><p>Add 2 blank lines before each section header.</p></li>
+<li><p>Add 1 blank line after each section header.</p></li>
+<li><p>Add 1 blank line between each line of a list.</p></li>
+</ul>
+</section>
+<section id="section-headers">
+<h3><span class="section-number">5.5.3. </span>Section Headers</h3>
+<ul>
+<li><p>Section headers should use the following underline formats:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Level 1 Heading
+===============
+
+
+Level 2 Heading
+---------------
+
+
+Level 3 Heading
+~~~~~~~~~~~~~~~
+
+
+Level 4 Heading
+^^^^^^^^^^^^^^^
+</pre></div>
+</div>
+</li>
+<li><p>Level 4 headings should be used sparingly.</p></li>
+<li><p>The underlines should match the length of the text.</p></li>
+<li><p>In general, the heading should be less than 80 characters, for conciseness.</p></li>
+<li><p>As noted above:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Add 2 blank lines before each section header.</p></li>
+<li><p>Add 1 blank line after each section header.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="lists">
+<h3><span class="section-number">5.5.4. </span>Lists</h3>
+<ul>
+<li><p>Bullet lists should be formatted with a leading <code class="docutils literal notranslate"><span class="pre">*</span></code> as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>* Item one.
+
+* Item two is a long line that is wrapped and then indented to match
+  the start of the previous line.
+
+* One space character between the bullet and the text is preferred.
+</pre></div>
+</div>
+</li>
+<li><p>Numbered lists can be formatted with a leading number but the preference is to use <code class="docutils literal notranslate"><span class="pre">#.</span></code> which will give automatic numbering.
+This is more convenient when adding or removing items:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>#. Item one.
+
+#. Item two is a long line that is wrapped and then indented to match
+   the start of the previous line.
+
+#. Item three.
+</pre></div>
+</div>
+</li>
+<li><p>Definition lists can be written with or without a bullet:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>* Item one.
+
+  Some text about item one.
+
+* Item two.
+
+  Some text about item two.
+</pre></div>
+</div>
+</li>
+<li><p>All lists, and sub-lists, must be separated from the preceding text by a blank line.
+This is a syntax requirement.</p></li>
+<li><p>All list items should be separated by a blank line for readability.</p></li>
+</ul>
+</section>
+<section id="code-and-literal-block-sections">
+<h3><span class="section-number">5.5.5. </span>Code and Literal block sections</h3>
+<ul>
+<li><p>Inline text that is required to be rendered with a fixed width font should be enclosed in backquotes like this:
+``text``, so that it appears like this: <code class="docutils literal notranslate"><span class="pre">text</span></code>.</p></li>
+<li><p>Fixed width, literal blocks of texts should be indented at least 3 spaces and prefixed with <code class="docutils literal notranslate"><span class="pre">::</span></code> like this:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>Here is some fixed width text::
+
+   0x0001 0x0001 0x00FF 0x00FF
+</pre></div>
+</div>
+</li>
+<li><p>It is also possible to specify an encoding for a literal block using the <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">code-block::</span></code> directive so that syntax
+highlighting can be applied.
+Examples of supported highlighting are:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. code-block:: console
+.. code-block:: c
+.. code-block:: python
+.. code-block:: diff
+.. code-block:: none
+</pre></div>
+</div>
+<p>That can be applied as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. code-block:: c
+
+   #include&lt;stdio.h&gt;
+
+   int main() {
+
+      printf(&quot;Hello World\n&quot;);
+
+      return 0;
+   }
+</pre></div>
+</div>
+<p>Which would be rendered as:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="cpf">&lt;stdio.h&gt;</span><span class="cp"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+
+<span class="w">   </span><span class="n">printf</span><span class="p">(</span><span class="s">&quot;Hello World</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Code snippets can also be included directly from the code using the <code class="docutils literal notranslate"><span class="pre">literalinclude</span></code> block.
+Using this block instead of a code block will ensure that the code snippets
+shown in the documentation are always up to date with the code.</p>
+<p>The following will include a snippet from the skeleton sample app:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. literalinclude:: ../../../examples/skeleton/basicfwd.c
+   :language: c
+   :start-after: Display the port MAC address.
+   :end-before: Enable RX in promiscuous mode for the Ethernet device.
+   :dedent: 1
+</pre></div>
+</div>
+<p>This would be rendered as:</p>
+<p>Specifying <code class="docutils literal notranslate"><span class="pre">:language:</span></code> will enable syntax highlighting for the specified language.
+<code class="docutils literal notranslate"><span class="pre">:dedent:</span></code> is used in this example to remove 1 leading tab from each line of the snippet.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">start-after</span></code> and <code class="docutils literal notranslate"><span class="pre">end-before</span></code> can use any text within a given file,
+however it may be difficult to find unique text within your code to mark the
+start and end of your snippets. In these cases, it is recommended to include
+explicit tags in your code to denote these locations for documentation purposes.
+The accepted format for these comments is:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Before the code snippet, create a new comment which is a sentence explaining
+what the code snippet contains. The comment is terminated with a scissors <code class="docutils literal notranslate"><span class="pre">8&lt;</span></code>.</p></li>
+<li><p>After the code snippet, create another new comment which starts with a
+scissors <code class="docutils literal notranslate"><span class="pre">&gt;8</span></code>, then <code class="docutils literal notranslate"><span class="pre">End</span> <span class="pre">of</span></code> and the first comment repeated.</p></li>
+<li><p>The scissors should be orientated as shown to make it clear what code is being snipped.</p></li>
+</ul>
+</div></blockquote>
+<p>This can be done as follows:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* Example feature being documented. 8&lt; */</span><span class="w"></span>
+<span class="n">foo</span><span class="p">(</span><span class="n">bar</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* &gt;8 End of example feature being documented. */</span><span class="w"></span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">foo(bar);</span></code> could then be included in the docs using:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. literalinclude:: ../../../examples/sample_app/main.c
+   :language: c
+   :start-after: Example feature being documented. 8&lt;
+   :end-before: &gt;8 End of example feature being documented.
+</pre></div>
+</div>
+<p>If a multiline comment is needed before the snippet,
+then the last line of the multiline comment should be in the same format as
+the first comment shown in the example.</p>
+</li>
+<li><p>More information about the <code class="docutils literal notranslate"><span class="pre">literalinclude</span></code> block can be found within the
+<a class="reference external" href="https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html?highlight=literalinclude#directive-literalinclude">Sphinx Documentation</a>.</p></li>
+<li><p>The default encoding for a literal block using the simplified <code class="docutils literal notranslate"><span class="pre">::</span></code>
+directive is <code class="docutils literal notranslate"><span class="pre">none</span></code>.</p></li>
+<li><p>Lines in literal blocks should be less than 80 characters.
+For long literal lines, try to wrap the text at sensible locations.
+For example a long command line could be documented like this and still work if copied directly from the docs:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-2 -n3 --vdev=net_pcap0,iface=eth0    \
+                          --vdev=net_pcap1,iface=eth1     \
+                          -- -i --nb-cores=2 --nb-ports=2 \
+                             --total-num-mbufs=2048
+</pre></div>
+</div>
+</li>
+<li><p>Long lines that cannot be wrapped, such as application output, should be truncated to be less than 80 characters.</p></li>
+</ul>
+</section>
+<section id="images">
+<h3><span class="section-number">5.5.6. </span>Images</h3>
+<ul>
+<li><p>All images should be in SVG scalar graphics format.
+They should be true SVG XML files and should not include binary formats embedded in a SVG wrapper.</p></li>
+<li><p>The DPDK documentation contains some legacy images in PNG format.
+These will be converted to SVG in time.</p></li>
+<li><p><a class="reference external" href="http://inkscape.org">Inkscape</a> is the recommended graphics editor for creating the images.
+Use some of the older images in <code class="docutils literal notranslate"><span class="pre">doc/guides/prog_guide/img/</span></code> as a template, for example <code class="docutils literal notranslate"><span class="pre">mbuf1.svg</span></code>
+or <code class="docutils literal notranslate"><span class="pre">ring-enqueue1.svg</span></code>.</p></li>
+<li><p>The SVG images should include a copyright notice, as an XML comment.</p></li>
+<li><p>Images in the documentation should be formatted as follows:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The image should be preceded by a label in the format <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">_figure_XXXX:</span></code> with a leading underscore and
+where <code class="docutils literal notranslate"><span class="pre">XXXX</span></code> is a unique descriptive name.</p></li>
+<li><p>Images should be included using the <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">figure::</span></code> directive and the file type should be set to <code class="docutils literal notranslate"><span class="pre">*</span></code> (not <code class="docutils literal notranslate"><span class="pre">.svg</span></code>).
+This allows the format of the image to be changed if required, without updating the documentation.</p></li>
+<li><p>Images must have a caption as part of the <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">figure::</span></code> directive.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Here is an example of the previous three guidelines:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. _figure_mempool:
+
+.. figure:: img/mempool.*
+
+   A mempool in memory with its associated ring.
+</pre></div>
+</div>
+</li>
+</ul>
+<ul id="mock-label">
+<li><p>Images can then be linked to using the <code class="docutils literal notranslate"><span class="pre">:numref:</span></code> directive:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>The mempool layout is shown in :numref:`figure_mempool`.
+</pre></div>
+</div>
+<p>This would be rendered as: <em>The mempool layout is shown in</em> <a class="reference internal" href="#mock-label"><span class="std std-ref">Fig 6.3</span></a>.</p>
+<p><strong>Note</strong>: The <code class="docutils literal notranslate"><span class="pre">:numref:</span></code> directive requires Sphinx 1.3.1 or later.
+With earlier versions it will still be rendered as a link but won’t have an automatically generated number.</p>
+</li>
+<li><p>The caption of the image can be generated, with a link, using the <code class="docutils literal notranslate"><span class="pre">:ref:</span></code> directive:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>:ref:`figure_mempool`
+</pre></div>
+</div>
+<p>This would be rendered as: <em>A mempool in memory with its associated ring.</em></p>
+</li>
+</ul>
+</section>
+<section id="tables">
+<h3><span class="section-number">5.5.7. </span>Tables</h3>
+<ul>
+<li><p>RST tables should be used sparingly.
+They are hard to format and to edit, and the same information
+can usually be shown just as clearly with a definition or bullet list.</p></li>
+<li><p>Tables in the documentation should be formatted as follows:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The table should be preceded by a label in the format <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">_table_XXXX:</span></code> with a leading underscore and where
+<code class="docutils literal notranslate"><span class="pre">XXXX</span></code> is a unique descriptive name.</p></li>
+<li><p>Tables should be included using the <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">table::</span></code> directive and must have a caption.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Here is an example of the previous two guidelines:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. _table_qos_pipes:
+
+.. table:: Sample configuration for QOS pipes.
+
+   +----------+----------+----------+
+   | Header 1 | Header 2 | Header 3 |
+   |          |          |          |
+   +==========+==========+==========+
+   | Text     | Text     | Text     |
+   +----------+----------+----------+
+   | ...      | ...      | ...      |
+   +----------+----------+----------+
+</pre></div>
+</div>
+</li>
+<li><p>Tables can be linked to using the <code class="docutils literal notranslate"><span class="pre">:numref:</span></code> and <code class="docutils literal notranslate"><span class="pre">:ref:</span></code> directives, as shown in the previous section for images.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>The QOS configuration is shown in :numref:`table_qos_pipes`.
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="hyperlinks">
+<span id="links"></span><h3><span class="section-number">5.5.8. </span>Hyperlinks</h3>
+<ul>
+<li><p>Links to external websites can be plain URLs.
+The following is rendered as <a class="reference external" href="https://dpdk.org">https://dpdk.org</a>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>https://dpdk.org
+</pre></div>
+</div>
+</li>
+<li><p>They can contain alternative text.
+The following is rendered as <a class="reference external" href="https://dpdk.org">Check out DPDK</a>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>`Check out DPDK &lt;https://dpdk.org&gt;`_
+</pre></div>
+</div>
+</li>
+<li><p>An internal link can be generated by placing labels in the document with the format <code class="docutils literal notranslate"><span class="pre">..</span> <span class="pre">_label_name</span></code>.</p></li>
+<li><p>The following links to the top of this section: <a class="reference internal" href="#links"><span class="std std-ref">Hyperlinks</span></a>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.. _links:
+
+Hyperlinks
+~~~~~~~~~~
+
+* The following links to the top of this section: :ref:`links`:
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The label must have a leading underscore but the reference to it must omit it.
+This is a frequent cause of errors and warnings.</p>
+</div>
+<ul class="simple">
+<li><p>The use of a label is preferred since it works across files and will still work if the header text changes.</p></li>
+</ul>
+</section>
+</section>
+<section id="doxygen-guidelines">
+<span id="id1"></span><h2><span class="section-number">5.6. </span>Doxygen Guidelines</h2>
+<p>The DPDK API is documented using Doxygen comment annotations in the header files.
+Doxygen is a very powerful tool, it is extremely configurable and with a little effort can be used to create expressive documents.
+See the <a class="reference external" href="http://www.doxygen.nl">Doxygen website</a> for full details on how to use it.</p>
+<p>The following are some guidelines for use of Doxygen in the DPDK API documentation:</p>
+<ul>
+<li><p>New libraries that are documented with Doxygen should be added to the Doxygen configuration file: <code class="docutils literal notranslate"><span class="pre">doc/api/doxy-api.conf</span></code>.
+It is only required to add the directory that contains the files.
+It isn’t necessary to explicitly name each file since the configuration matches all <code class="docutils literal notranslate"><span class="pre">rte_*.h</span></code> files in the directory.</p></li>
+<li><p>Use proper capitalization and punctuation in the Doxygen comments since they will become sentences in the documentation.
+This in particular applies to single line comments, which is the case the is most often forgotten.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">&#64;</span></code> style Doxygen commands instead of <code class="docutils literal notranslate"><span class="pre">\</span></code> style commands.</p></li>
+<li><p>Add a general description of each library at the head of the main header files:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
+<span class="cm"> * @file</span>
+<span class="cm"> * RTE Mempool.</span>
+<span class="cm"> *</span>
+<span class="cm"> * A memory pool is an allocator of fixed-size object. It is</span>
+<span class="cm"> * identified by its name, and uses a ring to store free objects.</span>
+<span class="cm"> * ...</span>
+<span class="cm"> */</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Document the purpose of a function, the parameters used and the return
+value:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
+<span class="cm"> * Try to take the lock.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @param sl</span>
+<span class="cm"> *   A pointer to the spinlock.</span>
+<span class="cm"> * @return</span>
+<span class="cm"> *   1 if the lock is successfully taken; 0 otherwise.</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="nf">rte_spinlock_trylock</span><span class="p">(</span><span class="n">rte_spinlock_t</span><span class="w"> </span><span class="o">*</span><span class="n">sl</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Doxygen supports Markdown style syntax such as bold, italics, fixed width text and lists.
+For example the second line in the <code class="docutils literal notranslate"><span class="pre">devargs</span></code> parameter in the previous example will be rendered as:</p>
+<blockquote>
+<div><p>The strings should be a pci address like <code class="docutils literal notranslate"><span class="pre">0000:01:00.0</span></code> or <strong>virtual</strong> device name like <code class="docutils literal notranslate"><span class="pre">net_pcap0</span></code>.</p>
+</div></blockquote>
+</li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">-</span></code> instead of <code class="docutils literal notranslate"><span class="pre">*</span></code> for lists within the Doxygen comment since the latter can get confused with the comment delimiter.</p></li>
+<li><p>Add an empty line between the function description, the <code class="docutils literal notranslate"><span class="pre">&#64;params</span></code> and <code class="docutils literal notranslate"><span class="pre">&#64;return</span></code> for readability.</p></li>
+<li><p>Place the <code class="docutils literal notranslate"><span class="pre">&#64;params</span></code> description on separate line and indent it by 2 spaces.
+(It would be better to use no indentation since this is more common and also because checkpatch complains about leading
+whitespace in comments.
+However this is the convention used in the existing DPDK code.)</p></li>
+<li><p>Documented functions can be linked to simply by adding <code class="docutils literal notranslate"><span class="pre">()</span></code> to the function name:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
+<span class="cm"> * The functions exported by the application Ethernet API to setup</span>
+<span class="cm"> * a device designated by its port identifier must be invoked in</span>
+<span class="cm"> * the following order:</span>
+<span class="cm"> *     - rte_eth_dev_configure()</span>
+<span class="cm"> *     - rte_eth_tx_queue_setup()</span>
+<span class="cm"> *     - rte_eth_rx_queue_setup()</span>
+<span class="cm"> *     - rte_eth_dev_start()</span>
+<span class="cm"> */</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In the API documentation the functions will be rendered as links, see the
+<a class="reference external" href="https://doc.dpdk.org/api/rte__ethdev_8h.html">online section of the rte_ethdev.h docs</a> that contains the above text.</p>
+</li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">&#64;see</span></code> keyword can be used to create a <em>see also</em> link to another file or library.
+This directive should be placed on one line at the bottom of the documentation section.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
+<span class="cm"> * ...</span>
+<span class="cm"> *</span>
+<span class="cm"> * Some text that references mempools.</span>
+<span class="cm"> *</span>
+<span class="cm"> * @see eal_memzone.c</span>
+<span class="cm"> */</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Doxygen supports two types of comments for documenting variables, constants and members: prefix and postfix:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/** This is a prefix comment. */</span><span class="w"></span>
+<span class="cp">#define RTE_FOO_ERROR  0x023.</span>
+
+<span class="cp">#define RTE_BAR_ERROR  0x024. </span><span class="cm">/**&lt; This is a postfix comment. */</span><span class="cp"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Postfix comments are preferred for struct members and constants if they can be documented in the same way:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_stats</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">ipackets</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Total number of received packets. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">opackets</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Total number of transmitted packets.*/</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">ibytes</span><span class="p">;</span><span class="w">   </span><span class="cm">/**&lt; Total number of received bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">obytes</span><span class="p">;</span><span class="w">   </span><span class="cm">/**&lt; Total number of transmitted bytes. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">imissed</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Total of RX missed packets. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">ibadcrc</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Total of RX packets with CRC error. */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">ibadlen</span><span class="p">;</span><span class="w">  </span><span class="cm">/**&lt; Total of RX packets with bad length. */</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note: postfix comments should be aligned with spaces not tabs in accordance
+with the <a class="reference internal" href="coding_style.html#coding-style"><span class="std std-ref">DPDK Coding Style</span></a>.</p>
+</li>
+<li><p>If a single comment type can’t be used, due to line length limitations then
+prefix comments should be preferred.
+For example this section of the code contains prefix comments, postfix comments on the same line and postfix
+comments on a separate line:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/** Number of elements in the elt_pa array. */</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w">    </span><span class="n">pg_num</span><span class="w"> </span><span class="n">__rte_cache_aligned</span><span class="p">;</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w">    </span><span class="n">pg_shift</span><span class="p">;</span><span class="w">     </span><span class="cm">/**&lt; LOG2 of the physical pages. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">pg_mask</span><span class="p">;</span><span class="w">      </span><span class="cm">/**&lt; Physical page mask value. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">elt_va_start</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/**&lt; Virtual address of the first mempool object. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">elt_va_end</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/**&lt; Virtual address of the &lt;size + 1&gt; mempool object. */</span><span class="w"></span>
+<span class="n">phys_addr_t</span><span class="w"> </span><span class="n">elt_pa</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span><span class="w"></span>
+<span class="cm">/**&lt; Array of physical page addresses for the mempool buffer. */</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This doesn’t have an effect on the rendered documentation but it is confusing for the developer reading the code.
+It this case it would be clearer to use prefix comments throughout:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/** Number of elements in the elt_pa array. */</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w">    </span><span class="n">pg_num</span><span class="w"> </span><span class="n">__rte_cache_aligned</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/** LOG2 of the physical pages. */</span><span class="w"></span>
+<span class="kt">uint32_t</span><span class="w">    </span><span class="n">pg_shift</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/** Physical page mask value. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">pg_mask</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/** Virtual address of the first mempool object. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">elt_va_start</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/** Virtual address of the &lt;size + 1&gt; mempool object. */</span><span class="w"></span>
+<span class="kt">uintptr_t</span><span class="w">   </span><span class="n">elt_va_end</span><span class="p">;</span><span class="w"></span>
+<span class="cm">/** Array of physical page addresses for the mempool buffer. */</span><span class="w"></span>
+<span class="n">phys_addr_t</span><span class="w"> </span><span class="n">elt_pa</span><span class="p">[</span><span class="mi">1</span><span class="p">];</span><span class="w"></span>
+</pre></div>
+</div>
+</li>
+<li><p>Read the rendered section of the documentation that you have added for correctness, clarity and consistency
+with the surrounding text.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="abi_versioning.html" title="previous chapter"><span class="section-number">4. </span>ABI Versioning</a></li>
+      <li>Next: <a href="unit_test.html" title="next chapter"><span class="section-number">6. </span>DPDK Unit Testing Guidelines</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/documentation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,484 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>33. Membership Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="34. LPM Library" href="lpm_lib.html" />
+    <link rel="prev" title="32. Elastic Flow Distributor Library" href="efd_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="membership-library">
+<span id="member-library"></span><h1><span class="section-number">33. </span>Membership Library</h1>
+<section id="introduction">
+<h2><span class="section-number">33.1. </span>Introduction</h2>
+<p>The DPDK Membership Library provides an API for DPDK applications to insert a
+new member, delete an existing member, or query the existence of a member in a
+given set, or a group of sets. For the case of a group of sets, the library
+will return not only whether the element has been inserted before in one of
+the sets but also which set it belongs to.  The Membership Library is an
+extension and generalization of a traditional filter structure (for example
+Bloom Filter [Member-bloom]) that has multiple usages in a wide variety of
+workloads and applications. In general, the Membership Library is a data
+structure that provides a “set-summary” on whether a member belongs to a set,
+and as discussed in detail later, there are two advantages of using such a
+set-summary rather than operating on a “full-blown” complete list of elements:
+first, it has a much smaller storage requirement than storing the whole list of
+elements themselves, and secondly checking an element membership (or other
+operations) in this set-summary is much faster than checking it for the
+original full-blown complete list of elements.</p>
+<p>We use the term “Set-Summary” in this guide to refer to the space-efficient,
+probabilistic membership data structure that is provided by the library. A
+membership test for an element will return the set this element belongs to or
+that the element is “not-found” with very high probability of accuracy. Set-summary
+is a fundamental data aggregation component that can be used in many network
+(and other) applications. It is a crucial structure to address performance and
+scalability issues of diverse network applications including overlay networks,
+data-centric networks, flow table summaries, network statistics and
+traffic monitoring. A set-summary is useful for applications who need to
+include a list of elements while a complete list requires too much space
+and/or too much processing cost. In these situations, the set-summary works as
+a lossy hash-based representation of a set of members. It can dramatically
+reduce space requirement and significantly improve the performance of set
+membership queries at the cost of introducing a very small membership test error
+probability.</p>
+<figure class="align-default" id="id3">
+<span id="figure-membership1"></span><img alt="../_images/member_i1.svg" src="../_images/member_i1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.1 </span><span class="caption-text">Example Usages of Membership Library</span></p>
+</figcaption>
+</figure>
+<p>There are various usages for a Membership Library in a very
+large set of applications and workloads. Interested readers can refer to
+[Member-survey] for a survey of possible networking usages. The above figure
+provide a small set of examples of using the Membership Library:</p>
+<ul class="simple">
+<li><p>Sub-figure (a)
+depicts a distributed web cache architecture where a collection of proxies
+attempt to share their web caches (cached from a set of back-end web servers) to
+provide faster responses to clients, and the proxies use the Membership
+Library to share summaries of what web pages/objects they are caching. With the
+Membership Library, a proxy receiving an http request will inquire the
+set-summary to find its location and quickly determine whether to retrieve the
+requested web page from a nearby proxy or from a back-end web server.</p></li>
+<li><p>Sub-figure (b) depicts another example for using the Membership Library to
+prevent routing loops which is typically done using slow TTL countdown and
+dropping packets when TTL expires. As shown in Sub-figure (b), an embedded
+set-summary in the packet header itself can be used to summarize the set of
+nodes a packet has gone through, and each node upon receiving a packet can check
+whether its id is a member of the set of visited nodes, and if it is, then a
+routing loop is detected.</p></li>
+<li><p>Sub-Figure (c) presents another usage of the Membership
+Library to load-balance flows to worker threads with in-order guarantee where a
+set-summary is used to query if a packet belongs to an existing flow or a new
+flow. Packets belonging to a new flow are forwarded to the current least loaded
+worker thread, while those belonging to an existing flow are forwarded to the
+pre-assigned thread to guarantee in-order processing.</p></li>
+<li><p>Sub-figure (d) highlights
+yet another usage example in the database domain where a set-summary is used to
+determine joins between sets instead of creating a join by comparing each
+element of a set against the other elements in a different set, a join is done
+on the summaries since they can efficiently encode members of a given set.</p></li>
+</ul>
+<p>Membership Library is a configurable library that is optimized to cover set
+membership functionality for both a single set and multi-set scenarios. Two set-summary
+schemes are presented including (a) vector of Bloom Filters and (b) Hash-Table based
+set-summary schemes with and without false negative probability.
+This guide first briefly describes these different types of set-summaries, usage examples for each,
+and then it highlights the Membership Library API.</p>
+</section>
+<section id="vector-of-bloom-filters">
+<h2><span class="section-number">33.2. </span>Vector of Bloom Filters</h2>
+<p>Bloom Filter (BF) [Member-bloom] is a well-known space-efficient
+probabilistic data structure that answers set membership queries (test whether
+an element is a member of a set) with some probability of false positives and
+zero false negatives; a query for an element returns either it is “possibly in
+a set” (with very high probability) or “definitely not in a set”.</p>
+<p>The BF is a method for representing a set of <code class="docutils literal notranslate"><span class="pre">n</span></code> elements (for example flow keys
+in network applications domain) to support membership queries. The idea of BF is
+to allocate a bit-vector <code class="docutils literal notranslate"><span class="pre">v</span></code> with <code class="docutils literal notranslate"><span class="pre">m</span></code> bits, which are initially all set to 0. Then
+it chooses <code class="docutils literal notranslate"><span class="pre">k</span></code> independent hash functions <code class="docutils literal notranslate"><span class="pre">h1</span></code>, <code class="docutils literal notranslate"><span class="pre">h2</span></code>, … <code class="docutils literal notranslate"><span class="pre">hk</span></code> with hash values range from
+<code class="docutils literal notranslate"><span class="pre">0</span></code> to <code class="docutils literal notranslate"><span class="pre">m-1</span></code> to perform hashing calculations on each element to be inserted. Every time when an
+element <code class="docutils literal notranslate"><span class="pre">X</span></code> being inserted into the set, the bits at positions <code class="docutils literal notranslate"><span class="pre">h1(X)</span></code>, <code class="docutils literal notranslate"><span class="pre">h2(X)</span></code>, …
+<code class="docutils literal notranslate"><span class="pre">hk(X)</span></code> in <code class="docutils literal notranslate"><span class="pre">v</span></code> are set to 1 (any particular bit might be set to 1 multiple times
+for multiple different inserted elements). Given a query for any element <code class="docutils literal notranslate"><span class="pre">Y</span></code>, the
+bits at positions <code class="docutils literal notranslate"><span class="pre">h1(Y)</span></code>, <code class="docutils literal notranslate"><span class="pre">h2(Y)</span></code>, … <code class="docutils literal notranslate"><span class="pre">hk(Y)</span></code> are checked. If any of them is 0,
+then Y is definitely not in the set. Otherwise there is a high probability that
+Y is a member of the set with certain false positive probability. As shown in
+the next equation, the false positive probability can be made arbitrarily small
+by changing the number of hash functions (<code class="docutils literal notranslate"><span class="pre">k</span></code>) and the vector length (<code class="docutils literal notranslate"><span class="pre">m</span></code>).</p>
+<figure class="align-default" id="id4">
+<span id="figure-membership2"></span><img alt="../_images/member_i2.svg" src="../_images/member_i2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.2 </span><span class="caption-text">Bloom Filter False Positive Probability</span></p>
+</figcaption>
+</figure>
+<p>Without BF, an accurate membership testing could involve a costly hash table
+lookup and full element comparison. The advantage of using a BF is to simplify
+the membership test into a series of hash calculations and memory accesses for a
+small bit-vector, which can be easily optimized. Hence the lookup throughput
+(set membership test) can be significantly faster than a normal hash table
+lookup with element comparison.</p>
+<figure class="align-default" id="id5">
+<span id="figure-membership3"></span><img alt="../_images/member_i3.svg" src="../_images/member_i3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.3 </span><span class="caption-text">Detecting Routing Loops Using BF</span></p>
+</figcaption>
+</figure>
+<p>BF is used for applications that need only one set, and the
+membership of elements is checked against the BF. The example discussed
+in the above figure is one example of potential applications that uses only one
+set to capture the node IDs that have been visited so far by the packet. Each
+node will then check this embedded BF in the packet header for its own id, and
+if the BF indicates that the current node is definitely not in the set then a
+loop-free route is guaranteed.</p>
+<figure class="align-default" id="id6">
+<span id="figure-membership4"></span><img alt="../_images/member_i4.svg" src="../_images/member_i4.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.4 </span><span class="caption-text">Vector Bloom Filter (vBF) Overview</span></p>
+</figcaption>
+</figure>
+<p>To support membership test for both multiple sets and a single set,
+the library implements a Vector Bloom Filter (vBF) scheme.
+vBF basically composes multiple bloom filters into a vector of bloom filers.
+The membership test is conducted on all of the
+bloom filters concurrently to determine which set(s) it belongs to or none of
+them. The basic idea of vBF is shown in the above figure where an element is
+used to address multiple bloom filters concurrently and the bloom filter
+index(es) with a hit is returned.</p>
+<figure class="align-default" id="id7">
+<span id="figure-membership5"></span><img alt="../_images/member_i5.svg" src="../_images/member_i5.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.5 </span><span class="caption-text">vBF for Flow Scheduling to Worker Thread</span></p>
+</figcaption>
+</figure>
+<p>As previously mentioned, there are many usages of such structures. vBF is used
+for applications that need to check membership against multiple sets
+simultaneously. The example shown in the above figure uses a set to capture
+all flows being assigned for processing at a given worker thread. Upon receiving
+a packet the vBF is used to quickly figure out if this packet belongs to a new flow
+so as to be forwarded to the current least loaded worker thread, or otherwise it
+should be queued for an existing thread to guarantee in-order processing (i.e.
+the property of vBF to indicate right away that a given flow is a new one or
+not is critical to minimize response time latency).</p>
+<p>It should be noted that vBF can be implemented using a set of single bloom
+filters with sequential lookup of each BF. However, being able to concurrently
+search all set-summaries is a big throughput advantage. In the library, certain
+parallelism is realized by the implementation of checking all bloom filters
+together.</p>
+</section>
+<section id="hash-table-based-set-summaries">
+<h2><span class="section-number">33.3. </span>Hash-Table based Set-Summaries</h2>
+<p>Hash-table based set-summary (HTSS) is another scheme in the membership library.
+Cuckoo filter [Member-cfilter] is an example of HTSS.
+HTSS supports multi-set membership testing like
+vBF does. However, while vBF is better for a small number of targets, HTSS is more suitable
+and can easily outperform vBF when the number of sets is
+large, since HTSS uses a single hash table for membership testing while vBF
+requires testing a series of Bloom Filters each corresponding to one set.
+As a result, generally speaking vBF is more adequate for the case of a small limited number of sets
+while HTSS should be used with a larger number of sets.</p>
+<figure class="align-default" id="id8">
+<span id="figure-membership6"></span><img alt="../_images/member_i6.svg" src="../_images/member_i6.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.6 </span><span class="caption-text">Using HTSS for Attack Signature Matching</span></p>
+</figcaption>
+</figure>
+<p>As shown in the above figure, attack signature matching where each set
+represents a certain signature length (for correctness of this example, an
+attack signature should not be a subset of another one) in the payload is a good
+example for using HTSS with 0% false negative (i.e., when an element returns not
+found, it has a 100% certainty that it is not a member of any set).  The packet
+inspection application benefits from knowing right away that the current payload
+does not match any attack signatures in the database to establish its
+legitimacy, otherwise a deep inspection of the packet is needed.</p>
+<p>HTSS employs a similar but simpler data structure to a traditional hash table,
+and the major difference is that HTSS stores only the signatures but not the
+full keys/elements which can significantly reduce the footprint of the table.
+Along with the signature, HTSS also stores a value to indicate the target set.
+When looking up an element, the element is hashed and the HTSS is addressed
+to retrieve the signature stored. If the signature matches then the value is
+retrieved corresponding to the index of the target set which the element belongs
+to. Because signatures can collide, HTSS can still has false positive
+probability. Furthermore, if elements are allowed to be
+overwritten or evicted when the hash table becomes full, it will also have a
+false negative probability. We discuss this case in the next section.</p>
+<section id="set-summaries-with-false-negative-probability">
+<h3><span class="section-number">33.3.1. </span>Set-Summaries with False Negative Probability</h3>
+<p>As previously mentioned, traditional set-summaries (e.g. Bloom Filters) do not
+have a false negative probability, i.e., it is 100% certain when an element
+returns “not to be present” for a given set. However, the Membership Library
+also supports a set-summary probabilistic data structure based on HTSS which
+allows for false negative probability.</p>
+<p>In HTSS, when the hash table becomes full, keys/elements will fail to be added
+into the table and the hash table has to be resized to accommodate for these new
+elements, which can be expensive. However, if we allow new elements to overwrite
+or evict existing elements (as a cache typically does), then the resulting
+set-summary will begin to have false negative probability. This is because the
+element that was evicted from the set-summary may still be present in the target
+set. For subsequent inquiries the set-summary will falsely report the element
+not being in the set, hence having a false negative probability.</p>
+<p>The major usage of HTSS with false negative is to use it as a cache for
+distributing elements to different target sets. By allowing HTSS to evict old
+elements, the set-summary can keep track of the most recent elements
+(i.e. active) as a cache typically does. Old inactive elements (infrequently
+used elements) will automatically and eventually get evicted from the
+set-summary. It is worth noting that the set-summary still has false positive
+probability, which means the application either can tolerate certain false positive
+or it has fall-back path when false positive happens.</p>
+<figure class="align-default" id="id9">
+<span id="figure-membership7"></span><img alt="../_images/member_i7.svg" src="../_images/member_i7.svg" /><figcaption>
+<p><span class="caption-number">Fig. 33.7 </span><span class="caption-text">Using HTSS with False Negatives for Wild Card Classification</span></p>
+</figcaption>
+</figure>
+<p>HTSS with false negative (i.e. a cache) also has its wide set of applications.
+For example wild card flow classification (e.g. ACL rules) highlighted in the
+above figure is an example of such application. In that case each target set
+represents a sub-table with rules defined by a certain flow mask. The flow masks
+are non-overlapping, and for flows matching more than one rule only the highest
+priority one is inserted in the corresponding sub-table (interested readers can
+refer to the Open vSwitch (OvS) design of Mega Flow Cache (MFC) [Member-OvS]
+for further details). Typically the rules will have a large number of distinct
+unique masks and hence, a large number of target sets each corresponding to one
+mask. Because the active set of flows varies widely based on the network
+traffic, HTSS with false negative will act as a cache for &lt;flowid, target ACL
+sub-table&gt; pair for the current active set of flows. When a miss occurs (as
+shown in red in the above figure) the sub-tables will be searched sequentially
+one by one for a possible match, and when found the flow key and target
+sub-table will be inserted into the set-summary (i.e. cache insertion) so
+subsequent packets from the same flow don’t incur the overhead of the
+sequential search of sub-tables.</p>
+</section>
+</section>
+<section id="library-api-overview">
+<h2><span class="section-number">33.4. </span>Library API Overview</h2>
+<p>The design goal of the Membership Library API is to be as generic as possible to
+support all the different types of set-summaries we discussed in previous
+sections and beyond. Fundamentally, the APIs need to include creation,
+insertion, deletion, and lookup.</p>
+<section id="set-summary-create">
+<h3><span class="section-number">33.4.1. </span>Set-summary Create</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_member_create()</span></code> function is used to create a set-summary structure, the input parameter
+is a struct to pass in parameters that needed to initialize the set-summary, while the function returns the
+pointer to the created set-summary or <code class="docutils literal notranslate"><span class="pre">NULL</span></code> if the creation failed.</p>
+<p>The general input arguments used when creating the set-summary should include <code class="docutils literal notranslate"><span class="pre">name</span></code>
+which is the name of the created set-summary, <em>type</em> which is one of the types
+supported by the library (e.g. <code class="docutils literal notranslate"><span class="pre">RTE_MEMBER_TYPE_HT</span></code> for HTSS or <code class="docutils literal notranslate"><span class="pre">RTE_MEMBER_TYPE_VBF</span></code> for vBF), and <code class="docutils literal notranslate"><span class="pre">key_len</span></code>
+which is the length of the element/key. There are other parameters
+are only used for certain type of set-summary, or which have a slightly different meaning for different types of set-summary.
+For example, <code class="docutils literal notranslate"><span class="pre">num_keys</span></code> parameter means the maximum number of entries for Hash table based set-summary.
+However, for bloom filter, this value means the expected number of keys that could be
+inserted into the bloom filter(s). The value is used to calculate the size of each
+bloom filter.</p>
+<p>We also pass two seeds: <code class="docutils literal notranslate"><span class="pre">prim_hash_seed</span></code> and
+<code class="docutils literal notranslate"><span class="pre">sec_hash_seed</span></code> for the primary and secondary hash functions to calculate two independent hash values.
+<code class="docutils literal notranslate"><span class="pre">socket_id</span></code> parameter is the NUMA socket ID for the memory used to create the
+set-summary. For HTSS, another parameter <code class="docutils literal notranslate"><span class="pre">is_cache</span></code> is used to indicate
+if this set-summary is a cache (i.e. with false negative probability) or not.
+For vBF, extra parameters are needed. For example, <code class="docutils literal notranslate"><span class="pre">num_set</span></code> is the number of
+sets needed to initialize the vector bloom filters. This number is equal to the
+number of bloom filters will be created.
+<code class="docutils literal notranslate"><span class="pre">false_pos_rate</span></code> is the false positive rate. num_keys and false_pos_rate will be used to determine
+the number of hash functions and the bloom filter size.</p>
+</section>
+<section id="set-summary-element-insertion">
+<h3><span class="section-number">33.4.2. </span>Set-summary Element Insertion</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_member_add()</span></code> function is used to insert an element/key into a set-summary structure. If it fails an
+error is returned. For success the returned value is dependent on the
+set-summary mode to provide extra information for the users. For vBF
+mode, a return value of 0 means a successful insert. For HTSS mode without false negative, the insert
+could fail with <code class="docutils literal notranslate"><span class="pre">-ENOSPC</span></code> if the table is full. With false negative (i.e. cache mode),
+for insert that does not cause any eviction (i.e. no overwriting happens to an
+existing entry) the return value is 0. For insertion that causes eviction, the return
+value is 1 to indicate such situation, but it is not an error.</p>
+<p>The input arguments for the function should include the <code class="docutils literal notranslate"><span class="pre">key</span></code> which is a pointer to the element/key that needs to
+be added to the set-summary, and <code class="docutils literal notranslate"><span class="pre">set_id</span></code> which is the set id associated
+with the key that needs to be added.</p>
+</section>
+<section id="set-summary-element-lookup">
+<h3><span class="section-number">33.4.3. </span>Set-summary Element Lookup</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_member_lookup()</span></code> function looks up a single key/element in the set-summary structure. It
+returns as soon as the first match is found. The return value is 1 if a
+match is found and 0 otherwise. The arguments for the function include <code class="docutils literal notranslate"><span class="pre">key</span></code> which is a pointer to the
+element/key that needs to be looked up, and <code class="docutils literal notranslate"><span class="pre">set_id</span></code> which is used to return the
+first target set id where the key has matched, if any.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_member_lookup_bulk()</span></code> function is used to look up a bulk of keys/elements in the
+set-summary structure for their first match. Each key lookup returns as soon as the first match is found. The
+return value is the number of keys that find a match. The arguments of the function include <code class="docutils literal notranslate"><span class="pre">keys</span></code>
+which is a pointer to a bulk of keys that are to be looked up,
+<code class="docutils literal notranslate"><span class="pre">num_keys</span></code> is the number
+of keys that will be looked up, and <code class="docutils literal notranslate"><span class="pre">set_ids</span></code> are the return target set
+ids for the first match found for each of the input keys. <code class="docutils literal notranslate"><span class="pre">set_ids</span></code> is an array
+needs to be sized according to the <code class="docutils literal notranslate"><span class="pre">num_keys</span></code>. If there is no match, the set id
+for that key will be set to RTE_MEMBER_NO_MATCH.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_member_lookup_multi()</span></code> function looks up a single key/element in the
+set-summary structure for multiple matches. It
+returns ALL the matches (possibly more than one) found for this key when it
+is matched against all target sets (it is worth noting that for cache mode HTSS,
+the current implementation matches at most one target set). The return value is
+the number of matches
+that was found for this key (for cache mode HTSS the return value
+should be at most 1). The arguments for the function include <code class="docutils literal notranslate"><span class="pre">key</span></code> which is a pointer to the
+element/key that needs to be looked up, <code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code> which is to indicate the maximum number of matches
+the user expects to find for each key, and <code class="docutils literal notranslate"><span class="pre">set_id</span></code> which is used to return all
+target set ids where the key has matched, if any. The <code class="docutils literal notranslate"><span class="pre">set_id</span></code> array should be sized
+according to <code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code>. For vBF, the maximum number of matches per key is equal
+to the number of sets. For HTSS, the maximum number of matches per key is equal to two time
+entry count per bucket. <code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code> should be equal or smaller than the maximum number of
+possible matches.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_membership_lookup_multi_bulk()</span></code> function looks up a bulk of keys/elements in the
+set-summary structure for multiple matches, each key lookup returns ALL the matches (possibly more
+than one) found for this key when it is matched against all target sets (cache mode HTSS
+matches at most one target set). The
+return value is the number of keys that find one or more matches in the
+set-summary structure. The arguments of the
+function include <code class="docutils literal notranslate"><span class="pre">keys</span></code> which is
+a pointer to a bulk of keys that are to be looked up, <code class="docutils literal notranslate"><span class="pre">num_keys</span></code> is the number
+of keys that will be looked up, <code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code> is the possible
+maximum number of matches for each key, <code class="docutils literal notranslate"><span class="pre">match_count</span></code> which is the returned number
+of matches for each key, and <code class="docutils literal notranslate"><span class="pre">set_ids</span></code> are the returned target set
+ids for all matches found for each keys. <code class="docutils literal notranslate"><span class="pre">set_ids</span></code> is 2-D array
+containing a 1-D array for each key (the size of 1-D array per key should be set by the user according to <code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code>).
+<code class="docutils literal notranslate"><span class="pre">max_match_per_key</span></code> should be equal or smaller than the maximum number of
+possible matches, similar to <code class="docutils literal notranslate"><span class="pre">rte_member_lookup_multi</span></code>.</p>
+</section>
+<section id="set-summary-element-delete">
+<h3><span class="section-number">33.4.4. </span>Set-summary Element Delete</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_membership_delete()</span></code> function deletes an element/key from a set-summary structure, if it fails
+an error is returned. The input arguments should include <code class="docutils literal notranslate"><span class="pre">key</span></code> which is a pointer to the
+element/key that needs to be deleted from the set-summary, and <code class="docutils literal notranslate"><span class="pre">set_id</span></code>
+which is the set id associated with the key to delete. It is worth noting that current
+implementation of vBF does not support deletion <a class="footnote-reference brackets" href="#id2" id="id1">1</a>. An error code <code class="docutils literal notranslate"><span class="pre">-EINVAL</span></code> will be returned.</p>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p>Traditional bloom filter does not support proactive deletion. Supporting proactive deletion require additional implementation and performance overhead.</p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="references">
+<h2><span class="section-number">33.5. </span>References</h2>
+<p>[Member-bloom] B H Bloom, “Space/Time Trade-offs in Hash Coding with Allowable Errors,” Communications of the ACM, 1970.</p>
+<p>[Member-survey] A Broder and M Mitzenmacher, “Network Applications of Bloom Filters: A Survey,” in Internet Mathematics, 2005.</p>
+<p>[Member-cfilter] B Fan, D G Andersen and M Kaminsky, “Cuckoo Filter: Practically Better Than Bloom,” in Conference on emerging Networking Experiments and Technologies, 2014.</p>
+<p>[Member-OvS] B Pfaff, “The Design and Implementation of Open vSwitch,” in NSDI, 2015.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="efd_lib.html" title="previous chapter"><span class="section-number">32. </span>Elastic Flow Distributor Library</a></li>
+      <li>Next: <a href="lpm_lib.html" title="next chapter"><span class="section-number">34. </span>LPM Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/member_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

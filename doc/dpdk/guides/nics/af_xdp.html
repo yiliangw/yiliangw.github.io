@@ -1,0 +1,331 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. AF_XDP Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. ARK Poll Mode Driver" href="ark.html" />
+    <link rel="prev" title="4. AF_PACKET Poll Mode Driver" href="af_packet.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="af-xdp-poll-mode-driver">
+<h1><span class="section-number">5. </span>AF_XDP Poll Mode Driver</h1>
+<p>AF_XDP is an address family that is optimized for high performance
+packet processing. AF_XDP sockets enable the possibility for an XDP program to
+redirect packets to a memory buffer in userspace.</p>
+<p>Further information about AF_XDP can be found in the
+<a class="reference external" href="https://www.kernel.org/doc/Documentation/networking/af_xdp.rst">AF_XDP kernel documentation</a>.</p>
+<p>This Linux-specific PMD creates the AF_XDP socket and binds it to a
+specific netdev queue. The DPDK application can then send and receive raw
+packets through the socket which bypass the kernel network stack.</p>
+<section id="prerequisites">
+<h2><span class="section-number">5.1. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>A Linux Kernel (version &gt;= v4.18) with the XDP sockets configuration option
+enabled (CONFIG_XDP_SOCKETS=y).</p></li>
+<li><p>Both libxdp (&gt;= v1.2.2) and libbpf (any version) libraries installed, or
+alternatively just the libbpf library &lt;= v0.6.0.</p></li>
+<li><p>The pkg-config package should be installed on the system as it is used to
+discover the libbpf and libxdp libraries and determine their versions are
+sufficient.</p></li>
+<li><p>If using libxdp, it requires an environment variable called
+LIBXDP_OBJECT_PATH to be set to the location of where libxdp placed its bpf
+object files. This is usually in /usr/local/lib/bpf or /usr/local/lib64/bpf.</p></li>
+<li><p>A Kernel bound interface to attach to.</p></li>
+<li><p>The need_wakeup feature requires kernel version &gt;= v5.4.</p></li>
+<li><p>The PMD zero copy feature requires kernel version &gt;= v5.4.</p></li>
+<li><p>The shared UMEM feature requires kernel version &gt;= v5.10 and libbpf version
+v0.2.0 or later. The LINUX_VERSION_CODE defined in the version.h kernel
+header is used to determine the kernel version at compile time.</p></li>
+<li><p>A kernel with version 5.4 or later is required for 32-bit OS.</p></li>
+<li><p>The busy polling feature requires kernel version &gt;= v5.11.</p></li>
+</ul>
+</section>
+<section id="options">
+<h2><span class="section-number">5.2. </span>Options</h2>
+<section id="iface">
+<h3><span class="section-number">5.2.1. </span>iface</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">iface</span></code> option is the only required option. It is the name of the Kernel
+interface to attach to.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1</span>
+</pre></div>
+</div>
+<p>The socket will by default be created on Rx queue 0. To ensure traffic lands on
+this queue, one can use flow steering if the network card supports it. Or, a
+simpler way is to reduce the number of configured queues for the device to just
+a single queue which will ensure that all traffic will land on that queue (queue
+1) and thus reach the socket. This can be configured using ethtool:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ethtool -L ens786f1 combined 1</span>
+</pre></div>
+</div>
+</section>
+<section id="start-queue">
+<h3><span class="section-number">5.2.2. </span>start_queue</h3>
+<p>To create a socket on another queue, first configure the netdev with multiple
+queues, for example 2, like so:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ethtool -L ens786f1 combined 2</span>
+</pre></div>
+</div>
+<p>Then, create the socket on one of those queues, for example queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,start_queue=1</span>
+</pre></div>
+</div>
+</section>
+<section id="queue-count">
+<h3><span class="section-number">5.2.3. </span>queue_count</h3>
+<p>To create a PMD with sockets on multiple queues, use the queue_count arg. The
+following example creates sockets on queues 0 and 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,queue_count=2</span>
+</pre></div>
+</div>
+</section>
+<section id="shared-umem">
+<h3><span class="section-number">5.2.4. </span>shared_umem</h3>
+<p>The shared UMEM feature allows for two sockets to share UMEM and can be
+configured like so:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp0,iface=ens786f1,shared_umem=1 \</span>
+<span class="go">--vdev net_af_xdp1,iface=ens786f2,shared_umem=1</span>
+</pre></div>
+</div>
+</section>
+<section id="xdp-prog">
+<h3><span class="section-number">5.2.5. </span>xdp_prog</h3>
+<p>The xdp_prog argument allows for the user to provide a path to a custom XDP
+program which should be used in place of the default libbpf/libxdp program which
+simply redirects packets to the sockets. For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,xdp_prog=/path/to/prog.o</span>
+</pre></div>
+</div>
+</section>
+<section id="busy-budget">
+<h3><span class="section-number">5.2.6. </span>busy_budget</h3>
+<p>The busy polling feature aims to improve single-core performance for AF_XDP
+sockets under heavy load. It is enabled by default if the detected kernel
+version is sufficient ie. &gt;= v5.11. The busy_budget arg sets the busy-polling
+NAPI budget which is the number of packets the kernel will attempt to process in
+the netdev’s NAPI context. It can be configured like so:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,busy_budget=32</span>
+</pre></div>
+</div>
+<p>To disable busy polling, simply set the busy_budget to 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,busy_budget=0</span>
+</pre></div>
+</div>
+<p>It is also strongly recommended to set the following for optimal performance
+when using the busy polling feature:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 2 | sudo tee /sys/class/net/ens786f1/napi_defer_hard_irqs</span>
+<span class="go">echo 200000 | sudo tee /sys/class/net/ens786f1/gro_flush_timeout</span>
+</pre></div>
+</div>
+<p>The above defers interrupts for interface ens786f1 and instead schedules its
+NAPI context from a watchdog timer instead of from softirqs. More information
+on this feature can be found at [1].</p>
+</section>
+<section id="force-copy">
+<h3><span class="section-number">5.2.7. </span>force_copy</h3>
+<p>The force_copy argument allows the user to force the socket to use copy mode
+instead of zero copy mode (if available).</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp,iface=ens786f1,force_copy=1</span>
+</pre></div>
+</div>
+</section>
+<section id="use-cni">
+<h3><span class="section-number">5.2.8. </span>use_cni</h3>
+<p>The EAL vdev argument <code class="docutils literal notranslate"><span class="pre">use_cni</span></code> is used to indicate that the user wishes to
+enable the <a class="reference external" href="https://github.com/intel/afxdp-plugins-for-kubernetes">AF_XDP Plugin for Kubernetes</a> within a DPDK application.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev=net_af_xdp0,use_cni=1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When using <a class="reference internal" href="#use-cni">use_cni</a>, both parameters <a class="reference internal" href="#xdp-prog">xdp_prog</a> and <a class="reference internal" href="#busy-budget">busy_budget</a> are disabled
+as both of these will be handled by the AF_XDP plugin.
+Since the DPDK application is running in limited privileges
+so enabling and disabling of the promiscuous mode through the DPDK application
+is also not supported.</p>
+</div>
+</section>
+</section>
+<section id="limitations">
+<h2><span class="section-number">5.3. </span>Limitations</h2>
+<ul>
+<li><p><strong>MTU</strong></p>
+<p>The MTU of the AF_XDP PMD is limited due to the XDP requirement of one packet
+per page. In the PMD we report the maximum MTU for zero copy to be equal
+to the page size less the frame overhead introduced by AF_XDP (XDP HR = 256)
+and DPDK (frame headroom = 320). With a 4K page size this works out at 3520.
+However in practice this value may be even smaller, due to differences between
+the supported RX buffer sizes of the underlying kernel netdev driver.</p>
+<p>For example, the largest RX buffer size supported by the underlying kernel driver
+which is less than the page size (4096B) may be 3072B. In this case, the maximum
+MTU value will be at most 3072, but likely even smaller than this, once relevant
+headers are accounted for eg. Ethernet and VLAN.</p>
+<p>To determine the actual maximum MTU value of the interface you are using with the
+AF_XDP PMD, consult the documentation for the kernel driver.</p>
+<p>Note: The AF_XDP PMD will fail to initialise if an MTU which violates the driver’s
+conditions as above is set prior to launching the application.</p>
+</li>
+<li><p><strong>Shared UMEM</strong></p>
+<p>The sharing of UMEM is only supported for AF_XDP sockets with unique contexts.
+The context refers to the netdev,qid tuple.</p>
+<p>The following combination will fail:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp0,iface=ens786f1,shared_umem=1 \</span>
+<span class="go">--vdev net_af_xdp1,iface=ens786f1,shared_umem=1 \</span>
+</pre></div>
+</div>
+<p>Either of the following however is permitted since either the netdev or qid differs
+between the two vdevs:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp0,iface=ens786f1,shared_umem=1 \</span>
+<span class="go">--vdev net_af_xdp1,iface=ens786f1,start_queue=1,shared_umem=1 \</span>
+</pre></div>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev net_af_xdp0,iface=ens786f1,shared_umem=1 \</span>
+<span class="go">--vdev net_af_xdp1,iface=ens786f2,shared_umem=1 \</span>
+</pre></div>
+</div>
+</li>
+<li><p><strong>Secondary Processes</strong></p>
+<p>Rx and Tx are not supported for secondary processes due to memory mapping of
+the AF_XDP rings being assigned by the kernel in the primary process only.
+However other operations including statistics retrieval are permitted.
+The maximum number of queues permitted for PMDs operating in this model is 8
+as this is the maximum number of fds that can be sent through the IPC APIs as
+defined by RTE_MP_MAX_FD_NUM.</p>
+</li>
+<li><p><strong>libxdp</strong></p>
+<p>When using the default program (ie. when the vdev arg ‘xdp_prog’ is not used),
+the following logs will appear when an application is launched:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">libbpf: elf: skipping unrecognized data section(7) .xdp_run_config</span>
+<span class="go">libbpf: elf: skipping unrecognized data section(8) xdp_metadata</span>
+</pre></div>
+</div>
+<p>These logs are not errors and can be ignored.</p>
+<p>[1] <a class="reference external" href="https://lwn.net/Articles/837010/">https://lwn.net/Articles/837010/</a></p>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="af_packet.html" title="previous chapter"><span class="section-number">4. </span>AF_PACKET Poll Mode Driver</a></li>
+      <li>Next: <a href="ark.html" title="next chapter"><span class="section-number">6. </span>ARK Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/af_xdp.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

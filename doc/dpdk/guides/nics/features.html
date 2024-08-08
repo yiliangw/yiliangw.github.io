@@ -1,0 +1,873 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. Features Overview &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. Compiling and testing a PMD for a NIC" href="build_and_test.html" />
+    <link rel="prev" title="1. Overview of Networking Drivers" href="overview.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="features-overview">
+<h1><span class="section-number">2. </span>Features Overview</h1>
+<p>This section explains the supported features that are listed in the
+<a class="reference internal" href="overview.html"><span class="doc">Overview of Networking Drivers</span></a>.</p>
+<p>As a guide to implementers it also shows the structs where the features are
+defined and the APIs that can be use to get/set the values.</p>
+<p>Following tags used for feature details, these are from driver point of view:</p>
+<p><code class="docutils literal notranslate"><span class="pre">[uses]</span></code>       : Driver uses some kind of input from the application.</p>
+<p><code class="docutils literal notranslate"><span class="pre">[implements]</span></code> : Driver implements a functionality.</p>
+<p><code class="docutils literal notranslate"><span class="pre">[provides]</span></code>   : Driver provides some kind of data to the application. It is possible
+to provide data by implementing some function, but “provides” is used
+for cases where provided data can’t be represented simply by a function.</p>
+<p><code class="docutils literal notranslate"><span class="pre">[related]</span></code>    : Related API with that feature.</p>
+<section id="speed-capabilities">
+<span id="nic-features-speed-capabilities"></span><h2><span class="section-number">2.1. </span>Speed capabilities</h2>
+<p>Supports getting the speed capabilities that the current device is capable of.</p>
+<ul class="simple">
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">speed_capa:RTE_ETH_LINK_SPEED_*</span></code>.</p></li>
+<li><p><strong>[related]  API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="link-status">
+<span id="nic-features-link-status"></span><h2><span class="section-number">2.2. </span>Link status</h2>
+<p>Supports getting the link speed, duplex mode and link state (up/down).</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">link_update</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">dev_link</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_link_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_link_get_nowait()</span></code>.</p></li>
+</ul>
+</section>
+<section id="link-status-event">
+<span id="nic-features-link-status-event"></span><h2><span class="section-number">2.3. </span>Link status event</h2>
+<p>Supports Link Status Change interrupts.</p>
+<ul class="simple">
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.intr_conf.lsc</span></code>.</p></li>
+<li><p><strong>[uses]       rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">dev_flags:RTE_ETH_DEV_INTR_LSC</span></code>.</p></li>
+<li><p><strong>[uses]       rte_eth_event_type</strong>: <code class="docutils literal notranslate"><span class="pre">RTE_ETH_EVENT_INTR_LSC</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">dev_link</span></code>.</p></li>
+<li><p><strong>[provides]   rte_pci_driver.drv_flags</strong>: <code class="docutils literal notranslate"><span class="pre">RTE_PCI_DRV_INTR_LSC</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_link_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_link_get_nowait()</span></code>.</p></li>
+</ul>
+</section>
+<section id="removal-event">
+<span id="nic-features-removal-event"></span><h2><span class="section-number">2.4. </span>Removal event</h2>
+<p>Supports device removal interrupts.</p>
+<ul class="simple">
+<li><p><strong>[uses]     user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.intr_conf.rmv</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">dev_flags:RTE_ETH_DEV_INTR_RMV</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_event_type</strong>: <code class="docutils literal notranslate"><span class="pre">RTE_ETH_EVENT_INTR_RMV</span></code>.</p></li>
+<li><p><strong>[provides] rte_pci_driver.drv_flags</strong>: <code class="docutils literal notranslate"><span class="pre">RTE_PCI_DRV_INTR_RMV</span></code>.</p></li>
+</ul>
+</section>
+<section id="queue-status-event">
+<span id="nic-features-queue-status-event"></span><h2><span class="section-number">2.5. </span>Queue status event</h2>
+<p>Supports queue enable/disable events.</p>
+<ul class="simple">
+<li><p><strong>[uses] rte_eth_event_type</strong>: <code class="docutils literal notranslate"><span class="pre">RTE_ETH_EVENT_QUEUE_STATE</span></code>.</p></li>
+</ul>
+</section>
+<section id="rx-interrupt">
+<span id="nic-features-rx-interrupt"></span><h2><span class="section-number">2.6. </span>Rx interrupt</h2>
+<p>Supports Rx interrupts.</p>
+<ul class="simple">
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.intr_conf.rxq</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">rx_queue_intr_enable</span></code>, <code class="docutils literal notranslate"><span class="pre">rx_queue_intr_disable</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rx_intr_enable()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rx_intr_disable()</span></code>.</p></li>
+</ul>
+</section>
+<section id="lock-free-tx-queue">
+<span id="nic-features-lock-free-tx-queue"></span><h2><span class="section-number">2.7. </span>Lock-free Tx queue</h2>
+<p>If a PMD advertises RTE_ETH_TX_OFFLOAD_MT_LOCKFREE capable, multiple threads can
+invoke rte_eth_tx_burst() concurrently on the same Tx queue without SW lock.</p>
+<ul class="simple">
+<li><p><strong>[uses]    rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_MT_LOCKFREE</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_MT_LOCKFREE</span></code>.</p></li>
+<li><p><strong>[related]  API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst()</span></code>.</p></li>
+</ul>
+</section>
+<section id="fast-mbuf-free">
+<span id="nic-features-fast-mbuf-free"></span><h2><span class="section-number">2.8. </span>Fast mbuf free</h2>
+<p>Supports optimization for fast release of mbufs following successful Tx.
+Requires that per queue, all mbufs come from the same mempool and has refcnt = 1.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_MBUF_FAST_FREE</span></code>.</p></li>
+</ul>
+</section>
+<section id="free-tx-mbuf-on-demand">
+<span id="nic-features-free-tx-mbuf-on-demand"></span><h2><span class="section-number">2.9. </span>Free Tx mbuf on demand</h2>
+<p>Supports freeing consumed buffers on a Tx ring.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">tx_done_cleanup</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_done_cleanup()</span></code>.</p></li>
+</ul>
+</section>
+<section id="queue-start-stop">
+<span id="nic-features-queue-start-stop"></span><h2><span class="section-number">2.10. </span>Queue start/stop</h2>
+<p>Supports starting/stopping a specific Rx/Tx queue of a port.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">rx_queue_start</span></code>, <code class="docutils literal notranslate"><span class="pre">rx_queue_stop</span></code>, <code class="docutils literal notranslate"><span class="pre">tx_queue_start</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_queue_stop</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rx_queue_start()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rx_queue_stop()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_tx_queue_start()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_tx_queue_stop()</span></code>.</p></li>
+</ul>
+</section>
+<section id="mtu-update">
+<span id="nic-features-mtu-update"></span><h2><span class="section-number">2.11. </span>MTU update</h2>
+<p>Supports updating port MTU.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">mtu_set</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">mtu</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">max_rx_pktlen</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_mtu()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_mtu()</span></code>.</p></li>
+</ul>
+</section>
+<section id="scattered-rx">
+<span id="nic-features-scattered-rx"></span><h2><span class="section-number">2.12. </span>Scattered Rx</h2>
+<p>Supports receiving segmented mbufs.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_SCATTER</span></code>.</p></li>
+<li><p><strong>[implements] datapath</strong>: <code class="docutils literal notranslate"><span class="pre">Scattered</span> <span class="pre">Rx</span> <span class="pre">function</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">scattered_rx</span></code>.</p></li>
+<li><p><strong>[provides]   eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">rxq_info_get:scattered_rx</span></code>.</p></li>
+<li><p><strong>[related]    eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">rx_pkt_burst</span></code>.</p></li>
+</ul>
+</section>
+<section id="buffer-split-on-rx">
+<span id="nic-features-buffer-split"></span><h2><span class="section-number">2.13. </span>Buffer split on Rx</h2>
+<p>Scatters the packets being received on specified boundaries to segmented mbufs.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_BUFFER_SPLIT</span></code>.</p></li>
+<li><p><strong>[uses]       rte_eth_rxconf</strong>: <code class="docutils literal notranslate"><span class="pre">rx_conf.rx_seg,</span> <span class="pre">rx_conf.rx_nseg</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">buffer_split_supported_hdr_ptypes_get</span></code>,</p></li>
+<li><p><strong>[implements] datapath</strong>: <code class="docutils literal notranslate"><span class="pre">Buffer</span> <span class="pre">Split</span> <span class="pre">functionality</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa:RTE_ETH_RX_OFFLOAD_BUFFER_SPLIT</span></code>.</p></li>
+<li><p><strong>[related] API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_queue_setup()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_buffer_split_get_supported_hdr_ptypes()</span></code>.</p></li>
+</ul>
+</section>
+<section id="lro">
+<span id="nic-features-lro"></span><h2><span class="section-number">2.14. </span>LRO</h2>
+<p>Supports Large Receive Offload.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_TCP_LRO</span></code>.
+<code class="docutils literal notranslate"><span class="pre">dev_conf.rxmode.max_lro_pkt_size</span></code>.</p></li>
+<li><p><strong>[implements] datapath</strong>: <code class="docutils literal notranslate"><span class="pre">LRO</span> <span class="pre">functionality</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">lro</span></code>.</p></li>
+<li><p><strong>[provides]   mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_LRO</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.tso_segsz</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_TCP_LRO</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">max_lro_pkt_size</span></code>.</p></li>
+</ul>
+</section>
+<section id="tso">
+<span id="nic-features-tso"></span><h2><span class="section-number">2.15. </span>TSO</h2>
+<p>Supports TCP Segmentation Offloading.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_TCP_TSO</span></code>.</p></li>
+<li><p><strong>[uses]       rte_eth_desc_lim</strong>: <code class="docutils literal notranslate"><span class="pre">nb_seg_max</span></code>, <code class="docutils literal notranslate"><span class="pre">nb_mtu_seg_max</span></code>.</p></li>
+<li><p><strong>[uses]       mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:</span></code> <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_TCP_SEG</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IPV4</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IPV6</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]       mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.tso_segsz</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l3_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l4_len</span></code>.</p></li>
+<li><p><strong>[implements] datapath</strong>: <code class="docutils literal notranslate"><span class="pre">TSO</span> <span class="pre">functionality</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_TCP_TSO,RTE_ETH_TX_OFFLOAD_UDP_TSO</span></code>.</p></li>
+</ul>
+</section>
+<section id="promiscuous-mode">
+<span id="nic-features-promiscuous-mode"></span><h2><span class="section-number">2.16. </span>Promiscuous mode</h2>
+<p>Supports enabling/disabling promiscuous mode for a port.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">promiscuous_enable</span></code>, <code class="docutils literal notranslate"><span class="pre">promiscuous_disable</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">promiscuous</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_promiscuous_enable()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_promiscuous_disable()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_promiscuous_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="allmulticast-mode">
+<span id="nic-features-allmulticast-mode"></span><h2><span class="section-number">2.17. </span>Allmulticast mode</h2>
+<p>Supports enabling/disabling receiving multicast frames.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">allmulticast_enable</span></code>, <code class="docutils literal notranslate"><span class="pre">allmulticast_disable</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">all_multicast</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_allmulticast_enable()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_allmulticast_disable()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_allmulticast_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="unicast-mac-filter">
+<span id="nic-features-unicast-mac-filter"></span><h2><span class="section-number">2.18. </span>Unicast MAC filter</h2>
+<p>Supports adding MAC addresses to enable incoming filtering of packets.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">mac_addr_set</span></code>, <code class="docutils literal notranslate"><span class="pre">mac_addr_add</span></code>, <code class="docutils literal notranslate"><span class="pre">mac_addr_remove</span></code>.</p></li>
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">mac_addrs</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_default_mac_addr_set()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_mac_addr_add()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_mac_addr_remove()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_macaddr_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="multicast-mac-filter">
+<span id="nic-features-multicast-mac-filter"></span><h2><span class="section-number">2.19. </span>Multicast MAC filter</h2>
+<p>Supports setting multicast addresses to filter.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">set_mc_addr_list</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_mc_addr_list()</span></code>.</p></li>
+</ul>
+</section>
+<section id="rss-hash">
+<span id="nic-features-rss-hash"></span><h2><span class="section-number">2.20. </span>RSS hash</h2>
+<p>Supports RSS hashing on RX.</p>
+<ul class="simple">
+<li><p><strong>[uses]     user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rxmode.mq_mode</span></code> = <code class="docutils literal notranslate"><span class="pre">RTE_ETH_MQ_RX_RSS_FLAG</span></code>.</p></li>
+<li><p><strong>[uses]     user config</strong>: <code class="docutils literal notranslate"><span class="pre">rss_conf.rss_hf</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_RSS_HASH</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">flow_type_rss_offloads</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_RSS_HASH</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.rss</span></code>.</p></li>
+<li><p><strong>[related]  API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_update</span></code>
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_conf_get()</span></code>.</p></li>
+</ul>
+<p>Supports RSS hash algorithm on Rx.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">dev_configure</span></code>, <code class="docutils literal notranslate"><span class="pre">rss_hash_update</span></code>, <code class="docutils literal notranslate"><span class="pre">rss_hash_conf_get</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">rss_conf.algorithm</span></code></p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rss_algo_capa</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_update()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_conf_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="inner-rss">
+<span id="nic-features-inner-rss"></span><h2><span class="section-number">2.21. </span>Inner RSS</h2>
+<p>Supports RSS hashing on inner headers with flow API.</p>
+<ul class="simple">
+<li><p><strong>[uses]    rte_flow_action_rss</strong>: <code class="docutils literal notranslate"><span class="pre">level</span></code>.</p></li>
+<li><p><strong>[uses]    rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_RSS_HASH</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_RSS_HASH</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.rss</span></code>.</p></li>
+</ul>
+</section>
+<section id="rss-key-update">
+<span id="nic-features-rss-key-update"></span><h2><span class="section-number">2.22. </span>RSS key update</h2>
+<p>Supports configuration of Receive Side Scaling (RSS) hash computation. Updating
+Receive Side Scaling (RSS) hash key.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">dev_configure</span></code>, <code class="docutils literal notranslate"><span class="pre">rss_hash_update</span></code>, <code class="docutils literal notranslate"><span class="pre">rss_hash_conf_get</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">rss_conf.rss_key</span></code>, <code class="docutils literal notranslate"><span class="pre">rss_conf.rss_key_len</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">hash_key_size</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_update()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_conf_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="rss-reta-update">
+<span id="nic-features-rss-reta-update"></span><h2><span class="section-number">2.23. </span>RSS reta update</h2>
+<p>Supports updating Redirection Table of the Receive Side Scaling (RSS).</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">reta_update</span></code>, <code class="docutils literal notranslate"><span class="pre">reta_query</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">reta_size</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_reta_update()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_reta_query()</span></code>.</p></li>
+</ul>
+</section>
+<section id="vmdq">
+<span id="nic-features-vmdq"></span><h2><span class="section-number">2.24. </span>VMDq</h2>
+<p>Supports Virtual Machine Device Queues (VMDq).</p>
+<ul class="simple">
+<li><p><strong>[uses] user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rxmode.mq_mode</span></code> = <code class="docutils literal notranslate"><span class="pre">RTE_ETH_MQ_RX_VMDQ_FLAG</span></code>.</p></li>
+<li><p><strong>[uses] user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rx_adv_conf.vmdq_dcb_conf</span></code>.</p></li>
+<li><p><strong>[uses] user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rx_adv_conf.vmdq_rx_conf</span></code>.</p></li>
+<li><p><strong>[uses] user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.tx_adv_conf.vmdq_dcb_tx_conf</span></code>.</p></li>
+<li><p><strong>[uses] user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.tx_adv_conf.vmdq_tx_conf</span></code>.</p></li>
+</ul>
+</section>
+<section id="sr-iov">
+<span id="nic-features-sriov"></span><h2><span class="section-number">2.25. </span>SR-IOV</h2>
+<p>Driver supports creating Virtual Functions.</p>
+<ul class="simple">
+<li><p><strong>[implements] rte_eth_dev_data</strong>: <code class="docutils literal notranslate"><span class="pre">sriov</span></code>.</p></li>
+</ul>
+</section>
+<section id="dcb">
+<span id="nic-features-dcb"></span><h2><span class="section-number">2.26. </span>DCB</h2>
+<p>Supports Data Center Bridging (DCB).</p>
+<ul class="simple">
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rxmode.mq_mode</span></code> = <code class="docutils literal notranslate"><span class="pre">RTE_ETH_MQ_RX_DCB_FLAG</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rx_adv_conf.vmdq_dcb_conf</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.rx_adv_conf.dcb_rx_conf</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.tx_adv_conf.vmdq_dcb_tx_conf</span></code>.</p></li>
+<li><p><strong>[uses]       user config</strong>: <code class="docutils literal notranslate"><span class="pre">dev_conf.tx_adv_conf.vmdq_tx_conf</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">get_dcb_info</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_dcb_info()</span></code>.</p></li>
+</ul>
+</section>
+<section id="vlan-filter">
+<span id="nic-features-vlan-filter"></span><h2><span class="section-number">2.27. </span>VLAN filter</h2>
+<p>Supports filtering of a VLAN Tag identifier.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_VLAN_FILTER</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">vlan_filter_set</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_vlan_filter()</span></code>.</p></li>
+</ul>
+</section>
+<section id="flow-control">
+<span id="nic-features-flow-control"></span><h2><span class="section-number">2.28. </span>Flow control</h2>
+<p>Supports configuring link flow control.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">flow_ctrl_get</span></code>, <code class="docutils literal notranslate"><span class="pre">flow_ctrl_set</span></code>,
+<code class="docutils literal notranslate"><span class="pre">priority_flow_ctrl_set</span></code>, <code class="docutils literal notranslate"><span class="pre">priority_flow_ctrl_queue_info_get</span></code>,
+<code class="docutils literal notranslate"><span class="pre">priority_flow_ctrl_queue_configure</span></code></p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_flow_ctrl_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_flow_ctrl_set()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_priority_flow_ctrl_set()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_priority_flow_ctrl_queue_info_get()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_priority_flow_ctrl_queue_configure()</span></code>.</p></li>
+</ul>
+</section>
+<section id="rate-limitation">
+<span id="nic-features-rate-limitation"></span><h2><span class="section-number">2.29. </span>Rate limitation</h2>
+<p>Supports Tx rate limitation for a queue.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">set_queue_rate_limit</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_set_queue_rate_limit()</span></code>.</p></li>
+</ul>
+</section>
+<section id="inline-crypto">
+<span id="nic-features-inline-crypto-doc"></span><h2><span class="section-number">2.30. </span>Inline crypto</h2>
+<p>Supports inline crypto processing defined by rte_security library to perform crypto
+operations of security protocol while packet is received in NIC. NIC is not aware
+of protocol operations. See Security library and PMD documentation for more details.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_SECURITY</span></code>,</p></li>
+<li><p><strong>[uses]       rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_SECURITY</span></code>.</p></li>
+<li><p><strong>[uses]       mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.l2_len</span></code>.</p></li>
+<li><p><strong>[implements] rte_security_ops</strong>: <code class="docutils literal notranslate"><span class="pre">session_create</span></code>, <code class="docutils literal notranslate"><span class="pre">session_update</span></code>,
+<code class="docutils literal notranslate"><span class="pre">session_stats_get</span></code>, <code class="docutils literal notranslate"><span class="pre">session_destroy</span></code>, <code class="docutils literal notranslate"><span class="pre">set_pkt_metadata</span></code>, <code class="docutils literal notranslate"><span class="pre">capabilities_get</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_SECURITY</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_SECURITY</span></code>.</p></li>
+<li><p><strong>[provides]   mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_SEC_OFFLOAD</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_SEC_OFFLOAD</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_SEC_OFFLOAD_FAILED</span></code>.</p></li>
+<li><p><strong>[provides]   rte_security_ops, capabilities_get</strong>:  <code class="docutils literal notranslate"><span class="pre">action:</span> <span class="pre">RTE_SECURITY_ACTION_TYPE_INLINE_CRYPTO</span></code></p></li>
+</ul>
+</section>
+<section id="inline-protocol">
+<span id="nic-features-inline-protocol-doc"></span><h2><span class="section-number">2.31. </span>Inline protocol</h2>
+<p>Supports inline protocol processing defined by rte_security library to perform
+protocol processing for the security protocol (e.g. IPsec, MACSEC) while the
+packet is received at NIC. The NIC is capable of understanding the security
+protocol operations. See security library and PMD documentation for more details.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_SECURITY</span></code>,</p></li>
+<li><p><strong>[uses]       rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_SECURITY</span></code>.</p></li>
+<li><p><strong>[uses]       mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l3_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags</span></code>.</p></li>
+<li><p><strong>[implements] rte_security_ops</strong>: <code class="docutils literal notranslate"><span class="pre">session_create</span></code>, <code class="docutils literal notranslate"><span class="pre">session_update</span></code>,
+<code class="docutils literal notranslate"><span class="pre">session_stats_get</span></code>, <code class="docutils literal notranslate"><span class="pre">session_destroy</span></code>, <code class="docutils literal notranslate"><span class="pre">set_pkt_metadata</span></code>,
+<code class="docutils literal notranslate"><span class="pre">capabilities_get</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_SECURITY</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_SECURITY</span></code>.</p></li>
+<li><p><strong>[provides]   mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_SEC_OFFLOAD</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_SEC_OFFLOAD</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_SEC_OFFLOAD_FAILED</span></code>.</p></li>
+<li><p><strong>[provides]   rte_security_ops, capabilities_get</strong>:  <code class="docutils literal notranslate"><span class="pre">action:</span> <span class="pre">RTE_SECURITY_ACTION_TYPE_INLINE_PROTOCOL</span></code></p></li>
+</ul>
+</section>
+<section id="crc-offload">
+<span id="nic-features-crc-offload"></span><h2><span class="section-number">2.32. </span>CRC offload</h2>
+<p>Supports CRC stripping by hardware.
+A PMD assumed to support CRC stripping by default. PMD should advertise if it supports keeping CRC.</p>
+<ul class="simple">
+<li><p><strong>[uses] rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_KEEP_CRC</span></code>.</p></li>
+</ul>
+</section>
+<section id="vlan-offload">
+<span id="nic-features-vlan-offload"></span><h2><span class="section-number">2.33. </span>VLAN offload</h2>
+<p>Supports VLAN offload to hardware.</p>
+<ul class="simple">
+<li><p><strong>[uses]       rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_VLAN_STRIP,RTE_ETH_RX_OFFLOAD_VLAN_FILTER,RTE_ETH_RX_OFFLOAD_VLAN_EXTEND</span></code>.</p></li>
+<li><p><strong>[uses]       rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_VLAN_INSERT</span></code>.</p></li>
+<li><p><strong>[uses]       mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_VLAN</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.vlan_tci</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">vlan_offload_set</span></code>.</p></li>
+<li><p><strong>[provides]   mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_VLAN_STRIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_VLAN</span></code> <code class="docutils literal notranslate"><span class="pre">mbuf.vlan_tci</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_VLAN_STRIP</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_VLAN_INSERT</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_vlan_offload()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_vlan_offload()</span></code>.</p></li>
+</ul>
+</section>
+<section id="qinq-offload">
+<span id="nic-features-qinq-offload"></span><h2><span class="section-number">2.34. </span>QinQ offload</h2>
+<p>Supports QinQ (queue in queue) offload.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_QINQ_STRIP</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_QINQ_INSERT</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_QINQ</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.vlan_tci_outer</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_QINQ_STRIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_QINQ</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_VLAN_STRIPPED</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_VLAN</span></code>
+<code class="docutils literal notranslate"><span class="pre">mbuf.vlan_tci</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.vlan_tci_outer</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_QINQ_STRIP</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_QINQ_INSERT</span></code>.</p></li>
+</ul>
+</section>
+<section id="fec">
+<span id="nic-features-fec"></span><h2><span class="section-number">2.35. </span>FEC</h2>
+<p>Supports Forward error correction. Forward error correction (FEC) is a bit error correction mode.
+It adds error correction information to data packets at the transmit end, and uses the error correction
+information to correct the bit errors generated during data packet transmission at the receive end. This
+improves signal quality but also brings a delay to signals. This function can be enabled or disabled as required.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">fec_get_capability</span></code>, <code class="docutils literal notranslate"><span class="pre">fec_get</span></code>, <code class="docutils literal notranslate"><span class="pre">fec_set</span></code>.</p></li>
+<li><p><strong>[provides]   rte_eth_fec_capa</strong>: <code class="docutils literal notranslate"><span class="pre">speed:RTE_ETH_SPEED_NUM_*</span></code>, <code class="docutils literal notranslate"><span class="pre">capa:RTE_ETH_FEC_MODE_TO_CAPA()</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_fec_get_capability()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_fec_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_fec_set()</span></code>.</p></li>
+</ul>
+</section>
+<section id="ip-reassembly">
+<span id="nic-features-ip-reassembly"></span><h2><span class="section-number">2.36. </span>IP reassembly</h2>
+<p>Supports IP reassembly in hardware.</p>
+<ul class="simple">
+<li><p><strong>[provides] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">ip_reassembly_capability_get</span></code>,
+<code class="docutils literal notranslate"><span class="pre">ip_reassembly_conf_get</span></code>, <code class="docutils literal notranslate"><span class="pre">ip_reassembly_conf_set</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_ip_reassembly_capability_get()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_ip_reassembly_conf_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_ip_reassembly_conf_set()</span></code>.</p></li>
+</ul>
+</section>
+<section id="l3-checksum-offload">
+<span id="nic-features-l3-checksum-offload"></span><h2><span class="section-number">2.37. </span>L3 checksum offload</h2>
+<p>Supports L3 checksum offload.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_IPV4_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_IPV4_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_IP_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_IPV4</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IPV6</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l3_len</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_IP_CKSUM_UNKNOWN</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_IP_CKSUM_BAD</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_IP_CKSUM_GOOD</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_IP_CKSUM_NONE</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_IPV4_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_IPV4_CKSUM</span></code>.</p></li>
+</ul>
+</section>
+<section id="l4-checksum-offload">
+<span id="nic-features-l4-checksum-offload"></span><h2><span class="section-number">2.38. </span>L4 checksum offload</h2>
+<p>Supports L4 checksum offload.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_UDP_CKSUM,RTE_ETH_RX_OFFLOAD_TCP_CKSUM,RTE_ETH_RX_OFFLOAD_SCTP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_UDP_CKSUM,RTE_ETH_TX_OFFLOAD_TCP_CKSUM,RTE_ETH_TX_OFFLOAD_SCTP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_IPV4</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IPV6</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_L4_NO_CKSUM</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_TCP_CKSUM</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_SCTP_CKSUM</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_UDP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.l3_len</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_L4_CKSUM_UNKNOWN</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_L4_CKSUM_BAD</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_L4_CKSUM_GOOD</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_L4_CKSUM_NONE</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_UDP_CKSUM,RTE_ETH_RX_OFFLOAD_TCP_CKSUM,RTE_ETH_RX_OFFLOAD_SCTP_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_UDP_CKSUM,RTE_ETH_TX_OFFLOAD_TCP_CKSUM,RTE_ETH_TX_OFFLOAD_SCTP_CKSUM</span></code>.</p></li>
+</ul>
+</section>
+<section id="timestamp-offload">
+<span id="nic-features-hw-timestamp"></span><h2><span class="section-number">2.39. </span>Timestamp offload</h2>
+<p>Supports Timestamp.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_TIMESTAMP</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_TIMESTAMP</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.timestamp</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:</span> <span class="pre">RTE_ETH_RX_OFFLOAD_TIMESTAMP</span></code>.</p></li>
+<li><p><strong>[related] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">read_clock</span></code>.</p></li>
+</ul>
+</section>
+<section id="macsec-offload">
+<span id="nic-features-macsec-offload"></span><h2><span class="section-number">2.40. </span>MACsec offload</h2>
+<p>Supports MACsec.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_MACSEC_STRIP</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_MACSEC_INSERT</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_MACSEC</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_MACSEC_STRIP</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_MACSEC_INSERT</span></code>.</p></li>
+</ul>
+</section>
+<section id="inner-l3-checksum">
+<span id="nic-features-inner-l3-checksum"></span><h2><span class="section-number">2.41. </span>Inner L3 checksum</h2>
+<p>Supports inner packet L3 checksum.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_OUTER_IPV4_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_OUTER_IPV4_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_IP_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_IPV4</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_IPV6</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_OUTER_IP_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_OUTER_IPV4</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_OUTER_IPV6</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.outer_l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.outer_l3_len</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_OUTER_IP_CKSUM_BAD</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_OUTER_IPV4_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_OUTER_IPV4_CKSUM</span></code>.</p></li>
+</ul>
+</section>
+<section id="inner-l4-checksum">
+<span id="nic-features-inner-l4-checksum"></span><h2><span class="section-number">2.42. </span>Inner L4 checksum</h2>
+<p>Supports inner packet L4 checksum.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_rxconf,rte_eth_rxmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_RX_OFFLOAD_OUTER_UDP_CKSUM</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_RX_OUTER_L4_CKSUM_UNKNOWN</span></code> |
+<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_OUTER_L4_CKSUM_BAD</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_OUTER_L4_CKSUM_GOOD</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_OUTER_L4_CKSUM_INVALID</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_txconf,rte_eth_txmode</strong>: <code class="docutils literal notranslate"><span class="pre">offloads:RTE_ETH_TX_OFFLOAD_OUTER_UDP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_OUTER_IPV4</span></code> | <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_TX_OUTER_IPV6</span></code>.
+<code class="docutils literal notranslate"><span class="pre">mbuf.ol_flags:RTE_MBUF_F_TX_OUTER_UDP_CKSUM</span></code>.</p></li>
+<li><p><strong>[uses]     mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.outer_l2_len</span></code>, <code class="docutils literal notranslate"><span class="pre">mbuf.outer_l3_len</span></code>.</p></li>
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_offload_capa,rx_queue_offload_capa:RTE_ETH_RX_OFFLOAD_OUTER_UDP_CKSUM</span></code>,
+<code class="docutils literal notranslate"><span class="pre">tx_offload_capa,tx_queue_offload_capa:RTE_ETH_TX_OFFLOAD_OUTER_UDP_CKSUM</span></code>.</p></li>
+</ul>
+</section>
+<section id="shared-rx-queue">
+<span id="nic-features-shared-rx-queue"></span><h2><span class="section-number">2.43. </span>Shared Rx queue</h2>
+<p>Supports shared Rx queue for ports in same Rx domain of a switch domain.</p>
+<ul class="simple">
+<li><p><strong>[uses]     rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">dev_capa:RTE_ETH_DEV_CAPA_RXQ_SHARE</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_dev_info，rte_eth_switch_info</strong>: <code class="docutils literal notranslate"><span class="pre">rx_domain</span></code>, <code class="docutils literal notranslate"><span class="pre">domain_id</span></code>.</p></li>
+<li><p><strong>[uses]     rte_eth_rxconf</strong>: <code class="docutils literal notranslate"><span class="pre">share_group</span></code>, <code class="docutils literal notranslate"><span class="pre">share_qid</span></code>.</p></li>
+<li><p><strong>[provides] mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.port</span></code>.</p></li>
+</ul>
+</section>
+<section id="packet-type-parsing">
+<span id="nic-features-packet-type-parsing"></span><h2><span class="section-number">2.44. </span>Packet type parsing</h2>
+<p>Supports packet type parsing and returns a list of supported types.
+Allows application to set ptypes it is interested in.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">dev_supported_ptypes_get</span></code>,</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_supported_ptypes()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_ptypes()</span></code>, <code class="docutils literal notranslate"><span class="pre">dev_ptypes_set</span></code>.</p></li>
+<li><p><strong>[provides]   mbuf</strong>: <code class="docutils literal notranslate"><span class="pre">mbuf.packet_type</span></code>.</p></li>
+</ul>
+</section>
+<section id="timesync">
+<span id="nic-features-timesync"></span><h2><span class="section-number">2.45. </span>Timesync</h2>
+<p>Supports IEEE1588/802.1AS timestamping.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">timesync_enable</span></code>, <code class="docutils literal notranslate"><span class="pre">timesync_disable</span></code>
+<code class="docutils literal notranslate"><span class="pre">timesync_read_rx_timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">timesync_read_tx_timestamp</span></code>,
+<code class="docutils literal notranslate"><span class="pre">timesync_adjust_time</span></code>, <code class="docutils literal notranslate"><span class="pre">timesync_read_time</span></code>, <code class="docutils literal notranslate"><span class="pre">timesync_write_time</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_enable()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_disable()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_read_rx_timestamp()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_read_tx_timestamp</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_adjust_time()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_read_time()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_timesync_write_time()</span></code>.</p></li>
+</ul>
+</section>
+<section id="rx-descriptor-status">
+<span id="nic-features-rx-descriptor-status"></span><h2><span class="section-number">2.46. </span>Rx descriptor status</h2>
+<p>Supports check the status of a Rx descriptor. When <code class="docutils literal notranslate"><span class="pre">rx_descriptor_status</span></code> is
+used, status can be “Available”, “Done” or “Unavailable”.</p>
+<ul class="simple">
+<li><p><strong>[implements] rte_eth_dev</strong>: <code class="docutils literal notranslate"><span class="pre">rx_descriptor_status</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_descriptor_status()</span></code>.</p></li>
+</ul>
+</section>
+<section id="tx-descriptor-status">
+<span id="nic-features-tx-descriptor-status"></span><h2><span class="section-number">2.47. </span>Tx descriptor status</h2>
+<p>Supports checking the status of a Tx descriptor. Status can be “Full”, “Done”
+or “Unavailable.”</p>
+<ul class="simple">
+<li><p><strong>[implements] rte_eth_dev</strong>: <code class="docutils literal notranslate"><span class="pre">tx_descriptor_status</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_descriptor_status()</span></code>.</p></li>
+</ul>
+</section>
+<section id="basic-stats">
+<span id="nic-features-basic-stats"></span><h2><span class="section-number">2.48. </span>Basic stats</h2>
+<p>Support basic statistics such as: ipackets, opackets, ibytes, obytes,
+imissed, ierrors, oerrors, rx_nombuf.</p>
+<p>And per queue stats: q_ipackets, q_opackets, q_ibytes, q_obytes, q_errors.</p>
+<p>These apply to all drivers.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">stats_get</span></code>, <code class="docutils literal notranslate"><span class="pre">stats_reset</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_stats_get</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_stats_reset()</span></code>.</p></li>
+</ul>
+</section>
+<section id="extended-stats">
+<span id="nic-features-extended-stats"></span><h2><span class="section-number">2.49. </span>Extended stats</h2>
+<p>Supports Extended Statistics, changes from driver to driver.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">xstats_get</span></code>, <code class="docutils literal notranslate"><span class="pre">xstats_reset</span></code>, <code class="docutils literal notranslate"><span class="pre">xstats_get_names</span></code>.</p></li>
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">xstats_get_by_id</span></code>, <code class="docutils literal notranslate"><span class="pre">xstats_get_names_by_id</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_reset()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get_names</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get_by_id()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get_names_by_id()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get_id_by_name()</span></code>.</p></li>
+</ul>
+</section>
+<section id="stats-per-queue">
+<span id="nic-features-stats-per-queue"></span><h2><span class="section-number">2.50. </span>Stats per queue</h2>
+<p>Supports configuring per-queue stat counter mapping.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">queue_stats_mapping_set</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_rx_queue_stats_mapping()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_tx_queue_stats_mapping()</span></code>.</p></li>
+</ul>
+</section>
+<section id="congestion-management">
+<span id="nic-features-congestion-management"></span><h2><span class="section-number">2.51. </span>Congestion management</h2>
+<p>Supports congestion management.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">cman_info_get</span></code>, <code class="docutils literal notranslate"><span class="pre">cman_config_set</span></code>, <code class="docutils literal notranslate"><span class="pre">cman_config_get</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_cman_info_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_cman_config_init()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_cman_config_set()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_cman_config_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="fw-version">
+<span id="nic-features-fw-version"></span><h2><span class="section-number">2.52. </span>FW version</h2>
+<p>Supports getting device hardware firmware information.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">fw_version_get</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_fw_version_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="eeprom-dump">
+<span id="nic-features-eeprom-dump"></span><h2><span class="section-number">2.53. </span>EEPROM dump</h2>
+<p>Supports getting/setting device eeprom data.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">get_eeprom_length</span></code>, <code class="docutils literal notranslate"><span class="pre">get_eeprom</span></code>, <code class="docutils literal notranslate"><span class="pre">set_eeprom</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_eeprom_length()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_eeprom()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_set_eeprom()</span></code>.</p></li>
+</ul>
+</section>
+<section id="module-eeprom-dump">
+<span id="nic-features-module-eeprom-dump"></span><h2><span class="section-number">2.54. </span>Module EEPROM dump</h2>
+<p>Supports getting information and data of plugin module eeprom.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">get_module_info</span></code>, <code class="docutils literal notranslate"><span class="pre">get_module_eeprom</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_module_info()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_module_eeprom()</span></code>.</p></li>
+</ul>
+</section>
+<section id="registers-dump">
+<span id="nic-features-register-dump"></span><h2><span class="section-number">2.55. </span>Registers dump</h2>
+<p>Supports retrieving device registers and registering attributes (number of
+registers and register size).</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">get_reg</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_get_reg_info()</span></code>.</p></li>
+</ul>
+</section>
+<section id="led">
+<span id="nic-features-led"></span><h2><span class="section-number">2.56. </span>LED</h2>
+<p>Supports turning on/off a software controllable LED on a device.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">dev_led_on</span></code>, <code class="docutils literal notranslate"><span class="pre">dev_led_off</span></code>.</p></li>
+<li><p><strong>[related]    API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_led_on()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_led_off()</span></code>.</p></li>
+</ul>
+</section>
+<section id="multiprocess-aware">
+<span id="nic-features-multiprocess-aware"></span><h2><span class="section-number">2.57. </span>Multiprocess aware</h2>
+<p>Driver can be used for primary-secondary process model.</p>
+</section>
+<section id="freebsd">
+<span id="nic-features-freebsd"></span><h2><span class="section-number">2.58. </span>FreeBSD</h2>
+<p>Supports running on FreeBSD.</p>
+</section>
+<section id="linux">
+<span id="nic-features-linux"></span><h2><span class="section-number">2.59. </span>Linux</h2>
+<p>Supports running on Linux.</p>
+</section>
+<section id="windows">
+<span id="nic-features-windows"></span><h2><span class="section-number">2.60. </span>Windows</h2>
+<p>Supports running on Windows.</p>
+</section>
+<section id="armv7">
+<span id="nic-features-armv7"></span><h2><span class="section-number">2.61. </span>ARMv7</h2>
+<p>Support armv7 architecture.</p>
+</section>
+<section id="armv8">
+<span id="nic-features-armv8"></span><h2><span class="section-number">2.62. </span>ARMv8</h2>
+<p>Support armv8a (64bit) architecture.</p>
+</section>
+<section id="loongarch64">
+<span id="nic-features-loongarch64"></span><h2><span class="section-number">2.63. </span>LoongArch64</h2>
+<p>Support 64-bit LoongArch architecture.</p>
+</section>
+<section id="power8">
+<span id="nic-features-power8"></span><h2><span class="section-number">2.64. </span>Power8</h2>
+<p>Support PowerPC architecture.</p>
+</section>
+<section id="rv64">
+<span id="nic-features-x86-32"></span><h2><span class="section-number">2.65. </span>rv64</h2>
+<p>Support 64-bit RISC-V architecture.</p>
+</section>
+<section id="x86-32">
+<h2><span class="section-number">2.66. </span>x86-32</h2>
+<p>Support 32bits x86 architecture.</p>
+</section>
+<section id="x86-64">
+<span id="nic-features-x86-64"></span><h2><span class="section-number">2.67. </span>x86-64</h2>
+<p>Support 64bits x86 architecture.</p>
+</section>
+<section id="usage-doc">
+<span id="nic-features-usage-doc"></span><h2><span class="section-number">2.68. </span>Usage doc</h2>
+<p>Documentation describes usage.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">doc/guides/nics/*.rst</span></code></p>
+</section>
+<section id="design-doc">
+<span id="nic-features-design-doc"></span><h2><span class="section-number">2.69. </span>Design doc</h2>
+<p>Documentation describes design.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">doc/guides/nics/*.rst</span></code>.</p>
+</section>
+<section id="perf-doc">
+<span id="nic-features-perf-doc"></span><h2><span class="section-number">2.70. </span>Perf doc</h2>
+<p>Documentation describes performance values.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">dpdk.org/doc/perf/*</span></code>.</p>
+</section>
+<section id="runtime-rx-queue-setup">
+<span id="nic-features-runtime-rx-queue-setup"></span><h2><span class="section-number">2.71. </span>Runtime Rx queue setup</h2>
+<p>Supports Rx queue setup after device started.</p>
+<ul class="simple">
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">dev_capa:RTE_ETH_DEV_CAPA_RUNTIME_RX_QUEUE_SETUP</span></code>.</p></li>
+<li><p><strong>[related]  API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="runtime-tx-queue-setup">
+<span id="nic-features-runtime-tx-queue-setup"></span><h2><span class="section-number">2.72. </span>Runtime Tx queue setup</h2>
+<p>Supports Tx queue setup after device started.</p>
+<ul class="simple">
+<li><p><strong>[provides] rte_eth_dev_info</strong>: <code class="docutils literal notranslate"><span class="pre">dev_capa:RTE_ETH_DEV_CAPA_RUNTIME_TX_QUEUE_SETUP</span></code>.</p></li>
+<li><p><strong>[related]  API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="burst-mode-info">
+<span id="nic-features-burst-mode-info"></span><h2><span class="section-number">2.73. </span>Burst mode info</h2>
+<p>Supports to get Rx/Tx packet burst mode information.</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">rx_burst_mode_get</span></code>, <code class="docutils literal notranslate"><span class="pre">tx_burst_mode_get</span></code>.</p></li>
+<li><p><strong>[related] API</strong>: <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_burst_mode_get()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst_mode_get()</span></code>.</p></li>
+</ul>
+</section>
+<section id="pmd-power-management-using-monitor-addresses">
+<span id="nic-features-get-monitor-addr"></span><h2><span class="section-number">2.74. </span>PMD power management using monitor addresses</h2>
+<p>Supports getting a monitoring condition to use together with Ethernet PMD power
+management (see <a class="reference internal" href="../prog_guide/power_man.html"><span class="doc">Power Management</span></a> for more details).</p>
+<ul class="simple">
+<li><p><strong>[implements] eth_dev_ops</strong>: <code class="docutils literal notranslate"><span class="pre">get_monitor_addr</span></code></p></li>
+</ul>
+</section>
+<section id="other-dev-ops-not-represented-by-a-feature">
+<span id="nic-features-other"></span><h2><span class="section-number">2.75. </span>Other dev ops not represented by a Feature</h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rxq_info_get</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_info_get</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlan_tpid_set</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlan_strip_queue_set</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vlan_pvid_set</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_queue_count</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uc_hash_table_set</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uc_all_hash_table_set</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">udp_tunnel_port_add</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">udp_tunnel_port_del</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_pkt_prepare</span></code></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="overview.html" title="previous chapter"><span class="section-number">1. </span>Overview of Networking Drivers</a></li>
+      <li>Next: <a href="build_and_test.html" title="next chapter"><span class="section-number">3. </span>Compiling and testing a PMD for a NIC</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/features.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

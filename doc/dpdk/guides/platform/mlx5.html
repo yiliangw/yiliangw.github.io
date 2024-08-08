@@ -1,0 +1,757 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. NVIDIA MLX5 Common Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. OCTEON TX Board Support Package" href="octeontx.html" />
+    <link rel="prev" title="4. NXP QorIQ DPAA2 Board Support Package" href="dpaa2.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nvidia-mlx5-common-driver">
+<h1><span class="section-number">5. </span>NVIDIA MLX5 Common Driver</h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>NVIDIA acquired Mellanox Technologies in 2020.
+The DPDK documentation and code might still include instances
+of or references to Mellanox trademarks (like BlueField and ConnectX)
+that are now NVIDIA trademarks.</p>
+</div>
+<p>The mlx5 common driver library (<strong>librte_common_mlx5</strong>) provides support for
+<strong>NVIDIA ConnectX-4</strong>, <strong>NVIDIA ConnectX-4 Lx</strong>, <strong>NVIDIA ConnectX-5</strong>,
+<strong>NVIDIA ConnectX-6</strong>, <strong>NVIDIA ConnectX-6 Dx</strong>, <strong>NVIDIA ConnectX-6 Lx</strong>,
+<strong>NVIDIA ConnectX-7</strong>, <strong>NVIDIA BlueField</strong>, <strong>NVIDIA BlueField-2</strong> and
+<strong>NVIDIA BlueField-3</strong> families of 10/25/40/50/100/200 Gb/s adapters.</p>
+<p>Information and documentation for these adapters can be found on the
+<a class="reference external" href="https://www.nvidia.com/en-us/networking/">NVIDIA website</a>.
+Help is also provided by the
+<a class="reference external" href="https://forums.developer.nvidia.com/c/infrastructure/369/">NVIDIA Networking forum</a>.
+In addition, there is a <a class="reference external" href="https://developer.nvidia.com/networking/dpdk">web section dedicated to DPDK</a>.</p>
+<section id="design">
+<h2><span class="section-number">5.1. </span>Design</h2>
+<p>For security reasons and to enhance robustness,
+this driver only handles virtual memory addresses.
+The way resources allocations are handled by the kernel,
+combined with hardware specifications that allow handling virtual memory addresses directly,
+ensure that DPDK applications cannot access random physical memory
+(or memory that does not belong to the current process).</p>
+<p>There are different levels of objects and bypassing abilities
+which are used to get the best performance:</p>
+<ul class="simple">
+<li><p><strong>Verbs</strong> is a complete high-level generic API</p></li>
+<li><p><strong>Direct Verbs</strong> is a device-specific API</p></li>
+<li><p><strong>DevX</strong> allows accessing firmware objects</p></li>
+<li><p><strong>Direct Rules</strong> manages flow steering at the low-level hardware layer</p></li>
+</ul>
+<p>On Linux, above interfaces are provided by linking with <cite>libibverbs</cite> and <cite>libmlx5</cite>.
+See <a class="reference internal" href="#mlx5-linux-prerequisites"><span class="std std-ref">Linux Prerequisites</span></a> for installation.</p>
+<p>On Windows, DevX is the only requirement from the above list.
+See <a class="reference internal" href="#mlx5-windows-prerequisites"><span class="std std-ref">Windows Prerequisites</span></a> for DevX SDK package installation.</p>
+</section>
+<section id="classes">
+<span id="mlx5-classes"></span><h2><span class="section-number">5.2. </span>Classes</h2>
+<p>One mlx5 device can be probed by a number of different PMDs.
+To select a specific PMD, its name should be specified as a device parameter
+(e.g. <code class="docutils literal notranslate"><span class="pre">0000:08:00.1,class=eth</span></code>).</p>
+<p>In order to allow probing by multiple PMDs,
+several classes may be listed separated by a colon.
+For example: <code class="docutils literal notranslate"><span class="pre">class=crypto:regex</span></code> will probe both Crypto and RegEx PMDs.</p>
+<section id="supported-classes">
+<h3><span class="section-number">5.2.1. </span>Supported Classes</h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">class=compress</span></code> for <a class="reference internal" href="../compressdevs/mlx5.html"><span class="doc">NVIDIA MLX5 Compress Driver</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">class=crypto</span></code> for <a class="reference internal" href="../cryptodevs/mlx5.html"><span class="doc">NVIDIA MLX5 Crypto Driver</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">class=eth</span></code> for <a class="reference internal" href="../nics/mlx5.html"><span class="doc">NVIDIA MLX5 Ethernet Driver</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">class=regex</span></code> for <a class="reference internal" href="../regexdevs/mlx5.html"><span class="doc">NVIDIA MLX5 RegEx Driver</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">class=vdpa</span></code> for <a class="reference internal" href="../vdpadevs/mlx5.html"><span class="doc">NVIDIA MLX5 vDPA Driver</span></a>.</p></li>
+</ul>
+<p>By default, the mlx5 device will be probed by the <code class="docutils literal notranslate"><span class="pre">eth</span></code> PMD.</p>
+</section>
+<section id="limitations">
+<h3><span class="section-number">5.2.2. </span>Limitations</h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">eth</span></code> and <code class="docutils literal notranslate"><span class="pre">vdpa</span></code> PMDs cannot be probed at the same time.
+All other combinations are possible.</p></li>
+<li><p>On Windows, only <code class="docutils literal notranslate"><span class="pre">eth</span></code> and <code class="docutils literal notranslate"><span class="pre">crypto</span></code> are supported.</p></li>
+</ul>
+</section>
+</section>
+<section id="compilation-prerequisites">
+<span id="mlx5-common-compilation"></span><h2><span class="section-number">5.3. </span>Compilation Prerequisites</h2>
+<section id="linux-prerequisites">
+<span id="mlx5-linux-prerequisites"></span><h3><span class="section-number">5.3.1. </span>Linux Prerequisites</h3>
+<p>This driver relies on external libraries and kernel drivers for resources
+allocations and initialization.
+The following dependencies are not part of DPDK and must be installed separately:</p>
+<ul>
+<li><p><strong>libibverbs</strong></p>
+<p>User space Verbs framework used by <code class="docutils literal notranslate"><span class="pre">librte_common_mlx5</span></code>.
+This library provides a generic interface between the kernel
+and low-level user space drivers such as <code class="docutils literal notranslate"><span class="pre">libmlx5</span></code>.</p>
+<p>It allows slow and privileged operations (context initialization,
+hardware resources allocations) to be managed by the kernel
+and fast operations to never leave user space.</p>
+</li>
+<li><p><strong>libmlx5</strong></p>
+<p>Low-level user space driver library for NVIDIA devices,
+it is automatically loaded by <code class="docutils literal notranslate"><span class="pre">libibverbs</span></code>.</p>
+<p>This library basically implements send/receive calls to the hardware queues.</p>
+</li>
+<li><p><strong>Kernel modules</strong></p>
+<p>They provide the kernel-side Verbs API and low level device drivers
+that manage actual hardware initialization
+and resources sharing with user-space processes.</p>
+<p>Unlike most other PMDs, these modules must remain loaded and bound to
+their devices:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">mlx5_core</span></code>: hardware driver managing NVIDIA devices
+and related Ethernet kernel network devices.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mlx5_ib</span></code>: InfiniBand device driver.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ib_uverbs</span></code>: user space driver for Verbs (entry point for <code class="docutils literal notranslate"><span class="pre">libibverbs</span></code>).</p></li>
+</ul>
+</li>
+<li><p><strong>Firmware update</strong></p>
+<p>NVIDIA MLNX_OFED/EN releases include firmware updates.</p>
+<p>Because each release provides new features, these updates must be applied to
+match the kernel modules and libraries they come with.</p>
+</li>
+</ul>
+<p>Libraries and kernel modules can be provided either by the Linux distribution,
+or by installing NVIDIA MLNX_OFED/EN which provides compatibility with older kernels.</p>
+<section id="upstream-dependencies">
+<h4><span class="section-number">5.3.1.1. </span>Upstream Dependencies</h4>
+<p>The mlx5 kernel modules are part of upstream Linux.
+The minimal supported kernel version is 4.14.
+For 32-bit, version 4.14.41 or above is required.</p>
+<p>The libraries <cite>libibverbs</cite> and <cite>libmlx5</cite> are part of <code class="docutils literal notranslate"><span class="pre">rdma-core</span></code>.
+It is packaged by most of Linux distributions.
+The minimal supported rdma-core version is 16.
+For 32-bit, version 18 or above is required.</p>
+<p>The rdma-core sources can be downloaded at
+<a class="reference external" href="https://github.com/linux-rdma/rdma-core">https://github.com/linux-rdma/rdma-core</a></p>
+<p>It is possible to build rdma-core as static libraries starting with version 21:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cd build
+CFLAGS=-fPIC cmake -DENABLE_STATIC=1 -DNO_PYVERBS=1 -DNO_MAN_PAGES=1 -GNinja ..
+ninja
+ninja install
+</pre></div>
+</div>
+</section>
+<section id="nvidia-mlnx-ofed-en">
+<h4><span class="section-number">5.3.1.2. </span>NVIDIA MLNX_OFED/EN</h4>
+<p>The kernel modules and libraries are packaged with other tools
+in NVIDIA MLNX_OFED or NVIDIA MLNX_EN.
+The minimal supported versions are:</p>
+<ul class="simple">
+<li><p>NVIDIA MLNX_OFED version: <strong>4.5</strong> and above.</p></li>
+<li><p>NVIDIA MLNX_EN version: <strong>4.5</strong> and above.</p></li>
+<li><p>Firmware version:</p>
+<ul>
+<li><p>ConnectX-4: <strong>12.21.1000</strong> and above.</p></li>
+<li><p>ConnectX-4 Lx: <strong>14.21.1000</strong> and above.</p></li>
+<li><p>ConnectX-5: <strong>16.21.1000</strong> and above.</p></li>
+<li><p>ConnectX-5 Ex: <strong>16.21.1000</strong> and above.</p></li>
+<li><p>ConnectX-6: <strong>20.27.0090</strong> and above.</p></li>
+<li><p>ConnectX-6 Dx: <strong>22.27.0090</strong> and above.</p></li>
+<li><p>ConnectX-6 Lx: <strong>26.27.0090</strong> and above.</p></li>
+<li><p>ConnectX-7: <strong>28.33.2028</strong> and above.</p></li>
+<li><p>BlueField: <strong>18.25.1010</strong> and above.</p></li>
+<li><p>BlueField-2: <strong>24.28.1002</strong> and above.</p></li>
+<li><p>BlueField-3: <strong>32.36.3126</strong> and above.</p></li>
+</ul>
+</li>
+</ul>
+<p>The firmware, the libraries libibverbs, libmlx5, and mlnx-ofed-kernel modules
+are packaged in <a class="reference external" href="https://network.nvidia.com/products/infiniband-drivers/linux/mlnx_ofed/">NVIDIA MLNX_OFED</a>.
+After downloading, it can be installed with this command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./mlnxofedinstall --dpdk
+</pre></div>
+</div>
+<p><a class="reference external" href="https://network.nvidia.com/products/ethernet-drivers/linux/mlnx_en/">NVIDIA MLNX_EN</a>
+is a smaller package including what is needed for DPDK.
+After downloading, it can be installed with this command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./install --dpdk
+</pre></div>
+</div>
+<p>After installing, the firmware version can be checked:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ibv_devinfo
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Several versions of NVIDIA MLNX_OFED/EN are available. Installing the version
+this DPDK release was developed and tested against is strongly recommended.
+Please check the “Tested Platforms” section in the <a class="reference internal" href="../rel_notes/index.html"><span class="doc">Release Notes</span></a>.</p>
+</div>
+</section>
+</section>
+<section id="windows-prerequisites">
+<span id="mlx5-windows-prerequisites"></span><h3><span class="section-number">5.3.2. </span>Windows Prerequisites</h3>
+<p>The mlx5 PMDs rely on external libraries and kernel drivers
+for resource allocation and initialization.</p>
+<section id="devx-sdk-installation">
+<h4><span class="section-number">5.3.2.1. </span>DevX SDK Installation</h4>
+<p>The DevX SDK must be installed on the machine building the Windows PMD.
+Additional information can be found at
+<a class="reference external" href="https://docs.nvidia.com/networking/display/winof2v260/RShim+Drivers+and+Usage#RShimDriversandUsage-DevXInterface">How to Integrate Windows DevX in Your Development Environment</a>.
+The minimal supported WinOF2 version is 2.60.</p>
+</section>
+</section>
+</section>
+<section id="compilation-options">
+<h2><span class="section-number">5.4. </span>Compilation Options</h2>
+<section id="compilation-on-linux">
+<h3><span class="section-number">5.4.1. </span>Compilation on Linux</h3>
+<p>The ibverbs libraries can be linked with this PMD in a number of ways,
+configured by the <code class="docutils literal notranslate"><span class="pre">ibverbs_link</span></code> build option:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">shared</span></code> (default)</dt><dd><p>The PMD depends on some .so files.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">dlopen</span></code></dt><dd><p>Split the dependencies glue in a separate library
+loaded when needed by dlopen (see <code class="docutils literal notranslate"><span class="pre">MLX5_GLUE_PATH</span></code>).
+It makes dependencies on libibverbs and libmlx5 optional,
+and has no performance impact.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">static</span></code></dt><dd><p>Embed static flavor of the dependencies libibverbs and libmlx5
+in the PMD shared library or the executable static binary.</p>
+</dd>
+</dl>
+</section>
+<section id="compilation-on-windows">
+<h3><span class="section-number">5.4.2. </span>Compilation on Windows</h3>
+<p>The DevX SDK location must be set through CFLAGS/LDFLAGS,
+either:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson.exe setup &quot;-Dc_args=-I\&quot;%DEVX_INC_PATH%\&quot;&quot; &quot;-Dc_link_args=-L\&quot;%DEVX_LIB_PATH%\&quot;&quot; ...
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>set CFLAGS=-I&quot;%DEVX_INC_PATH%&quot; &amp;&amp; set LDFLAGS=-L&quot;%DEVX_LIB_PATH%&quot; &amp;&amp; meson.exe setup ...
+</pre></div>
+</div>
+</section>
+</section>
+<section id="environment-configuration">
+<span id="mlx5-common-env"></span><h2><span class="section-number">5.5. </span>Environment Configuration</h2>
+<section id="linux-environment">
+<h3><span class="section-number">5.5.1. </span>Linux Environment</h3>
+<p>The kernel network interfaces are brought up during initialization.
+Forcing them down prevents packets reception.</p>
+<p>The ethtool operations on the kernel interfaces may also affect the PMD.</p>
+<p>Some runtime behaviours may be configured through environment variables.</p>
+<dl>
+<dt><code class="docutils literal notranslate"><span class="pre">MLX5_GLUE_PATH</span></code></dt><dd><p>If built with <code class="docutils literal notranslate"><span class="pre">ibverbs_link=dlopen</span></code>,
+list of directories in which to search for the rdma-core “glue” plug-in,
+separated by colons or semi-colons.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">MLX5_SHUT_UP_BF</span></code></dt><dd><p>If Verbs is used (DevX disabled),
+HW queue doorbell register mapping.
+The value 0 means non-cached IO mapping,
+while 1 is a regular memory mapping.</p>
+<p>With regular memory mapping, the register is flushed to HW
+usually when the write-combining buffer becomes full,
+but it depends on CPU design.</p>
+</dd>
+</dl>
+<section id="port-link-with-mlnx-ofed-en">
+<h4><span class="section-number">5.5.1.1. </span>Port Link with MLNX_OFED/EN</h4>
+<p>Ports links must be set to Ethernet:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;mst device&gt; query | grep LINK_TYPE
+LINK_TYPE_P1                        ETH(2)
+LINK_TYPE_P2                        ETH(2)
+
+mlxconfig -d &lt;mst device&gt; set LINK_TYPE_P1/2=1/2/3
+</pre></div>
+</div>
+<p>Link type values are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code> Infiniband</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">2</span></code> Ethernet</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">3</span></code> VPI (auto-sense)</p></li>
+</ul>
+<p>If link type was changed, firmware must be reset as well:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxfwreset -d &lt;mst device&gt; reset
+</pre></div>
+</div>
+</section>
+<section id="sr-iov-virtual-function-with-mlnx-ofed-en">
+<span id="mlx5-vf"></span><h4><span class="section-number">5.5.1.2. </span>SR-IOV Virtual Function with MLNX_OFED/EN</h4>
+<p>SR-IOV must be enabled on the NIC.
+It can be checked in the following command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;mst device&gt; query | grep SRIOV_EN
+SRIOV_EN                            True(1)
+</pre></div>
+</div>
+<p>If needed, configure SR-IOV:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;mst device&gt; set SRIOV_EN=1 NUM_OF_VFS=16
+mlxfwreset -d &lt;mst device&gt; reset
+</pre></div>
+</div>
+<p>After doing the change, restart the driver:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/etc/init.d/openibd restart
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>service openibd restart
+</pre></div>
+</div>
+<p>Then the virtual functions can be instantiated:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo [num_vfs] &gt; /sys/class/infiniband/mlx5_0/device/sriov_numvfs
+</pre></div>
+</div>
+</section>
+<section id="sub-function-with-mlnx-ofed-en">
+<span id="mlx5-sub-function"></span><h4><span class="section-number">5.5.1.3. </span>Sub-Function with MLNX_OFED/EN</h4>
+<p>Sub-Function is a portion of the PCI device,
+it has its own dedicated queues.
+An SF shares PCI-level resources with other SFs and/or with its parent PCI function.</p>
+<ol class="arabic">
+<li><p>Requirement:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>MLNX_OFED version &gt;= 5.4-0.3.3.0
+</pre></div>
+</div>
+</li>
+<li><p>Configure SF feature:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span># Run mlxconfig on both PFs on host and ECPFs on BlueField.
+mlxconfig -d &lt;mst device&gt; set PER_PF_NUM_SF=1 PF_TOTAL_SF=252 PF_SF_BAR_SIZE=12
+</pre></div>
+</div>
+</li>
+<li><p>Enable switchdev mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxdevm dev eswitch set pci/&lt;DBDF&gt; mode switchdev
+</pre></div>
+</div>
+</li>
+<li><p>Add SF port:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxdevm port add pci/&lt;DBDF&gt; flavour pcisf pfnum 0 sfnum &lt;sfnum&gt;
+
+Get SFID from output: pci/&lt;DBDF&gt;/&lt;SFID&gt;
+</pre></div>
+</div>
+</li>
+<li><p>Modify MAC address:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxdevm port function set pci/&lt;DBDF&gt;/&lt;SFID&gt; hw_addr &lt;MAC&gt;
+</pre></div>
+</div>
+</li>
+<li><p>Activate SF port:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxdevm port function set pci/&lt;DBDF&gt;/&lt;ID&gt; state active
+</pre></div>
+</div>
+</li>
+<li><p>Devargs to probe SF device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>auxiliary:mlx5_core.sf.&lt;num&gt;,class=eth:regex
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="enable-switchdev-mode">
+<h4><span class="section-number">5.5.1.4. </span>Enable Switchdev Mode</h4>
+<p>Switchdev mode is a mode in E-Switch, that binds between representor and VF or SF.
+Representor is a port in DPDK that is connected to a VF or SF in such a way
+that assuming there are no offload flows, each packet that is sent from the VF or SF
+will be received by the corresponding representor.
+While each packet that is sent to a representor will be received by the VF or SF.</p>
+<p>After <a class="reference internal" href="#mlx5-vf"><span class="std std-ref">configuring VF</span></a>, the device must be unbound:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>printf &quot;&lt;device pci address&gt;&quot; &gt; /sys/bus/pci/drivers/mlx5_core/unbind
+</pre></div>
+</div>
+<p>Then switchdev mode is enabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo switchdev &gt; /sys/class/net/&lt;net device&gt;/compat/devlink/mode
+</pre></div>
+</div>
+<p>The device can be bound again at this point.</p>
+</section>
+<section id="run-as-non-root">
+<h4><span class="section-number">5.5.1.5. </span>Run as Non-Root</h4>
+<p>Hugepage and resource limit setup are documented
+in the <a class="reference internal" href="../linux_gsg/enable_func.html#running-without-root-privileges"><span class="std std-ref">common Linux guide</span></a>.
+This PMD can operate without access to physical addresses,
+therefore it does not require <code class="docutils literal notranslate"><span class="pre">SYS_ADMIN</span></code> to access <code class="docutils literal notranslate"><span class="pre">/proc/self/pagemaps</span></code>.
+Note that this requirement may still come from other drivers.</p>
+<p>Below are additional capabilities that must be granted to the application
+with the reasons for the need of each capability:</p>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">NET_RAW</span></code></dt><dd><p>For raw Ethernet queue allocation through the kernel driver.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">NET_ADMIN</span></code></dt><dd><p>For device configuration, like setting link status or MTU.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">SYS_RAWIO</span></code></dt><dd><p>For using group 1 and above (software steering) in Flow API.</p>
+</dd>
+</dl>
+<p>They can be manually granted for a specific executable file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>setcap cap_net_raw,cap_net_admin,cap_sys_rawio+ep &lt;executable&gt;
+</pre></div>
+</div>
+<p>Alternatively, a service manager or a container runtime
+may configure the capabilities for a process.</p>
+</section>
+</section>
+<section id="windows-environment">
+<h3><span class="section-number">5.5.2. </span>Windows Environment</h3>
+<p>WinOF2 version 2.60 or higher must be installed on the machine.</p>
+<section id="winof2-installation">
+<h4><span class="section-number">5.5.2.1. </span>WinOF2 Installation</h4>
+<p>The driver can be downloaded from the following site: <a class="reference external" href="https://network.nvidia.com/products/adapter-software/ethernet/windows/winof-2/">WINOF2</a>.</p>
+</section>
+<section id="devx-enablement">
+<h4><span class="section-number">5.5.2.2. </span>DevX Enablement</h4>
+<p>DevX for Windows must be enabled in the Windows registry.
+The keys <code class="docutils literal notranslate"><span class="pre">DevxEnabled</span></code> and <code class="docutils literal notranslate"><span class="pre">DevxFsRules</span></code> must be set.
+Additional information can be found in the WinOF2 user manual.</p>
+</section>
+</section>
+<section id="firmware-configuration">
+<span id="mlx5-firmware-config"></span><h3><span class="section-number">5.5.3. </span>Firmware Configuration</h3>
+<p>Firmware features can be configured as key/value pairs.</p>
+<p>The command to set a value is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;device&gt; set &lt;key&gt;=&lt;value&gt;
+</pre></div>
+</div>
+<p>The command to query a value is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;device&gt; query &lt;key&gt;
+</pre></div>
+</div>
+<p>The device name for the command <code class="docutils literal notranslate"><span class="pre">mlxconfig</span></code> can be either the PCI address,
+or the mst device name found with:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mst status
+</pre></div>
+</div>
+<p>Below are some firmware configurations listed.</p>
+<ul>
+<li><p>link type:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>LINK_TYPE_P1
+LINK_TYPE_P2
+value: 1=Infiniband 2=Ethernet 3=VPI(auto-sense)
+</pre></div>
+</div>
+</li>
+<li><p>enable SR-IOV:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>SRIOV_EN=1
+</pre></div>
+</div>
+</li>
+<li><p>the maximum number of SR-IOV virtual functions:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>NUM_OF_VFS=&lt;max&gt;
+</pre></div>
+</div>
+</li>
+<li><p>enable DevX (required by Direct Rules and other features):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>UCTX_EN=1
+</pre></div>
+</div>
+</li>
+<li><p>aggressive CQE zipping:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>CQE_COMPRESSION=1
+</pre></div>
+</div>
+</li>
+<li><p>L3 VXLAN and VXLAN-GPE destination UDP port:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>IP_OVER_VXLAN_EN=1
+IP_OVER_VXLAN_PORT=&lt;udp dport&gt;
+</pre></div>
+</div>
+</li>
+<li><p>enable VXLAN-GPE tunnel flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=0
+or
+FLEX_PARSER_PROFILE_ENABLE=2
+</pre></div>
+</div>
+</li>
+<li><p>enable IP-in-IP tunnel flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=0
+</pre></div>
+</div>
+</li>
+<li><p>enable MPLS flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=1
+</pre></div>
+</div>
+</li>
+<li><p>enable ICMP(code/type/identifier/sequence number) / ICMP6(code/type) fields matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=2
+</pre></div>
+</div>
+</li>
+<li><p>enable Geneve flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=0
+or
+FLEX_PARSER_PROFILE_ENABLE=1
+</pre></div>
+</div>
+</li>
+<li><p>enable Geneve TLV option flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=0
+</pre></div>
+</div>
+</li>
+<li><p>enable GTP flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=3
+</pre></div>
+</div>
+</li>
+<li><p>enable eCPRI flow matching:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=4
+PROG_PARSE_GRAPH=1
+</pre></div>
+</div>
+</li>
+<li><p>enable dynamic flex parser for flex item:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>FLEX_PARSER_PROFILE_ENABLE=4
+PROG_PARSE_GRAPH=1
+</pre></div>
+</div>
+</li>
+<li><p>enable realtime timestamp format:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>REAL_TIME_CLOCK_ENABLE=1
+</pre></div>
+</div>
+</li>
+<li><p>allow locking hairpin RQ data buffer in device memory:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>HAIRPIN_DATA_BUFFER_LOCK=1
+MEMIC_SIZE_LIMIT=0
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="device-arguments">
+<span id="mlx5-common-driver-options"></span><h2><span class="section-number">5.6. </span>Device Arguments</h2>
+<p>The driver can be configured per device.
+A single argument list can be used for a device managed by multiple PMDs.
+The parameters must be passed through the EAL option <code class="docutils literal notranslate"><span class="pre">-a</span></code>,
+as examples below:</p>
+<ul>
+<li><p>PCI device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:03:00.2,class=eth:regex,mr_mempool_reg_en=0
+</pre></div>
+</div>
+</li>
+<li><p>Auxiliary SF:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a auxiliary:mlx5_core.sf.2,class=compress,mr_ext_memseg_en=0
+</pre></div>
+</div>
+</li>
+</ul>
+<p>Each device class PMD has its own list of specific arguments,
+and below are the arguments supported by the common mlx5 layer.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">class</span></code> parameter [string]</p>
+<p>Select the classes of the drivers that should probe the device.
+See <a class="reference internal" href="#mlx5-classes"><span class="std std-ref">Classes</span></a> for more explanation and details.</p>
+<p>The default value is <code class="docutils literal notranslate"><span class="pre">eth</span></code>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mr_ext_memseg_en</span></code> parameter [int]</p>
+<p>A nonzero value enables extending memseg when registering DMA memory. If
+enabled, the number of entries in MR (Memory Region) lookup table on datapath
+is minimized and it benefits performance. On the other hand, it worsens memory
+utilization because registered memory is pinned by kernel driver. Even if a
+page in the extended chunk is freed, that doesn’t become reusable until the
+entire memory is freed.</p>
+<p>Enabled by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mr_mempool_reg_en</span></code> parameter [int]</p>
+<p>A nonzero value enables implicit registration of DMA memory of all mempools
+except those having <code class="docutils literal notranslate"><span class="pre">RTE_MEMPOOL_F_NON_IO</span></code>. This flag is set automatically
+for mempools populated with non-contiguous objects or those without IOVA.
+The effect is that when a packet from a mempool is transmitted,
+its memory is already registered for DMA in the PMD and no registration
+will happen on the data path. The tradeoff is extra work on the creation
+of each mempool and increased HW resource use if some mempools
+are not used with MLX5 devices.</p>
+<p>Enabled by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sys_mem_en</span></code> parameter [int]</p>
+<p>A non-zero value enables the PMD memory management allocating memory
+from system by default, without explicit rte memory flag.</p>
+<p>By default, the PMD will set this value to 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> parameter [int]</p>
+<p>The rdma core library can map doorbell register in two ways,
+depending on the environment variable “MLX5_SHUT_UP_BF”:</p>
+<ul class="simple">
+<li><p>As regular cached memory (usually with write combining attribute),
+if the variable is either missing or set to zero.</p></li>
+<li><p>As non-cached memory, if the variable is present and set to not “0” value.</p></li>
+</ul>
+<blockquote>
+<div><p>The same doorbell mapping approach is implemented directly by PMD
+in UAR generation for queues created with DevX.</p>
+</div></blockquote>
+<p>The type of mapping may slightly affect the send queue performance,
+the optimal choice strongly relied on the host architecture
+and should be deduced practically.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> is set to zero, the doorbell is forced to be mapped to
+regular memory (with write combining), the PMD will perform the extra write
+memory barrier after writing to doorbell, it might increase the needed CPU
+clocks per packet to send, but latency might be improved.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> is set to one, the doorbell is forced to be mapped to non
+cached memory, the PMD will not perform the extra write memory barrier after
+writing to doorbell, on some architectures it might improve the performance.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> is set to two, the doorbell is forced to be mapped to
+regular memory, the PMD will use heuristics to decide whether a write memory
+barrier should be performed. For bursts with size multiple of recommended one
+(64 pkts) it is supposed the next burst is coming and no need to issue the
+extra memory barrier (it is supposed to be issued in the next coming burst,
+at least after descriptor writing). It might increase latency (on some hosts
+till the next packets transmit) and should be used with care.
+The PMD uses heuristics only for Tx queue, for other semd queues the doorbell
+is forced to be mapped to regular memory as same as <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> is set to 0.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> is omitted, the preset (if any) environment variable
+“MLX5_SHUT_UP_BF” value is used. If there is no “MLX5_SHUT_UP_BF”, the
+default <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code> value is zero for ARM64 hosts and one for others.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">cmd_fd</span></code> parameter [int]</p>
+<p>File descriptor of <code class="docutils literal notranslate"><span class="pre">ibv_context</span></code> created outside the PMD.
+PMD will use this FD to import remote CTX. The <code class="docutils literal notranslate"><span class="pre">cmd_fd</span></code> is obtained from
+the <code class="docutils literal notranslate"><span class="pre">ibv_context-&gt;cmd_fd</span></code> member, which must be dup’d before being passed.
+This parameter is valid only if <code class="docutils literal notranslate"><span class="pre">pd_handle</span></code> parameter is specified.</p>
+<p>By default, the PMD will create a new <code class="docutils literal notranslate"><span class="pre">ibv_context</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When FD comes from another process, it is the user responsibility to
+share the FD between the processes (e.g. by SCM_RIGHTS).</p>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pd_handle</span></code> parameter [int]</p>
+<p>Protection domain handle of <code class="docutils literal notranslate"><span class="pre">ibv_pd</span></code> created outside the PMD.
+PMD will use this handle to import remote PD. The <code class="docutils literal notranslate"><span class="pre">pd_handle</span></code> can be
+achieved from the original PD by getting its <code class="docutils literal notranslate"><span class="pre">ibv_pd-&gt;handle</span></code> member value.
+This parameter is valid only if <code class="docutils literal notranslate"><span class="pre">cmd_fd</span></code> parameter is specified,
+and its value must be a valid kernel handle for a PD object
+in the context represented by given <code class="docutils literal notranslate"><span class="pre">cmd_fd</span></code>.</p>
+<p>By default, the PMD will allocate a new PD.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">ibv_pd-&gt;handle</span></code> member is different than <code class="docutils literal notranslate"><span class="pre">mlx5dv_pd-&gt;pdn</span></code> member.</p>
+</div>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Platform Specific Guides</a><ul>
+      <li>Previous: <a href="dpaa2.html" title="previous chapter"><span class="section-number">4. </span>NXP QorIQ DPAA2 Board Support Package</a></li>
+      <li>Next: <a href="octeontx.html" title="next chapter"><span class="section-number">6. </span>OCTEON TX Board Support Package</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/platform/mlx5.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

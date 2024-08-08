@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>43. NFB poll mode driver library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="44. NFP poll mode driver library" href="nfp.html" />
+    <link rel="prev" title="42. Netvsc poll mode driver" href="netvsc.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nfb-poll-mode-driver-library">
+<h1><span class="section-number">43. </span>NFB poll mode driver library</h1>
+<p>The NFB poll mode driver library implements support for the Netcope
+FPGA Boards (<strong>NFB-40G2, NFB-100G2, NFB-200G2QL</strong>) and Silicom <strong>FB2CGG3</strong> card,
+FPGA-based programmable NICs. The NFB PMD uses interface provided by the libnfb
+library to communicate with these cards over the nfb layer.</p>
+<p>More information about the
+<a class="reference external" href="https://www.liberouter.org/technologies/cards/">NFB cards</a>
+and used technology
+(<a class="reference external" href="https://www.liberouter.org/ndk/">Network Development Kit</a>)
+can be found on the <a class="reference external" href="http://www.liberouter.org/">Liberouter website</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently the driver is supported only on x86_64 architectures.
+Only x86_64 versions of the external libraries are provided.</p>
+</div>
+<section id="prerequisites">
+<h2><span class="section-number">43.1. </span>Prerequisites</h2>
+<p>This PMD requires kernel modules which are responsible for initialization and
+allocation of resources needed for nfb layer function.
+Communication between PMD and kernel modules is mediated by libnfb library.
+These kernel modules and library are not part of DPDK and must be installed
+separately:</p>
+<ul>
+<li><p><strong>libnfb library</strong></p>
+<p>The library provides API for initialization of nfb transfers, receiving and
+transmitting data segments.</p>
+</li>
+<li><p><strong>Kernel modules</strong></p>
+<ul class="simple">
+<li><p>nfb</p></li>
+</ul>
+<p>Kernel modules manage initialization of hardware, allocation and
+sharing of resources for user space applications.</p>
+</li>
+</ul>
+<p>Dependencies can be found here:
+<a class="reference external" href="https://github.com/CESNET/ndk-sw">Netcope common</a>.</p>
+<section id="versions-of-the-packages">
+<h3><span class="section-number">43.1.1. </span>Versions of the packages</h3>
+<p>The minimum version of the provided packages:</p>
+<ul class="simple">
+<li><p>for DPDK from 19.05</p></li>
+</ul>
+</section>
+</section>
+<section id="configuration">
+<h2><span class="section-number">43.2. </span>Configuration</h2>
+<p>Timestamps</p>
+<p>The PMD supports hardware timestamps of frame receipt on physical network interface. In order to use
+the timestamps, the hardware timestamping unit must be enabled (follow the documentation of the NFB
+products). The standard <cite>RTE_ETH_RX_OFFLOAD_TIMESTAMP</cite> flag can be used for this feature.</p>
+<p>When the timestamps are enabled, a timestamp validity flag is set in the MBUFs
+containing received frames and timestamp is inserted into the <cite>rte_mbuf</cite> struct.</p>
+<p>The timestamp is an <cite>uint64_t</cite> field. Its lower 32 bits represent <em>seconds</em> portion of the timestamp
+(number of seconds elapsed since 1.1.1970 00:00:00 UTC) and its higher 32 bits represent
+<em>nanosecond</em> portion of the timestamp (number of nanoseconds elapsed since the beginning of the
+second in the <em>seconds</em> portion.</p>
+</section>
+<section id="using-the-nfb-pmd">
+<h2><span class="section-number">43.3. </span>Using the NFB PMD</h2>
+<p>Kernel modules have to be loaded before running the DPDK application.</p>
+</section>
+<section id="nfb-card-architecture">
+<h2><span class="section-number">43.4. </span>NFB card architecture</h2>
+<p>The NFB cards are multi-port multi-queue cards, where (generally) data from any
+Ethernet port may be sent to any queue.
+They are represented in DPDK as a single port.</p>
+<p>NFB-200G2QL card employs an add-on cable which allows to connect it to two
+physical PCI-E slots at the same time (see the diagram below).
+This is done to allow 200 Gbps of traffic to be transferred through the PCI-E
+bus (note that a single PCI-E 3.0 x16 slot provides only 125 Gbps theoretical
+throughput).</p>
+<p>Although each slot may be connected to a different CPU and therefore to a different
+NUMA node, the card is represented as a single port in DPDK. To work with data
+from the individual queues on the right NUMA node, connection of NUMA nodes on
+first and last queue (each NUMA node has half of the queues) need to be checked.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">43.5. </span>Limitations</h2>
+<p>Driver is usable only on Linux architecture, namely on CentOS.</p>
+<p>Since a card is always represented as a single port, but can be connected to two
+NUMA nodes, there is need for manual check where master/slave is connected.</p>
+</section>
+<section id="example-of-usage">
+<h2><span class="section-number">43.6. </span>Example of usage</h2>
+<p>Read packets from 0. and 1. receive queue and write them to 0. and 1.
+transmit queue:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 2 \</span>
+<span class="go">-- --port-topology=chained --rxq=2 --txq=2 --nb-cores=2 -i -a</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:06:00.0 on NUMA socket -1</span>
+<span class="go">EAL:   probe driver: 1b26:c1c1 net_nfb</span>
+<span class="go">PMD: Initializing NFB device (0000:06:00.0)</span>
+<span class="go">PMD: Available DMA queues RX: 8 TX: 8</span>
+<span class="go">PMD: NFB device (0000:06:00.0) successfully initialized</span>
+<span class="go">Interactive-mode selected</span>
+<span class="go">Auto-start selected</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:11:17:00:00:00</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">Start automatic packet forwarding</span>
+<span class="go">  io packet forwarding - CRC stripping disabled - packets/burst=32</span>
+<span class="go">  nb forwarding cores=2 - nb forwarding ports=1</span>
+<span class="go">  RX queues=2 - RX desc=128 - RX free threshold=0</span>
+<span class="go">  RX threshold registers: pthresh=0 hthresh=0 wthresh=0</span>
+<span class="go">  TX queues=2 - TX desc=512 - TX free threshold=0</span>
+<span class="go">  TX threshold registers: pthresh=0 hthresh=0 wthresh=0</span>
+<span class="go">  TX RS bit threshold=0 - TXQ flags=0x0</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="netvsc.html" title="previous chapter"><span class="section-number">42. </span>Netvsc poll mode driver</a></li>
+      <li>Next: <a href="nfp.html" title="next chapter"><span class="section-number">44. </span>NFP poll mode driver library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/nfb.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

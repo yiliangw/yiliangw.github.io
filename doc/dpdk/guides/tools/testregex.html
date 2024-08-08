@@ -1,0 +1,210 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>14. dpdk-test-regex Tool &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="15. dpdk-test-mldev Application" href="testmldev.html" />
+    <link rel="prev" title="13. dpdk-test-eventdev Application" href="testeventdev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-test-regex-tool">
+<h1><span class="section-number">14. </span>dpdk-test-regex Tool</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-test-regex</span></code> tool is a Data Plane Development Kit (DPDK)
+application that allows functional testing and performance measurement for
+the RegEx PMDs.</p>
+<p>It is based on precompiled rule file, and an input file, both of them can
+be selected using command-line options.</p>
+<p>In general case, each PMD has its own rule file.</p>
+<p>By default the test supports one QP per core, however a higher number of cores
+and QPs can be configured. The QPs are evenly distributed on the cores. All QPs
+are assigned the same number of segments of input file to parse.  Given n QPs
+(per core) - the enqueue/dequeue RegEx operations are interleaved as follows:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>enqueue(QP #1)
+enqueue(QP #2)
+...
+enqueue(QP #n)
+dequeue(QP #1)
+dequeue(QP #2)
+...
+dequeue(QP #n)
+</pre></div>
+</div>
+<p>The test outputs the following data per QP and core:</p>
+<ul class="simple">
+<li><p>Performance, in gigabit per second.</p></li>
+<li><p>Matching results (rule id, position, length), for each job.</p></li>
+<li><p>Matching results in absolute location (rule id, position , length),
+relative to the start of the input data.</p></li>
+</ul>
+<section id="limitations">
+<h2><span class="section-number">14.1. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Supports only precompiled rules.</p></li>
+</ul>
+</section>
+<section id="application-options">
+<h2><span class="section-number">14.2. </span>Application Options</h2>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">--rules</span> <span class="pre">NAME</span></code></dt><dd><p>precompiled rule file</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--data</span> <span class="pre">NAME</span></code></dt><dd><p>data file to use</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--nb_jobs</span> <span class="pre">N</span></code></dt><dd><p>number of jobs to use</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--nb_qps</span> <span class="pre">N</span></code></dt><dd><p>number of QPs to use</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--nb_lcores</span> <span class="pre">N</span></code></dt><dd><p>number of cores to use</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--perf</span> <span class="pre">N</span></code></dt><dd><p>only outputs the performance data</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--nb_iter</span> <span class="pre">N</span></code></dt><dd><p>number of iteration to run</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--nb_segs</span> <span class="pre">N</span></code></dt><dd><p>number of mbuf segment</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--match_mode</span> <span class="pre">N</span></code></dt><dd><p>match mode: 0 - None (default), 1 - Highest Priority, 2 - Stop on Any</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">--help</span></code></dt><dd><p>print application options</p>
+</dd>
+</dl>
+<section id="running-the-tool">
+<h3><span class="section-number">14.2.1. </span>Running the Tool</h3>
+<p><strong>Step 1: Compile a rule file</strong></p>
+<p>In order for the RegEx to work it must have a precompiled rule file.
+to generate this file there is a need to use a RegEx compiler that matches the
+RegEx PMD.</p>
+<p><strong>Step 2: Generate a data file</strong></p>
+<p>The data file, will be used as a source data for the RegEx to work on.</p>
+<p><strong>Step 3: Run the tool</strong></p>
+<p>The tool has a number of command line options. Here is the sample command line:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./dpdk-test-regex -a 83:00.0 -- --rules rule_file.rof2 --data data_file.txt --job 100 \
+  --nb_qps 4 --nb_lcores 2
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DPDK Tools User Guides</a><ul>
+      <li>Previous: <a href="testeventdev.html" title="previous chapter"><span class="section-number">13. </span>dpdk-test-eventdev Application</a></li>
+      <li>Next: <a href="testmldev.html" title="next chapter"><span class="section-number">15. </span>dpdk-test-mldev Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/testregex.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

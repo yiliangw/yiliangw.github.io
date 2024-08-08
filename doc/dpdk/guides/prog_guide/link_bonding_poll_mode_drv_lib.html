@@ -1,0 +1,744 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>28. Link Bonding Poll Mode Driver Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="29. Timer Library" href="timer_lib.html" />
+    <link rel="prev" title="27. Rawdevice Library" href="rawdev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="link-bonding-poll-mode-driver-library">
+<h1><span class="section-number">28. </span>Link Bonding Poll Mode Driver Library</h1>
+<p>In addition to Poll Mode Drivers (PMDs) for physical and virtual hardware,
+DPDK also includes a pure-software library that
+allows physical PMDs to be bonded together to create a single logical PMD.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/bond-overview.svg" src="../_images/bond-overview.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.2 </span><span class="caption-text">Bonding PMDs</span></p>
+</figcaption>
+</figure>
+<p>The Link Bonding PMD library(librte_net_bond) supports bonding of groups of
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev</span></code> ports of the same speed and duplex to provide similar
+capabilities to that found in Linux bonding driver to allow the aggregation
+of multiple (member) NICs into a single logical interface between a server
+and a switch. The new bonding PMD will then process these interfaces based on
+the mode of operation specified to provide support for features such as
+redundant links, fault tolerance and/or load balancing.</p>
+<p>The librte_net_bond library exports a C API which provides an API for the
+creation of bonding devices as well as the configuration and management of the
+bonding device and its member devices.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The Link Bonding PMD Library is enabled by default in the build
+configuration, the library can be disabled using the meson option
+“-Ddisable_drivers=net/bonding”.</p>
+</div>
+<section id="link-bonding-modes-overview">
+<h2><span class="section-number">28.1. </span>Link Bonding Modes Overview</h2>
+<p>Currently the Link Bonding PMD library supports following modes of operation:</p>
+<ul class="simple">
+<li><p><strong>Round-Robin (Mode 0):</strong></p></li>
+</ul>
+<figure class="align-default" id="id2">
+<img alt="../_images/bond-mode-0.svg" src="../_images/bond-mode-0.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.3 </span><span class="caption-text">Round-Robin (Mode 0)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>This mode provides load balancing and fault tolerance by transmission of
+packets in sequential order from the first available member device through
+the last. Packets are bulk dequeued from devices then serviced in a
+round-robin manner. This mode does not guarantee in order reception of
+packets and down stream should be able to handle out of order packets.</p>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Active Backup (Mode 1):</strong></p></li>
+</ul>
+<figure class="align-default" id="id3">
+<img alt="../_images/bond-mode-1.svg" src="../_images/bond-mode-1.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.4 </span><span class="caption-text">Active Backup (Mode 1)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>In this mode only one member in the bond is active at any time, a different
+member becomes active if, and only if, the primary active member fails,
+thereby providing fault tolerance to member failure. The single logical
+bonding interface’s MAC address is externally visible on only one NIC (port)
+to avoid confusing the network switch.</p>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Balance XOR (Mode 2):</strong></p></li>
+</ul>
+<figure class="align-default" id="id4">
+<img alt="../_images/bond-mode-2.svg" src="../_images/bond-mode-2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.5 </span><span class="caption-text">Balance XOR (Mode 2)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>This mode provides transmit load balancing (based on the selected
+transmission policy) and fault tolerance. The default policy (layer2) uses
+a simple calculation based on the packet flow source and destination MAC
+addresses as well as the number of active members available to the bonding
+device to classify the packet to a specific member to transmit on. Alternate
+transmission policies supported are layer 2+3, this takes the IP source and
+destination addresses into the calculation of the transmit member port and
+the final supported policy is layer 3+4, this uses IP source and
+destination addresses as well as the TCP/UDP source and destination port.</p>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The coloring differences of the packets are used to identify different flow
+classification calculated by the selected transmit policy</p>
+</div>
+<ul class="simple">
+<li><p><strong>Broadcast (Mode 3):</strong></p></li>
+</ul>
+<figure class="align-default" id="id5">
+<img alt="../_images/bond-mode-3.svg" src="../_images/bond-mode-3.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.6 </span><span class="caption-text">Broadcast (Mode 3)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>This mode provides fault tolerance by transmission of packets on all member
+ports.</p>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Link Aggregation 802.3AD (Mode 4):</strong></p></li>
+</ul>
+<figure class="align-default" id="id6">
+<img alt="../_images/bond-mode-4.svg" src="../_images/bond-mode-4.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.7 </span><span class="caption-text">Link Aggregation 802.3AD (Mode 4)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>This mode provides dynamic link aggregation according to the 802.3ad
+specification. It negotiates and monitors aggregation groups that share the
+same speed and duplex settings using the selected balance transmit policy
+for balancing outgoing traffic.</p>
+<p>DPDK implementation of this mode provide some additional requirements of
+the application.</p>
+<ol class="arabic simple">
+<li><p>It needs to call <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_burst</span></code> with
+intervals period of less than 100ms.</p></li>
+<li><p>Calls to <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst</span></code> must have a buffer size of at least 2xN,
+where N is the number of members. This is a space required for LACP
+frames. Additionally LACP packets are included in the statistics, but
+they are not returned to the application.</p></li>
+</ol>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+<ul class="simple">
+<li><p><strong>Transmit Load Balancing (Mode 5):</strong></p></li>
+</ul>
+<figure class="align-default" id="id7">
+<img alt="../_images/bond-mode-5.svg" src="../_images/bond-mode-5.svg" /><figcaption>
+<p><span class="caption-number">Fig. 28.8 </span><span class="caption-text">Transmit Load Balancing (Mode 5)</span></p>
+<div class="legend">
+<blockquote>
+<div><p>This mode provides an adaptive transmit load balancing. It dynamically
+changes the transmitting member, according to the computed load. Statistics
+are collected in 100ms intervals and scheduled every 10ms.</p>
+</div></blockquote>
+</div>
+</figcaption>
+</figure>
+</section>
+<section id="implementation-details">
+<h2><span class="section-number">28.2. </span>Implementation Details</h2>
+<p>The librte_net_bond bonding device is compatible with the Ethernet device API
+exported by the Ethernet PMDs described in the <em>DPDK API Reference</em>.</p>
+<p>The Link Bonding Library supports the creation of bonding devices at application
+startup time during EAL initialization using the <code class="docutils literal notranslate"><span class="pre">--vdev</span></code> option as well as
+programmatically via the C API <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_create</span></code> function.</p>
+<p>Bonding devices support the dynamical addition and removal of member devices using
+the <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_member_add</span></code> / <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_member_remove</span></code> APIs.</p>
+<p>After a member device is added to a bonding device member is stopped using
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stop</span></code> and then reconfigured using <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure</span></code>
+the RX and TX queues are also reconfigured using <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_queue_setup</span></code> /
+<code class="docutils literal notranslate"><span class="pre">rte_eth_rx_queue_setup</span></code> with the parameters use to configure the bonding
+device. If RSS is enabled for bonding device, this mode is also enabled on new
+member and configured as well.
+Any flow which was configured to the bond device also is configured to the added
+member.</p>
+<p>Setting up multi-queue mode for bonding device to RSS, makes it fully
+RSS-capable, so all members are synchronized with its configuration. This mode is
+intended to provide RSS configuration on members transparent for client
+application implementation.</p>
+<p>Bonding device stores its own version of RSS settings i.e. RETA, RSS hash
+function and RSS key, used to set up its members. That let to define the meaning
+of RSS configuration of bonding device as desired configuration of whole bonding
+(as one unit), without pointing any of member inside. It is required to ensure
+consistency and made it more error-proof.</p>
+<p>RSS hash function set for bonding device, is a maximal set of RSS hash functions
+supported by all bonding members. RETA size is a GCD of all its RETA’s sizes, so
+it can be easily used as a pattern providing expected behavior, even if member
+RETAs’ sizes are different. If RSS Key is not set for bonding device, it’s not
+changed on the members and default key for device is used.</p>
+<p>As RSS configurations, there is flow consistency in the bonding members for the
+next rte flow operations:</p>
+<dl class="simple">
+<dt>Validate:</dt><dd><ul class="simple">
+<li><p>Validate flow for each member, failure at least for one member causes to
+bond validation failure.</p></li>
+</ul>
+</dd>
+<dt>Create:</dt><dd><ul class="simple">
+<li><p>Create the flow in all members.</p></li>
+<li><p>Save all the members created flows objects in bonding internal flow
+structure.</p></li>
+<li><p>Failure in flow creation for existed member rejects the flow.</p></li>
+<li><p>Failure in flow creation for new members in member adding time rejects
+the member.</p></li>
+</ul>
+</dd>
+<dt>Destroy:</dt><dd><ul class="simple">
+<li><p>Destroy the flow in all members and release the bond internal flow
+memory.</p></li>
+</ul>
+</dd>
+<dt>Flush:</dt><dd><ul class="simple">
+<li><p>Destroy all the bonding PMD flows in all the members.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Don’t call members flush directly, It destroys all the member flows which
+may include external flows or the bond internal LACP flow.</p>
+</div>
+<dl class="simple">
+<dt>Query:</dt><dd><ul class="simple">
+<li><p>Summarize flow counters from all the members, relevant only for
+<code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_COUNT</span></code>.</p></li>
+</ul>
+</dd>
+<dt>Isolate:</dt><dd><ul class="simple">
+<li><p>Call to flow isolate for all members.</p></li>
+<li><p>Failure in flow isolation for existed member rejects the isolate mode.</p></li>
+<li><p>Failure in flow isolation for new members in member adding time rejects
+the member.</p></li>
+</ul>
+</dd>
+</dl>
+<p>All settings are managed through the bonding port API and always are propagated
+in one direction (from bonding to members).</p>
+<section id="link-status-change-interrupts-polling">
+<h3><span class="section-number">28.2.1. </span>Link Status Change Interrupts / Polling</h3>
+<p>Link bonding devices support the registration of a link status change callback,
+using the <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_callback_register</span></code> API, this will be called when the
+status of the bonding device changes. For example in the case of a bonding
+device which has 3 members, the link status will change to up when one member
+becomes active or change to down when all members become inactive. There is no
+callback notification when a single member changes state and the previous
+conditions are not met. If a user wishes to monitor individual members then they
+must register callbacks with that member directly.</p>
+<p>The link bonding library also supports devices which do not implement link
+status change interrupts, this is achieved by polling the devices link status at
+a defined period which is set using the <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_link_monitoring_set</span></code>
+API, the default polling interval is 10ms. When a device is added as a member to
+a bonding device it is determined using the <code class="docutils literal notranslate"><span class="pre">RTE_PCI_DRV_INTR_LSC</span></code> flag
+whether the device supports interrupts or whether the link status should be
+monitored by polling it.</p>
+</section>
+<section id="requirements-limitations">
+<h3><span class="section-number">28.2.2. </span>Requirements / Limitations</h3>
+<p>The current implementation only supports devices that support the same speed
+and duplex to be added as a members to the same bonding device. The bonding device
+inherits these attributes from the first active member added to the bonding
+device and then all further members added to the bonding device must support
+these parameters.</p>
+<p>A bonding device must have a minimum of one member before the bonding device
+itself can be started.</p>
+<p>To use a bonding device dynamic RSS configuration feature effectively, it is
+also required, that all members should be RSS-capable and support, at least one
+common hash function available for each of them. Changing RSS key is only
+possible, when all member devices support the same key size.</p>
+<p>To prevent inconsistency on how members process packets, once a device is added
+to a bonding device, RSS and rte flow configurations should be managed through
+the bonding device API, and not directly on the member.</p>
+<p>Like all other PMD, all functions exported by a PMD are lock-free functions
+that are assumed not to be invoked in parallel on different logical cores to
+work on the same target object.</p>
+<p>It should also be noted that the PMD receive function should not be invoked
+directly on a member devices after they have been to a bonding device since
+packets read directly from the member device will no longer be available to the
+bonding device to read.</p>
+</section>
+<section id="configuration">
+<h3><span class="section-number">28.2.3. </span>Configuration</h3>
+<p>Link bonding devices are created using the <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_create</span></code> API
+which requires a unique device name, the bonding mode,
+and the socket Id to allocate the bonding device’s resources on.
+The other configurable parameters for a bonding device are its member devices,
+its primary member, a user defined MAC address and transmission policy to use if
+the device is in balance XOR mode.</p>
+<section id="member-devices">
+<h4><span class="section-number">28.2.3.1. </span>Member Devices</h4>
+<p>Bonding devices support up to a maximum of <code class="docutils literal notranslate"><span class="pre">RTE_MAX_ETHPORTS</span></code> member devices
+of the same speed and duplex. Ethernet devices can be added as a member to a
+maximum of one bonding device. Member devices are reconfigured with the
+configuration of the bonding device on being added to a bonding device.</p>
+<p>The bonding also guarantees to return the MAC address of the member device to its
+original value of removal of a member from it.</p>
+</section>
+<section id="primary-member">
+<h4><span class="section-number">28.2.3.2. </span>Primary Member</h4>
+<p>The primary member is used to define the default port to use when a bonding
+device is in active backup mode. A different port will only be used if, and
+only if, the current primary port goes down. If the user does not specify a
+primary port it will default to being the first port added to the bonding device.</p>
+</section>
+<section id="mac-address">
+<h4><span class="section-number">28.2.3.3. </span>MAC Address</h4>
+<p>The bonding device can be configured with a user specified MAC address, this
+address will be inherited by the some/all member devices depending on the
+operating mode. If the device is in active backup mode then only the primary
+device will have the user specified MAC, all other members will retain their
+original MAC address. In mode 0, 2, 3, 4 all members devices are configure with
+the bonding devices MAC address.</p>
+<p>If a user defined MAC address is not defined then the bonding device will
+default to using the primary members MAC address.</p>
+</section>
+<section id="balance-xor-transmit-policies">
+<h4><span class="section-number">28.2.3.4. </span>Balance XOR Transmit Policies</h4>
+<p>There are 3 supported transmission policies for bonding device running in
+Balance XOR mode. Layer 2, Layer 2+3, Layer 3+4.</p>
+<ul class="simple">
+<li><p><strong>Layer 2:</strong>   Ethernet MAC address based balancing is the default
+transmission policy for Balance XOR bonding mode. It uses a simple XOR
+calculation on the source MAC address and destination MAC address of the
+packet and then calculate the modulus of this value to calculate the member
+device to transmit the packet on.</p></li>
+<li><p><strong>Layer 2 + 3:</strong> Ethernet MAC address &amp; IP Address based balancing uses a
+combination of source/destination MAC addresses and the source/destination
+IP addresses of the data packet to decide which member port the packet will
+be transmitted on.</p></li>
+<li><p><strong>Layer 3 + 4:</strong>  IP Address &amp; UDP Port based  balancing uses a combination
+of source/destination IP Address and the source/destination UDP ports of
+the packet of the data packet to decide which member port the packet will be
+transmitted on.</p></li>
+</ul>
+<p>All these policies support 802.1Q VLAN Ethernet packets, as well as IPv4, IPv6
+and UDP protocols for load balancing.</p>
+</section>
+</section>
+</section>
+<section id="using-link-bonding-devices">
+<h2><span class="section-number">28.3. </span>Using Link Bonding Devices</h2>
+<p>The librte_net_bond library supports two modes of device creation, the libraries
+export full C API or using the EAL command line to statically configure link
+bonding devices at application startup. Using the EAL option it is possible to
+use link bonding functionality transparently without specific knowledge of the
+libraries API, this can be used, for example, to add bonding functionality,
+such as active backup, to an existing application which has no knowledge of
+the link bonding C API.</p>
+<section id="using-the-poll-mode-driver-from-an-application">
+<h3><span class="section-number">28.3.1. </span>Using the Poll Mode Driver from an Application</h3>
+<p>Using the librte_net_bond libraries API it is possible to dynamically create
+and manage link bonding device from within any application. Link bonding
+devices are created using the <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_create</span></code> API which requires a
+unique device name, the link bonding mode to initial the device in and finally
+the socket Id which to allocate the devices resources onto. After successful
+creation of a bonding device it must be configured using the generic Ethernet
+device configure API <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure</span></code> and then the RX and TX queues
+which will be used must be setup using <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_queue_setup</span></code> /
+<code class="docutils literal notranslate"><span class="pre">rte_eth_rx_queue_setup</span></code>.</p>
+<p>Member devices can be dynamically added and removed from a link bonding device
+using the <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_member_add</span></code> / <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_member_remove</span></code>
+APIs but at least one member device must be added to the link bonding device
+before it can be started using <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_start</span></code>.</p>
+<p>The link status of a bonding device is dictated by that of its members, if all
+member device link status are down or if all members are removed from the link
+bonding device then the link status of the bonding device will go down.</p>
+<p>It is also possible to configure / query the configuration of the control
+parameters of a bonding device using the provided APIs
+<code class="docutils literal notranslate"><span class="pre">rte_eth_bond_mode_set/</span> <span class="pre">get</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_primary_set/get</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_bond_mac_set/reset</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_eth_bond_xmit_policy_set/get</span></code>.</p>
+</section>
+<section id="using-link-bonding-devices-from-the-eal-command-line">
+<h3><span class="section-number">28.3.2. </span>Using Link Bonding Devices from the EAL Command Line</h3>
+<p>Link bonding devices can be created at application startup time using the
+<code class="docutils literal notranslate"><span class="pre">--vdev</span></code> EAL command line option. The device name must start with the
+net_bonding prefix followed by numbers or letters. The name must be unique for
+each device. Each device can have multiple options arranged in a comma
+separated list. Multiple devices definitions can be arranged by calling the
+<code class="docutils literal notranslate"><span class="pre">--vdev</span></code> option multiple times.</p>
+<p>Device names and bonding options must be separated by commas as shown below:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 --vdev &#39;net_bonding0,bond_opt0=..,bond opt1=..&#39;--vdev &#39;net_bonding1,bond _opt0=..,bond_opt1=..&#39;</span>
+</pre></div>
+</div>
+<section id="link-bonding-eal-options">
+<h4><span class="section-number">28.3.2.1. </span>Link Bonding EAL Options</h4>
+<p>There are multiple ways of definitions that can be assessed and combined as
+long as the following two rules are respected:</p>
+<ul class="simple">
+<li><p>A unique device name, in the format of net_bondingX is provided,
+where X can be any combination of numbers and/or letters,
+and the name is no greater than 32 characters long.</p></li>
+<li><p>A least one member device is provided with for each bonding device definition.</p></li>
+<li><p>The operation mode of the bonding device being created is provided.</p></li>
+</ul>
+<p>The different options are:</p>
+<ul class="simple">
+<li><p>mode: Integer value defining the bonding mode of the device.
+Currently supports modes 0,1,2,3,4,5 (round-robin, active backup, balance,
+broadcast, link aggregation, transmit load balancing).</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mode=2</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>member: Defines the PMD device which will be added as member to the bonding
+device. This option can be selected multiple times, for each device to be
+added as a member. Physical devices should be specified using their PCI
+address, in the format domain:bus:devid.function</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">member=0000:0a:00.0,member=0000:0a:00.1</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>primary: Optional parameter which defines the primary member port,
+is used in active backup mode to select the primary member for data TX/RX if
+it is available. The primary port also is used to select the MAC address to
+use when it is not defined by the user. This defaults to the first member
+added to the device if it is specified. The primary device must be a member
+of the bonding device.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">primary=0000:0a:00.0</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>socket_id: Optional parameter used to select which socket on a NUMA device
+the bonding devices resources will be allocated on.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">socket_id=0</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>mac: Optional parameter to select a MAC address for link bonding device,
+this overrides the value of the primary member device.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mac=00:1e:67:1d:fd:1d</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>xmit_policy: Optional parameter which defines the transmission policy when
+the bonding device is in  balance mode. If not user specified this defaults
+to l2 (layer 2) forwarding, the other transmission policies available are
+l23 (layer 2+3) and l34 (layer 3+4)</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">xmit_policy=l23</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>lsc_poll_period_ms: Optional parameter which defines the polling interval
+in milli-seconds at which devices which don’t support lsc interrupts are
+checked for a change in the devices link status</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">lsc_poll_period_ms=100</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>up_delay: Optional parameter which adds a delay in milli-seconds to the
+propagation of a devices link status changing to up, by default this
+parameter is zero.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">up_delay=10</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>down_delay: Optional parameter which adds a delay in milli-seconds to the
+propagation of a devices link status changing to down, by default this
+parameter is zero.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">down_delay=50</span>
+</pre></div>
+</div>
+</section>
+<section id="examples-of-usage">
+<h4><span class="section-number">28.3.2.2. </span>Examples of Usage</h4>
+<p>Create a bonding device in round robin mode with two members specified by their PCI address:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 --vdev &#39;net_bonding0,mode=0,member=0000:0a:00.01,member=0000:04:00.00&#39; -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Create a bonding device in round robin mode with two members specified by their PCI address and an overriding MAC address:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 --vdev &#39;net_bonding0,mode=0,member=0000:0a:00.01,member=0000:04:00.00,mac=00:1e:67:1d:fd:1d&#39; -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Create a bonding device in active backup mode with two members specified, and a primary member specified by their PCI addresses:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 --vdev &#39;net_bonding0,mode=1,member=0000:0a:00.01,member=0000:04:00.00,primary=0000:0a:00.01&#39; -- --port-topology=chained</span>
+</pre></div>
+</div>
+<p>Create a bonding device in balance mode with two members specified by their PCI addresses, and a transmission policy of layer 3 + 4 forwarding:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 --vdev &#39;net_bonding0,mode=2,member=0000:0a:00.01,member=0000:04:00.00,xmit_policy=l34&#39; -- --port-topology=chained</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="testpmd-driver-specific-commands">
+<span id="bonding-testpmd-commands"></span><h2><span class="section-number">28.4. </span>Testpmd driver specific commands</h2>
+<p>Some bonding driver specific features are integrated in testpmd.</p>
+<section id="create-bonding-device">
+<h3><span class="section-number">28.4.1. </span>create bonding device</h3>
+<p>Create a new bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; create bonding device (mode) (socket)
+</pre></div>
+</div>
+<p>For example, to create a bonding device in mode 1 on socket 0:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; create bonding device 1 0
+created new bonding device (port X)
+</pre></div>
+</div>
+</section>
+<section id="add-bonding-member">
+<h3><span class="section-number">28.4.2. </span>add bonding member</h3>
+<p>Adds Ethernet device to a Link Bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; add bonding member (member id) (port id)
+</pre></div>
+</div>
+<p>For example, to add Ethernet device (port 6) to a Link Bonding device (port 10):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; add bonding member 6 10
+</pre></div>
+</div>
+</section>
+<section id="remove-bonding-member">
+<h3><span class="section-number">28.4.3. </span>remove bonding member</h3>
+<p>Removes an Ethernet member device from a Link Bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; remove bonding member (member id) (port id)
+</pre></div>
+</div>
+<p>For example, to remove Ethernet member device (port 6) to a Link Bonding device (port 10):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; remove bonding member 6 10
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-mode">
+<h3><span class="section-number">28.4.4. </span>set bonding mode</h3>
+<p>Set the Link Bonding mode of a Link Bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mode (value) (port id)
+</pre></div>
+</div>
+<p>For example, to set the bonding mode of a Link Bonding device (port 10) to broadcast (mode 3):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mode 3 10
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-primary">
+<h3><span class="section-number">28.4.5. </span>set bonding primary</h3>
+<p>Set an Ethernet member device as the primary device on a Link Bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding primary (member id) (port id)
+</pre></div>
+</div>
+<p>For example, to set the Ethernet member device (port 6) as the primary port of a Link Bonding device (port 10):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding primary 6 10
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-mac">
+<h3><span class="section-number">28.4.6. </span>set bonding mac</h3>
+<p>Set the MAC address of a Link Bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mac (port id) (mac)
+</pre></div>
+</div>
+<p>For example, to set the MAC address of a Link Bonding device (port 10) to 00:00:00:00:00:01:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mac 10 00:00:00:00:00:01
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-balance-xmit-policy">
+<h3><span class="section-number">28.4.7. </span>set bonding balance_xmit_policy</h3>
+<p>Set the transmission policy for a Link Bonding device when it is in Balance XOR mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding balance_xmit_policy (port_id) (l2|l23|l34)
+</pre></div>
+</div>
+<p>For example, set a Link Bonding device (port 10) to use a balance policy of layer 3+4 (IP addresses &amp; UDP ports):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding balance_xmit_policy 10 l34
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-mon-period">
+<h3><span class="section-number">28.4.8. </span>set bonding mon_period</h3>
+<p>Set the link status monitoring polling period in milliseconds for a bonding device.</p>
+<p>This adds support for PMD member devices which do not support link status interrupts.
+When the mon_period is set to a value greater than 0 then all PMD’s which do not support
+link status ISR will be queried every polling interval to check if their link status has changed:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mon_period (port_id) (value)
+</pre></div>
+</div>
+<p>For example, to set the link status monitoring polling period of bonding device (port 5) to 150ms:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding mon_period 5 150
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-lacp-dedicated-queue">
+<h3><span class="section-number">28.4.9. </span>set bonding lacp dedicated_queue</h3>
+<p>Enable dedicated tx/rx queues on bonding devices members to handle LACP control plane traffic
+when in mode 4 (link-aggregation-802.3ad):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding lacp dedicated_queues (port_id) (enable|disable)
+</pre></div>
+</div>
+</section>
+<section id="set-bonding-agg-mode">
+<h3><span class="section-number">28.4.10. </span>set bonding agg_mode</h3>
+<p>Enable one of the specific aggregators mode when in mode 4 (link-aggregation-802.3ad):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; set bonding agg_mode (port_id) (bandwidth|count|stable)
+</pre></div>
+</div>
+</section>
+<section id="show-bonding-config">
+<h3><span class="section-number">28.4.11. </span>show bonding config</h3>
+<p>Show the current configuration of a Link Bonding device,
+it also shows link-aggregation-802.3ad information if the link mode is mode 4:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; show bonding config (port id)
+</pre></div>
+</div>
+<p>For example,
+to show the configuration a Link Bonding device (port 9) with 3 member devices (1, 3, 4)
+in balance mode with a transmission policy of layer 2+3:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; show bonding config 9
+  - Dev basic:
+     Bonding mode: BALANCE(2)
+     Balance Xmit Policy: BALANCE_XMIT_POLICY_LAYER23
+     Members (3): [1 3 4]
+     Active Members (3): [1 3 4]
+     Primary: [3]
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="rawdev.html" title="previous chapter"><span class="section-number">27. </span>Rawdevice Library</a></li>
+      <li>Next: <a href="timer_lib.html" title="next chapter"><span class="section-number">29. </span>Timer Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/link_bonding_poll_mode_drv_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

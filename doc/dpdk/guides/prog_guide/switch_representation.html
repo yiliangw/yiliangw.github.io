@@ -1,0 +1,976 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>16. Switch Representation within DPDK Applications &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="17. Traffic Metering and Policing API" href="traffic_metering_and_policing.html" />
+    <link rel="prev" title="15. Generic flow API (rte_flow)" href="rte_flow.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="switch-representation-within-dpdk-applications">
+<span id="switch-representation"></span><h1><span class="section-number">16. </span>Switch Representation within DPDK Applications</h1>
+<div class="contents local topic" id="contents">
+<ul class="simple">
+<li><p><a class="reference internal" href="#introduction" id="id7">Introduction</a></p></li>
+<li><p><a class="reference internal" href="#sub-function" id="id8">Sub Function</a></p></li>
+<li><p><a class="reference internal" href="#port-representors" id="id9">Port Representors</a></p></li>
+<li><p><a class="reference internal" href="#basic-sr-iov" id="id10">Basic SR-IOV</a></p></li>
+<li><p><a class="reference internal" href="#controlled-sr-iov" id="id11">Controlled SR-IOV</a></p>
+<ul>
+<li><p><a class="reference internal" href="#initialization" id="id12">Initialization</a></p></li>
+<li><p><a class="reference internal" href="#vf-representors" id="id13">VF Representors</a></p></li>
+<li><p><a class="reference internal" href="#traffic-steering" id="id14">Traffic Steering</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#flow-api-rte-flow" id="id15">Flow API (rte_flow)</a></p>
+<ul>
+<li><p><a class="reference internal" href="#extensions" id="id16">Extensions</a></p></li>
+<li><p><a class="reference internal" href="#traffic-direction" id="id17">Traffic Direction</a></p></li>
+<li><p><a class="reference internal" href="#transferring-traffic" id="id18">Transferring Traffic</a></p>
+<ul>
+<li><p><a class="reference internal" href="#without-port-representors" id="id19">Without Port Representors</a></p></li>
+<li><p><a class="reference internal" href="#with-port-representors" id="id20">With Port Representors</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#pattern-items-and-actions" id="id21">Pattern Items And Actions</a></p>
+<ul>
+<li><p><a class="reference internal" href="#port-representor-pattern-item" id="id22">PORT_REPRESENTOR Pattern Item</a></p></li>
+<li><p><a class="reference internal" href="#port-representor-action" id="id23">PORT_REPRESENTOR Action</a></p></li>
+<li><p><a class="reference internal" href="#represented-port-pattern-item" id="id24">REPRESENTED_PORT Pattern Item</a></p></li>
+<li><p><a class="reference internal" href="#represented-port-action" id="id25">REPRESENTED_PORT Action</a></p></li>
+<li><p><a class="reference internal" href="#port-pattern-item" id="id26">PORT Pattern Item</a></p></li>
+<li><p><a class="reference internal" href="#port-action" id="id27">PORT Action</a></p></li>
+<li><p><a class="reference internal" href="#port-id-pattern-item" id="id28">PORT_ID Pattern Item</a></p></li>
+<li><p><a class="reference internal" href="#port-id-action" id="id29">PORT_ID Action</a></p></li>
+<li><p><a class="reference internal" href="#pf-action" id="id30">PF Action</a></p></li>
+<li><p><a class="reference internal" href="#vf-pattern-item" id="id31">VF Pattern Item</a></p></li>
+<li><p><a class="reference internal" href="#vf-action" id="id32">VF Action</a></p></li>
+<li><p><a class="reference internal" href="#encap-actions" id="id33">*_ENCAP actions</a></p></li>
+<li><p><a class="reference internal" href="#decap-actions" id="id34">*_DECAP actions</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#actions-order-and-repetition" id="id35">Actions Order and Repetition</a></p></li>
+</ul>
+</li>
+<li><p><a class="reference internal" href="#switching-examples" id="id36">Switching Examples</a></p>
+<ul>
+<li><p><a class="reference internal" href="#associating-vf-1-with-physical-port-0" id="id37">Associating VF 1 with Physical Port 0</a></p></li>
+<li><p><a class="reference internal" href="#sharing-broadcasts" id="id38">Sharing Broadcasts</a></p></li>
+<li><p><a class="reference internal" href="#encapsulating-vf-2-traffic-in-vxlan" id="id39">Encapsulating VF 2 Traffic in VXLAN</a></p></li>
+</ul>
+</li>
+</ul>
+</div>
+<section id="introduction">
+<h2><a class="toc-backref" href="#id7"><span class="section-number">16.1. </span>Introduction</a></h2>
+<p>Network adapters with multiple physical ports and/or SR-IOV capabilities
+usually support the offload of traffic steering rules between their virtual
+functions (VFs), sub functions (SFs), physical functions (PFs) and ports.</p>
+<p>Like for standard Ethernet switches, this involves a combination of
+automatic MAC learning and manual configuration. For most purposes it is
+managed by the host system and fully transparent to users and applications.</p>
+<p>On the other hand, applications typically found on hypervisors that process
+layer 2 (L2) traffic (such as OVS) need to steer traffic themselves
+according on their own criteria.</p>
+<p>Without a standard software interface to manage traffic steering rules
+between VFs, SFs, PFs and the various physical ports of a given device,
+applications cannot take advantage of these offloads; software processing is
+mandatory even for traffic which ends up re-injected into the device it
+originates from.</p>
+<p>This document describes how such steering rules can be configured through
+the DPDK flow API (<strong>rte_flow</strong>), with emphasis on the SR-IOV use case
+(PF/VF steering) using a single physical port for clarity, however the same
+logic applies to any number of ports without necessarily involving SR-IOV.</p>
+</section>
+<section id="sub-function">
+<h2><a class="toc-backref" href="#id8"><span class="section-number">16.2. </span>Sub Function</a></h2>
+<p>Besides SR-IOV, Sub function is a portion of the PCI device, a SF netdev
+has its own dedicated queues(txq, rxq). A SF netdev supports E-Switch
+representation offload similar to existing PF and VF representors.
+A SF shares PCI level resources with other SFs and/or with its parent PCI
+function.</p>
+<p>Sub function is created on-demand, coexists with VFs. Number of SFs is
+limited by hardware resources.</p>
+</section>
+<section id="port-representors">
+<h2><a class="toc-backref" href="#id9"><span class="section-number">16.3. </span>Port Representors</a></h2>
+<p>In many cases, traffic steering rules cannot be determined in advance;
+applications usually have to process a bit of traffic in software before
+thinking about offloading specific flows to hardware.</p>
+<p>Applications therefore need the ability to receive and inject traffic to
+various device endpoints (other VFs, SFs, PFs or physical ports) before
+connecting them together. Device drivers must provide means to hook the
+“other end” of these endpoints and to refer them when configuring flow
+rules.</p>
+<p>This role is left to so-called “port representors” (also known as “VF
+representors” in the specific context of VFs, “SF representors” in the
+specific context of SFs), which are to DPDK what the Ethernet switch
+device driver model (<strong>switchdev</strong>) <a class="footnote-reference brackets" href="#id2" id="id1">1</a> is to Linux, and which can be
+thought as a software “patch panel” front-end for applications.</p>
+<ul class="simple">
+<li><p>DPDK port representors are implemented as additional virtual Ethernet
+device (<strong>ethdev</strong>) instances, spawned on an as needed basis through
+configuration parameters passed to the driver of the underlying
+device using devargs.</p></li>
+</ul>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a pci:dbdf,representor=vf0
+-a pci:dbdf,representor=vf[0-3]
+-a pci:dbdf,representor=vf[0,5-11]
+-a pci:dbdf,representor=sf1
+-a pci:dbdf,representor=sf[0-1023]
+-a pci:dbdf,representor=sf[0,2-1023]
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>As virtual devices, they may be more limited than their physical
+counterparts, for instance by exposing only a subset of device
+configuration callbacks and/or by not necessarily having Rx/Tx capability.</p></li>
+<li><p>Among other things, they can be used to assign MAC addresses to the
+resource they represent.</p></li>
+<li><p>Applications can tell port representors apart from other physical of virtual
+port by checking the dev_flags field within their device information
+structure for the RTE_ETH_DEV_REPRESENTOR bit-field.</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_dev_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">dev_flags</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Device flags */</span><span class="w"></span>
+<span class="w">    </span><span class="p">...</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>The device or group relationship of ports can be discovered using the
+switch <code class="docutils literal notranslate"><span class="pre">domain_id</span></code> field within the devices switch information structure. By
+default the switch <code class="docutils literal notranslate"><span class="pre">domain_id</span></code> of a port will be
+<code class="docutils literal notranslate"><span class="pre">RTE_ETH_DEV_SWITCH_DOMAIN_ID_INVALID</span></code> to indicate that the port doesn’t
+support the concept of a switch domain, but ports which do support the concept
+will be allocated a unique switch <code class="docutils literal notranslate"><span class="pre">domain_id</span></code>, ports within the same switch
+domain will share the same <code class="docutils literal notranslate"><span class="pre">domain_id</span></code>. The switch <code class="docutils literal notranslate"><span class="pre">port_id</span></code> is used to
+specify the port_id in terms of the switch, so in the case of SR-IOV devices
+the switch <code class="docutils literal notranslate"><span class="pre">port_id</span></code> would represent the virtual function identifier of the
+port.</p></li>
+</ul>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/**</span>
+<span class="cm"> * Ethernet device associated switch information</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_switch_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; switch name */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">domain_id</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; switch domain id */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">port_id</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; switch port id */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<dl class="footnote brackets">
+<dt class="label" id="id2"><span class="brackets"><a class="fn-backref" href="#id1">1</a></span></dt>
+<dd><p><a class="reference external" href="https://www.kernel.org/doc/Documentation/networking/switchdev.txt">Ethernet switch device driver model (switchdev)</a></p>
+</dd>
+</dl>
+<ul class="simple">
+<li><p>For some PMDs, memory usage of representors is huge when number of
+representor grows, mbufs are allocated for each descriptor of Rx queue.
+Polling large number of ports brings more CPU load, cache miss and
+latency. Shared Rx queue can be used to share Rx queue between PF and
+representors among same Rx domain. <code class="docutils literal notranslate"><span class="pre">RTE_ETH_DEV_CAPA_RXQ_SHARE</span></code> in
+device info is used to indicate the capability. Setting non-zero share
+group in Rx queue configuration to enable share, share_qid is used to
+identify the shared Rx queue in group. Polling any member port can
+receive packets of all member ports in the group, port ID is saved in
+<code class="docutils literal notranslate"><span class="pre">mbuf.port</span></code>.</p></li>
+</ul>
+</section>
+<section id="basic-sr-iov">
+<h2><a class="toc-backref" href="#id10"><span class="section-number">16.4. </span>Basic SR-IOV</a></h2>
+<p>“Basic” in the sense that it is not managed by applications, which
+nonetheless expect traffic to flow between the various endpoints and the
+outside as if everything was linked by an Ethernet hub.</p>
+<p>The following diagram pictures a setup involving a device with one PF, two
+VFs and one shared physical port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+----------&#39;                 `----------+--&#39; `--+----------&#39;
+      |                                       |       |
+.-----+-----.                                 |       |
+| port_id 3 |                                 |       |
+`-----+-----&#39;                                 |       |
+      |                                       |       |
+    .-+--.                                .---+--. .--+---.
+    | PF |                                | VF 1 | | VF 2 |
+    `-+--&#39;                                `---+--&#39; `--+---&#39;
+      |                                       |       |
+      `---------.     .-----------------------&#39;       |
+                |     |     .-------------------------&#39;
+                |     |     |
+             .--+-----+-----+--.
+             | interconnection |
+             `--------+--------&#39;
+                      |
+                 .----+-----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>A DPDK application running on the hypervisor owns the PF device, which is
+arbitrarily assigned port index 3.</p></li>
+<li><p>Both VFs are assigned to VMs and used by unknown applications; they may be
+DPDK-based or anything else.</p></li>
+<li><p>Interconnection is not necessarily done through a true Ethernet switch and
+may not even exist as a separate entity. The role of this block is to show
+that something brings PF, VFs and physical ports together and enables
+communication between them, with a number of built-in restrictions.</p></li>
+</ul>
+<p>Subsequent sections in this document describe means for DPDK applications
+running on the hypervisor to freely assign specific flows between PF, VFs
+and physical ports based on traffic properties, by managing this
+interconnection.</p>
+</section>
+<section id="controlled-sr-iov">
+<h2><a class="toc-backref" href="#id11"><span class="section-number">16.5. </span>Controlled SR-IOV</a></h2>
+<section id="initialization">
+<h3><a class="toc-backref" href="#id12"><span class="section-number">16.5.1. </span>Initialization</a></h3>
+<p>When a DPDK application gets assigned a PF device and is deliberately not
+started in <a class="reference internal" href="#basic-sr-iov">basic SR-IOV</a> mode, any traffic coming from physical ports is
+received by PF according to default rules, while VFs remain isolated.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+----------&#39;                 `----------+--&#39; `--+----------&#39;
+      |                                       |       |
+.-----+-----.                                 |       |
+| port_id 3 |                                 |       |
+`-----+-----&#39;                                 |       |
+      |                                       |       |
+    .-+--.                                .---+--. .--+---.
+    | PF |                                | VF 1 | | VF 2 |
+    `-+--&#39;                                `------&#39; `------&#39;
+      |
+      `-----.
+            |
+         .--+----------------------.
+         | managed interconnection |
+         `------------+------------&#39;
+                      |
+                 .----+-----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<p>In this mode, interconnection must be configured by the application to
+enable VF communication, for instance by explicitly directing traffic with a
+given destination MAC address to VF 1 and allowing that with the same source
+MAC address to come out of it.</p>
+<p>For this to work, hypervisor applications need a way to refer to either VF 1
+or VF 2 in addition to the PF. This is addressed by <a class="reference internal" href="#vf-representors">VF representors</a>.</p>
+</section>
+<section id="vf-representors">
+<h3><a class="toc-backref" href="#id13"><span class="section-number">16.5.2. </span>VF Representors</a></h3>
+<p>VF representors are virtual but standard DPDK network devices (albeit with
+limited capabilities) created by PMDs when managing a PF device.</p>
+<p>Since they represent VF instances used by other applications, configuring
+them (e.g. assigning a MAC address or setting up promiscuous mode) affects
+interconnection accordingly. If supported, they may also be used as two-way
+communication ports with VFs (assuming <strong>switchdev</strong> topology)</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+---+---+--&#39;                 `----------+--&#39; `--+----------&#39;
+      |   |   |                               |       |
+      |   |   `-------------------.           |       |
+      |   `---------.             |           |       |
+      |             |             |           |       |
+.-----+-----. .-----+-----. .-----+-----.     |       |
+| port_id 3 | | port_id 4 | | port_id 5 |     |       |
+`-----+-----&#39; `-----+-----&#39; `-----+-----&#39;     |       |
+      |             |             |           |       |
+    .-+--.    .-----+-----. .-----+-----. .---+--. .--+---.
+    | PF |    | VF 1 rep. | | VF 2 rep. | | VF 1 | | VF 2 |
+    `-+--&#39;    `-----+-----&#39; `-----+-----&#39; `---+--&#39; `--+---&#39;
+      |             |             |           |       |
+      |             |   .---------&#39;           |       |
+      `-----.       |   |   .-----------------&#39;       |
+            |       |   |   |   .---------------------&#39;
+            |       |   |   |   |
+         .--+-------+---+---+---+--.
+         | managed interconnection |
+         `------------+------------&#39;
+                      |
+                 .----+-----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>VF representors are assigned arbitrary port indices 4 and 5 in the
+hypervisor application and are respectively associated with VF 1 and VF 2.</p></li>
+<li><p>They can’t be dissociated; even if VF 1 and VF 2 were not connected,
+representors could still be used for configuration.</p></li>
+<li><p>In this context, port index 3 can be thought as a representor for physical
+port 0.</p></li>
+</ul>
+<p>As previously described, the “interconnection” block represents a logical
+concept. Interconnection occurs when hardware configuration enables traffic
+flows from one place to another (e.g. physical port 0 to VF 1) according to
+some criteria.</p>
+<p>This is discussed in more detail in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p>
+</section>
+<section id="traffic-steering">
+<h3><a class="toc-backref" href="#id14"><span class="section-number">16.5.3. </span>Traffic Steering</a></h3>
+<p>In the following diagram, each meaningful traffic origin or endpoint as seen
+by the hypervisor application is tagged with a unique letter from A to F.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+---+---+--&#39;                 `----------+--&#39; `--+----------&#39;
+      |   |   |                               |       |
+      |   |   `-------------------.           |       |
+      |   `---------.             |           |       |
+      |             |             |           |       |
+.----(A)----. .----(B)----. .----(C)----.     |       |
+| port_id 3 | | port_id 4 | | port_id 5 |     |       |
+`-----+-----&#39; `-----+-----&#39; `-----+-----&#39;     |       |
+      |             |             |           |       |
+    .-+--.    .-----+-----. .-----+-----. .---+--. .--+---.
+    | PF |    | VF 1 rep. | | VF 2 rep. | | VF 1 | | VF 2 |
+    `-+--&#39;    `-----+-----&#39; `-----+-----&#39; `--(D)-&#39; `-(E)--&#39;
+      |             |             |           |       |
+      |             |   .---------&#39;           |       |
+      `-----.       |   |   .-----------------&#39;       |
+            |       |   |   |   .---------------------&#39;
+            |       |   |   |   |
+         .--+-------+---+---+---+--.
+         | managed interconnection |
+         `------------+------------&#39;
+                      |
+                 .---(F)----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>A</strong>: PF device.</p></li>
+<li><p><strong>B</strong>: port representor for VF 1.</p></li>
+<li><p><strong>C</strong>: port representor for VF 2.</p></li>
+<li><p><strong>D</strong>: VF 1 proper.</p></li>
+<li><p><strong>E</strong>: VF 2 proper.</p></li>
+<li><p><strong>F</strong>: physical port.</p></li>
+</ul>
+<p>Although uncommon, some devices do not enforce a one to one mapping between
+PF and physical ports. For instance, by default all ports of <strong>mlx4</strong>
+adapters are available to all their PF/VF instances, in which case
+additional ports appear next to <strong>F</strong> in the above diagram.</p>
+<p>Assuming no interconnection is provided by default in this mode, setting up
+a <a class="reference internal" href="#basic-sr-iov">basic SR-IOV</a> configuration involving physical port 0 could be broken
+down as:</p>
+<p>PF:</p>
+<ul class="simple">
+<li><p><strong>A to F</strong>: let everything through.</p></li>
+<li><p><strong>F to A</strong>: PF MAC as destination.</p></li>
+</ul>
+<p>VF 1:</p>
+<ul class="simple">
+<li><p><strong>A to D</strong>, <strong>E to D</strong> and <strong>F to D</strong>: VF 1 MAC as destination.</p></li>
+<li><p><strong>D to A</strong>: VF 1 MAC as source and PF MAC as destination.</p></li>
+<li><p><strong>D to E</strong>: VF 1 MAC as source and VF 2 MAC as destination.</p></li>
+<li><p><strong>D to F</strong>: VF 1 MAC as source.</p></li>
+</ul>
+<p>VF 2:</p>
+<ul class="simple">
+<li><p><strong>A to E</strong>, <strong>D to E</strong> and <strong>F to E</strong>: VF 2 MAC as destination.</p></li>
+<li><p><strong>E to A</strong>: VF 2 MAC as source and PF MAC as destination.</p></li>
+<li><p><strong>E to D</strong>: VF 2 MAC as source and VF 1 MAC as destination.</p></li>
+<li><p><strong>E to F</strong>: VF 2 MAC as source.</p></li>
+</ul>
+<p>Devices may additionally support advanced matching criteria such as
+IPv4/IPv6 addresses or TCP/UDP ports.</p>
+<p>The combination of matching criteria with target endpoints fits well with
+<strong>rte_flow</strong> <a class="footnote-reference brackets" href="#id4" id="id3">6</a>, which expresses flow rules as combinations of patterns
+and actions.</p>
+<p>Enhancing <strong>rte_flow</strong> with the ability to make flow rules match and target
+these endpoints provides a standard interface to manage their
+interconnection without introducing new concepts and whole new API to
+implement them. This is described in <a class="reference internal" href="#flow-api-rte-flow">flow API (rte_flow)</a>.</p>
+<dl class="footnote brackets">
+<dt class="label" id="id4"><span class="brackets"><a class="fn-backref" href="#id3">6</a></span></dt>
+<dd><p><a class="reference internal" href="rte_flow.html"><span class="doc">Generic flow API (rte_flow)</span></a></p>
+</dd>
+</dl>
+</section>
+</section>
+<section id="flow-api-rte-flow">
+<h2><a class="toc-backref" href="#id15"><span class="section-number">16.6. </span>Flow API (rte_flow)</a></h2>
+<section id="extensions">
+<h3><a class="toc-backref" href="#id16"><span class="section-number">16.6.1. </span>Extensions</a></h3>
+<p>Compared to creating a brand new dedicated interface, <strong>rte_flow</strong> was
+deemed flexible enough to manage representor traffic only with minor
+extensions:</p>
+<ul class="simple">
+<li><p>Using physical ports, PF, SF, VF or port representors as targets.</p></li>
+<li><p>Affecting traffic that is not necessarily addressed to the DPDK port ID a
+flow rule is associated with (e.g. forcing VF traffic redirection to PF).</p></li>
+</ul>
+<p>For advanced uses:</p>
+<ul class="simple">
+<li><p>Rule-based packet counters.</p></li>
+<li><p>The ability to combine several identical actions for traffic duplication
+(e.g. VF representor in addition to a physical port).</p></li>
+<li><p>Dedicated actions for traffic encapsulation / decapsulation before
+reaching an endpoint.</p></li>
+</ul>
+</section>
+<section id="traffic-direction">
+<h3><a class="toc-backref" href="#id17"><span class="section-number">16.6.2. </span>Traffic Direction</a></h3>
+<p>From an application standpoint, “ingress” and “egress” flow rule attributes
+apply to the DPDK port ID they are associated with. They select a traffic
+direction for matching patterns, but have no impact on actions.</p>
+<p>When matching traffic coming from or going to a different place than the
+immediate port ID a flow rule is associated with, these attributes keep
+their meaning while applying to the chosen origin, as highlighted by the
+following diagram</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+---+---+--&#39;                 `----------+--&#39; `--+----------&#39;
+      |   |   |                               |       |
+      |   |   `-------------------.           |       |
+      |   `---------.             |           |       |
+      | ^           | ^           | ^         |       |
+      | | ingress   | | ingress   | | ingress |       |
+      | | egress    | | egress    | | egress  |       |
+      | v           | v           | v         |       |
+.----(A)----. .----(B)----. .----(C)----.     |       |
+| port_id 3 | | port_id 4 | | port_id 5 |     |       |
+`-----+-----&#39; `-----+-----&#39; `-----+-----&#39;     |       |
+      |             |             |           |       |
+    .-+--.    .-----+-----. .-----+-----. .---+--. .--+---.
+    | PF |    | VF 1 rep. | | VF 2 rep. | | VF 1 | | VF 2 |
+    `-+--&#39;    `-----+-----&#39; `-----+-----&#39; `--(D)-&#39; `-(E)--&#39;
+      |             |             |         ^ |       | ^
+      |             |             |  egress | |       | | egress
+      |             |             | ingress | |       | | ingress
+      |             |   .---------&#39;         v |       | v
+      `-----.       |   |   .-----------------&#39;       |
+            |       |   |   |   .---------------------&#39;
+            |       |   |   |   |
+         .--+-------+---+---+---+--.
+         | managed interconnection |
+         `------------+------------&#39;
+                    ^ |
+            ingress | |
+             egress | |
+                    v |
+                 .---(F)----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<p>Ingress and egress are defined as relative to the application creating the
+flow rule.</p>
+<p>For instance, matching traffic sent by VM 2 would be done through an ingress
+flow rule on VF 2 (<strong>E</strong>). Likewise for incoming traffic on physical port
+(<strong>F</strong>). This also applies to <strong>C</strong> and <strong>A</strong> respectively.</p>
+</section>
+<section id="transferring-traffic">
+<h3><a class="toc-backref" href="#id18"><span class="section-number">16.6.3. </span>Transferring Traffic</a></h3>
+<section id="without-port-representors">
+<h4><a class="toc-backref" href="#id19"><span class="section-number">16.6.3.1. </span>Without Port Representors</a></h4>
+<p><a class="reference internal" href="#traffic-direction">Traffic direction</a> describes how an application could match traffic coming
+from or going to a specific place reachable from a DPDK port ID. This makes
+sense when the traffic in question is normally seen (i.e. sent or received)
+by the application creating the flow rule.</p>
+<p>However, if there is an entity (VF <strong>D</strong>, for instance) not associated with
+a DPDK port (representor), the application (<strong>A</strong>) won’t be able to match
+traffic generated by such entity. The traffic goes directly to its
+default destination (to physical port <strong>F</strong>, for instance).</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>.-------------. .-------------.
+| hypervisor  | |    VM 1     |
+| application | | application |
+`------+------&#39; `--+----------&#39;
+       |           | | traffic
+ .----(A)----.     | v
+ | port_id 3 |     |
+ `-----+-----&#39;     |
+       |           |
+       |           |
+     .-+--.    .---+--.
+     | PF |    | VF 1 |
+     `-+--&#39;    `--(D)-&#39;
+       |           | | traffic
+       |           | v
+    .--+-----------+--.
+    | interconnection |
+    `--------+--------&#39;
+             | | traffic
+             | v
+        .---(F)----.
+        | physical |
+        |  port 0  |
+        `----------&#39;
+</pre></div>
+</div>
+</section>
+<section id="with-port-representors">
+<h4><a class="toc-backref" href="#id20"><span class="section-number">16.6.3.2. </span>With Port Representors</a></h4>
+<p>When port representors exist, implicit flow rules with the “transfer”
+attribute (described in <a class="reference internal" href="#without-port-representors">without port representors</a>) are be assumed to
+exist between them and their represented resources. These may be immutable.</p>
+<p>In this case, traffic is received by default through the representor and
+neither the “transfer” attribute nor traffic origin in flow rule patterns
+are necessary. They simply have to be created on the representor port
+directly and may target a different representor as described
+in <a class="reference internal" href="#port-representor-action">PORT_REPRESENTOR Action</a>.</p>
+<p>Implicit traffic flow with port representor</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.   .-------------.
+   | hypervisor  |   |    VM 1     |
+   | application |   | application |
+   `--+-------+--&#39;   `----------+--&#39;
+      |       | ^               | | traffic
+      |       | | traffic       | v
+      |       `-----.           |
+      |             |           |
+.----(A)----. .----(B)----.     |
+| port_id 3 | | port_id 4 |     |
+`-----+-----&#39; `-----+-----&#39;     |
+      |             |           |
+    .-+--.    .-----+-----. .---+--.
+    | PF |    | VF 1 rep. | | VF 1 |
+    `-+--&#39;    `-----+-----&#39; `--(D)-&#39;
+      |             |           |
+   .--|-------------|-----------|--.
+   |  |             |           |  |
+   |  |             `-----------&#39;  |
+   |  |              &lt;-- traffic   |
+   `--|----------------------------&#39;
+      |
+ .---(F)----.
+ | physical |
+ |  port 0  |
+ `----------&#39;
+</pre></div>
+</div>
+</section>
+</section>
+<section id="pattern-items-and-actions">
+<h3><a class="toc-backref" href="#id21"><span class="section-number">16.6.4. </span>Pattern Items And Actions</a></h3>
+<section id="port-representor-pattern-item">
+<h4><a class="toc-backref" href="#id22"><span class="section-number">16.6.4.1. </span>PORT_REPRESENTOR Pattern Item</a></h4>
+<p>Matches traffic entering the embedded switch from the given ethdev.</p>
+<ul class="simple">
+<li><p>Matches <strong>A</strong>, <strong>B</strong> or <strong>C</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="port-representor-action">
+<h4><a class="toc-backref" href="#id23"><span class="section-number">16.6.4.2. </span>PORT_REPRESENTOR Action</a></h4>
+<p>At embedded switch level, sends matching traffic to the given ethdev.</p>
+<ul class="simple">
+<li><p>Targets <strong>A</strong>, <strong>B</strong> or <strong>C</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="represented-port-pattern-item">
+<h4><a class="toc-backref" href="#id24"><span class="section-number">16.6.4.3. </span>REPRESENTED_PORT Pattern Item</a></h4>
+<p>Matches traffic entering the embedded switch from
+the entity represented by the given ethdev.</p>
+<ul class="simple">
+<li><p>Matches <strong>D</strong>, <strong>E</strong> or <strong>F</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="represented-port-action">
+<h4><a class="toc-backref" href="#id25"><span class="section-number">16.6.4.4. </span>REPRESENTED_PORT Action</a></h4>
+<p>At embedded switch level, send matching traffic to
+the entity represented by the given ethdev.</p>
+<ul class="simple">
+<li><p>Targets <strong>D</strong>, <strong>E</strong> or <strong>F</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="port-pattern-item">
+<h4><a class="toc-backref" href="#id26"><span class="section-number">16.6.4.5. </span>PORT Pattern Item</a></h4>
+<p>Matches traffic originating from (ingress) or going to (egress) a physical
+port of the underlying device.</p>
+<p>Using this pattern item without specifying a port index matches the physical
+port associated with the current DPDK port ID by default. As described in
+<a class="reference internal" href="#traffic-steering">traffic steering</a>, specifying it should be rarely needed.</p>
+<ul class="simple">
+<li><p>Matches <strong>F</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="port-action">
+<h4><a class="toc-backref" href="#id27"><span class="section-number">16.6.4.6. </span>PORT Action</a></h4>
+<p>Directs matching traffic to a given physical port index.</p>
+<ul class="simple">
+<li><p>Targets <strong>F</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="port-id-pattern-item">
+<h4><a class="toc-backref" href="#id28"><span class="section-number">16.6.4.7. </span>PORT_ID Pattern Item</a></h4>
+<p>Matches traffic originating from (ingress) or going to (egress) a given DPDK
+port ID.</p>
+<p>Normally only supported if the port ID in question is known by the
+underlying PMD and related to the device the flow rule is created against.</p>
+<p>This must not be confused with the <a class="reference internal" href="#port-pattern-item">PORT pattern item</a> which refers to the
+physical port of a device. <code class="docutils literal notranslate"><span class="pre">PORT_ID</span></code> refers to a <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_dev</span></code>
+object on the application side (also known as “port representor” depending
+on the kind of underlying device).</p>
+<ul class="simple">
+<li><p>Matches <strong>A</strong>, <strong>B</strong> or <strong>C</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="port-id-action">
+<h4><a class="toc-backref" href="#id29"><span class="section-number">16.6.4.8. </span>PORT_ID Action</a></h4>
+<p>Directs matching traffic to a given DPDK port ID.</p>
+<p>Same restrictions as <a class="reference internal" href="#port-id-pattern-item">PORT_ID pattern item</a>.</p>
+<ul class="simple">
+<li><p>Targets <strong>A</strong>, <strong>B</strong> or <strong>C</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="pf-action">
+<h4><a class="toc-backref" href="#id30"><span class="section-number">16.6.4.9. </span>PF Action</a></h4>
+<p>Directs matching traffic to the physical function of the current device.</p>
+<ul class="simple">
+<li><p>Targets <strong>A</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="vf-pattern-item">
+<h4><a class="toc-backref" href="#id31"><span class="section-number">16.6.4.10. </span>VF Pattern Item</a></h4>
+<p>Matches traffic originating from (ingress) or going to (egress) a given
+virtual function of the current device.</p>
+<p>If supported, should work even if the virtual function is not managed by
+the application and thus not associated with a DPDK port ID. Its behavior is
+otherwise similar to <a class="reference internal" href="#port-id-pattern-item">PORT_ID pattern item</a> using VF port ID.</p>
+<p>Note this pattern item does not match VF representors traffic which, as
+separate entities, should be addressed through their own port IDs.</p>
+<ul class="simple">
+<li><p>Matches <strong>D</strong> or <strong>E</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="vf-action">
+<h4><a class="toc-backref" href="#id32"><span class="section-number">16.6.4.11. </span>VF Action</a></h4>
+<p>Directs matching traffic to a given virtual function of the current device.</p>
+<p>Same restrictions as <a class="reference internal" href="#vf-pattern-item">VF pattern item</a>.</p>
+<ul class="simple">
+<li><p>Targets <strong>D</strong> or <strong>E</strong> in <a class="reference internal" href="#traffic-steering">traffic steering</a>.</p></li>
+</ul>
+</section>
+<section id="encap-actions">
+<h4><a class="toc-backref" href="#id33"><span class="section-number">16.6.4.12. </span>*_ENCAP actions</a></h4>
+<p>These actions are named according to the protocol they encapsulate traffic
+with (e.g. <code class="docutils literal notranslate"><span class="pre">VXLAN_ENCAP</span></code>) and using specific parameters (e.g. VNI for
+VXLAN).</p>
+<p>While they modify traffic and can be used multiple times (order matters),
+unlike <a class="reference internal" href="#port-representor-action">PORT_REPRESENTOR Action</a> and friends, they don’t impact on steering.</p>
+<p>As described in <a class="reference internal" href="#actions-order-and-repetition">actions order and repetition</a> this means they are useless
+if used alone in an action list, the resulting traffic gets dropped unless
+combined with either <code class="docutils literal notranslate"><span class="pre">PASSTHRU</span></code> or other endpoint-targeting actions.</p>
+</section>
+<section id="decap-actions">
+<h4><a class="toc-backref" href="#id34"><span class="section-number">16.6.4.13. </span>*_DECAP actions</a></h4>
+<p>They perform the reverse of <a class="reference internal" href="#encap-actions">*_ENCAP actions</a> by popping protocol headers
+from traffic instead of pushing them. They can be used multiple times as
+well.</p>
+<p>Note that using these actions on non-matching traffic results in undefined
+behavior. It is recommended to match the protocol headers to decapsulate on
+the pattern side of a flow rule in order to use these actions or otherwise
+make sure only matching traffic goes through.</p>
+</section>
+</section>
+<section id="actions-order-and-repetition">
+<h3><a class="toc-backref" href="#id35"><span class="section-number">16.6.5. </span>Actions Order and Repetition</a></h3>
+<p>Flow rules are currently restricted to at most a single action of each
+supported type, performed in an unpredictable order (or all at once). To
+repeat actions in a predictable fashion, applications have to make rules
+pass-through and use priority levels.</p>
+<p>It’s now clear that PMD support for chaining multiple non-terminating flow
+rules of varying priority levels is prohibitively difficult to implement
+compared to simply allowing multiple identical actions performed in a
+defined order by a single flow rule.</p>
+<ul class="simple">
+<li><p>This change is required to support protocol encapsulation offloads and the
+ability to perform them multiple times (e.g. VLAN then VXLAN).</p></li>
+<li><p>It makes the <code class="docutils literal notranslate"><span class="pre">DUP</span></code> action redundant since multiple <code class="docutils literal notranslate"><span class="pre">QUEUE</span></code> actions can
+be combined for duplication.</p></li>
+<li><p>The (non-)terminating property of actions must be discarded. Instead, flow
+rules themselves must be considered terminating by default (i.e. dropping
+traffic if there is no specific target) unless a <code class="docutils literal notranslate"><span class="pre">PASSTHRU</span></code> action is
+also specified.</p></li>
+</ul>
+</section>
+</section>
+<section id="switching-examples">
+<h2><a class="toc-backref" href="#id36"><span class="section-number">16.7. </span>Switching Examples</a></h2>
+<p>This section provides practical examples based on the established testpmd
+flow command syntax <a class="footnote-reference brackets" href="#id6" id="id5">2</a>, in the context described in <a class="reference internal" href="#traffic-steering">traffic steering</a></p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>   .-------------.                 .-------------. .-------------.
+   | hypervisor  |                 |    VM 1     | |    VM 2     |
+   | application |                 | application | | application |
+   `--+---+---+--&#39;                 `----------+--&#39; `--+----------&#39;
+      |   |   |                               |       |
+      |   |   `-------------------.           |       |
+      |   `---------.             |           |       |
+      |             |             |           |       |
+.----(A)----. .----(B)----. .----(C)----.     |       |
+| port_id 3 | | port_id 4 | | port_id 5 |     |       |
+`-----+-----&#39; `-----+-----&#39; `-----+-----&#39;     |       |
+      |             |             |           |       |
+    .-+--.    .-----+-----. .-----+-----. .---+--. .--+---.
+    | PF |    | VF 1 rep. | | VF 2 rep. | | VF 1 | | VF 2 |
+    `-+--&#39;    `-----+-----&#39; `-----+-----&#39; `--(D)-&#39; `-(E)--&#39;
+      |             |             |           |       |
+      |             |   .---------&#39;           |       |
+      `-----.       |   |   .-----------------&#39;       |
+            |       |   |   |   .---------------------&#39;
+            |       |   |   |   |
+         .--|-------|---|---|---|--.
+         |  |       |   `---|---&#39;  |
+         |  |       `-------&#39;      |
+         |  `---------.            |
+         `------------|------------&#39;
+                      |
+                 .---(F)----.
+                 | physical |
+                 |  port 0  |
+                 `----------&#39;
+</pre></div>
+</div>
+<p>By default, PF (<strong>A</strong>) can communicate with the physical port it is
+associated with (<strong>F</strong>), while VF 1 (<strong>D</strong>) and VF 2 (<strong>E</strong>) are isolated
+and restricted to communicate with the hypervisor application through their
+respective representors (<strong>B</strong> and <strong>C</strong>) if supported.</p>
+<p>Examples in subsequent sections apply to hypervisor applications only and
+are based on port representors <strong>A</strong>, <strong>B</strong> and <strong>C</strong>.</p>
+<dl class="footnote brackets">
+<dt class="label" id="id6"><span class="brackets"><a class="fn-backref" href="#id5">2</a></span></dt>
+<dd><p><a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html#testpmd-rte-flow"><span class="std std-ref">Flow syntax</span></a></p>
+</dd>
+</dl>
+<section id="associating-vf-1-with-physical-port-0">
+<h3><a class="toc-backref" href="#id37"><span class="section-number">16.7.1. </span>Associating VF 1 with Physical Port 0</a></h3>
+<p>Assign all port traffic (<strong>F</strong>) to VF 1 (<strong>D</strong>) indiscriminately through
+their representors</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern represented_port ethdev_port_id is 3 / end
+   actions represented_port ethdev_port_id 4 / end
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern represented_port ethdev_port_id is 4 / end
+   actions represented_port ethdev_port_id 3 / end
+</pre></div>
+</div>
+</section>
+<section id="sharing-broadcasts">
+<h3><a class="toc-backref" href="#id38"><span class="section-number">16.7.2. </span>Sharing Broadcasts</a></h3>
+<p>From outside to PF and VFs</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern
+      represented_port ethdev_port_id is 3 /
+      eth dst is ff:ff:ff:ff:ff:ff /
+      end
+   actions
+      port_representor ethdev_port_id 3 /
+      represented_port ethdev_port_id 4 /
+      represented_port ethdev_port_id 5 /
+      end
+</pre></div>
+</div>
+<p>Note <code class="docutils literal notranslate"><span class="pre">port_representor</span> <span class="pre">ethdev_port_id</span> <span class="pre">3</span></code> is necessary otherwise only VFs would receive matching
+traffic.</p>
+<p>From PF to outside and VFs</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern
+      port_representor ethdev_port_id is 3 /
+      eth dst is ff:ff:ff:ff:ff:ff /
+      end
+   actions
+      represented_port ethdev_port_id 3 /
+      represented_port ethdev_port_id 4 /
+      represented_port ethdev_port_id 5 /
+      end
+</pre></div>
+</div>
+<p>From VFs to outside and PF</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern
+      represented_port ethdev_port_id is 4 /
+      eth dst is ff:ff:ff:ff:ff:ff /
+      end
+   actions
+      represented_port ethdev_port_id 3 /
+      port_representor ethdev_port_id 3 /
+      end
+
+flow create 3 transfer
+   pattern
+      represented_port ethdev_port_id is 5 /
+      eth dst is ff:ff:ff:ff:ff:ff /
+      end
+   actions
+      represented_port ethdev_port_id 3 /
+      port_representor ethdev_port_id 3 /
+      end
+</pre></div>
+</div>
+<p>Similar <code class="docutils literal notranslate"><span class="pre">33:33:*</span></code> rules based on known MAC addresses should be added for
+IPv6 traffic.</p>
+</section>
+<section id="encapsulating-vf-2-traffic-in-vxlan">
+<h3><a class="toc-backref" href="#id39"><span class="section-number">16.7.3. </span>Encapsulating VF 2 Traffic in VXLAN</a></h3>
+<p>Assuming pass-through flow rules are supported</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 5 ingress
+   pattern eth / end
+   actions vxlan_encap vni 42 / passthru / end
+</pre></div>
+</div>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 5 egress
+   pattern vxlan vni is 42 / end
+   actions vxlan_decap / passthru / end
+</pre></div>
+</div>
+<p>Here <code class="docutils literal notranslate"><span class="pre">passthru</span></code> is needed since as described in <a class="reference internal" href="#actions-order-and-repetition">actions order and
+repetition</a>, flow rules are otherwise terminating; if supported, a rule
+without a target endpoint will drop traffic.</p>
+<p>Without pass-through support, ingress encapsulation on the destination
+endpoint might not be supported and action list must provide one</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 3 transfer
+   pattern represented_port ethdev_port_id is 5 / end
+   actions vxlan_encap vni 42 / represented_port ethdev_port_id 3 / end
+
+flow create 3 transfer
+   pattern
+      represented_port ethdev_port_id is 3 /
+      vxlan vni is 42 /
+      end
+   actions vxlan_decap / represented_port ethdev_port_id 5 / end
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="rte_flow.html" title="previous chapter"><span class="section-number">15. </span>Generic flow API (rte_flow)</a></li>
+      <li>Next: <a href="traffic_metering_and_policing.html" title="next chapter"><span class="section-number">17. </span>Traffic Metering and Policing API</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/switch_representation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,1091 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>11. DPDK Release 20.11 &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="12. DPDK Release 20.08" href="release_20_08.html" />
+    <link rel="prev" title="10. DPDK Release 21.02" href="release_21_02.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-release-20-11">
+<h1><span class="section-number">11. </span>DPDK Release 20.11</h1>
+<section id="new-features">
+<h2><span class="section-number">11.1. </span>New Features</h2>
+<ul>
+<li><p><strong>Added write combining store APIs.</strong></p>
+<p>Added <code class="docutils literal notranslate"><span class="pre">rte_write32_wc</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_write32_wc_relaxed</span></code> APIs
+that enable write combining stores (depending on architecture).
+The functions are provided as a generic stub and
+x86 specific implementation.</p>
+</li>
+<li><p><strong>Added prefetch with intention to write APIs.</strong></p>
+<p>Added new prefetch function variants e.g. <code class="docutils literal notranslate"><span class="pre">rte_prefetch0_write</span></code>,
+which allow the programmer to prefetch a cache line and also indicate
+the intention to write.</p>
+</li>
+<li><p><strong>Added the rte_cldemote API.</strong></p>
+<p>Added a hardware hint CLDEMOTE, which is similar to prefetch in reverse.
+CLDEMOTE moves the cache line to the more remote cache, where it expects
+sharing to be efficient. Moving the cache line to a level more distant from
+the processor helps to accelerate core-to-core communication.
+This API is specific to x86 and implemented as a stub for other
+architectures.</p>
+</li>
+<li><p><strong>Added support for limiting maximum SIMD bitwidth.</strong></p>
+<p>Added a new EAL config setting <code class="docutils literal notranslate"><span class="pre">max_simd_bitwidth</span></code> to limit the vector
+path selection at runtime. This value can be set by apps using the
+<code class="docutils literal notranslate"><span class="pre">rte_vect_set_max_simd_bitwidth</span></code> function, or by the user with EAL flag
+<code class="docutils literal notranslate"><span class="pre">--force-max-simd-bitwidth</span></code>.</p>
+</li>
+<li><p><strong>Added zero copy APIs for rte_ring.</strong></p>
+<p>For rings with producer/consumer in <code class="docutils literal notranslate"><span class="pre">RTE_RING_SYNC_ST</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_RING_SYNC_MT_HTS</span></code>
+modes, these APIs split enqueue/dequeue operation into three phases
+(enqueue/dequeue start, copy data to/from ring, enqueue/dequeue finish).
+Along with the advantages of the peek APIs, these provide the ability to
+copy the data to the ring memory directly without the need for temporary
+storage.</p>
+</li>
+<li><p><strong>Updated CRC modules of the net library.</strong></p>
+<ul class="simple">
+<li><p>Added runtime selection of the optimal architecture-specific CRC path.</p></li>
+<li><p>Added optimized implementations of CRC32-Ethernet and CRC16-CCITT
+using the AVX512 and VPCLMULQDQ instruction sets.</p></li>
+</ul>
+</li>
+<li><p><strong>Introduced extended buffer description for receiving.</strong></p>
+<p>Added the extended Rx buffer description for Rx queue setup routine
+providing the individual settings for each Rx segment with maximal size,
+buffer offset and memory pool to allocate data buffers from.</p>
+</li>
+<li><p><strong>Added the FEC API, for a generic FEC query and config.</strong></p>
+<p>Added the FEC API which provides functions for query FEC capabilities and
+current FEC mode from device. An API for configuring FEC mode is also provided.</p>
+</li>
+<li><p><strong>Added thread safety to rte_flow functions.</strong></p>
+<p>Added the <code class="docutils literal notranslate"><span class="pre">RTE_ETH_DEV_FLOW_OPS_THREAD_SAFE</span></code> device flag to indicate
+whether a PMD supports thread safe operations. If the PMD doesn’t set the flag,
+the rte_flow API level functions will protect the flow operations with a mutex.</p>
+</li>
+<li><p><strong>Added flow-based traffic sampling support.</strong></p>
+<p>Added a new action <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SAMPLE</span></code> that will sample the
+incoming traffic and send a duplicated traffic with the specified ratio to
+the application, while the original packet will continue to the target
+destination.</p>
+<p>The packets sampling is ‘1/ratio’. A ratio value set to 1 means that the
+packets will be completely mirrored. The sample packet can be assigned with
+a different set of actions than the original packet.</p>
+</li>
+<li><p><strong>Added support of shared action in flow API.</strong></p>
+<p>Added shared action support to use single flow actions in multiple flow
+rules. An update to the shared action configuration alters the behavior of all
+flow rules using it.</p>
+<ul class="simple">
+<li><p>Added a new action: <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SHARED</span></code> to use shared action
+as a flow action.</p></li>
+<li><p>Added new flow APIs to create/update/destroy/query shared actions.</p></li>
+</ul>
+</li>
+<li><p><strong>Added support to flow rules to allow private PMD items/actions.</strong></p>
+<ul class="simple">
+<li><p>Flow rule verification has been  updated to accept private PMD
+items and actions.</p></li>
+</ul>
+</li>
+<li><p><strong>Added a generic API to offload tunneled traffic and restore missed packets.</strong></p>
+<ul class="simple">
+<li><p>Added a new hardware independent helper to the flow API that
+offloads tunneled traffic and restores missed packets.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the ethdev library to support hairpin between two ports.</strong></p>
+<p>New APIs have been introduced to support binding / unbinding of 2 ports in a
+hairpin configuration. The hairpin Tx part flow rules can be inserted
+explicitly. A new API has been added to get the hairpin peer ports list.</p>
+</li>
+<li><p><strong>Updated the Amazon ena driver.</strong></p>
+<p>Updated the ena PMD with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added network interface metrics which can be read using xstats.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Broadcom bnxt driver.</strong></p>
+<p>Updated the Broadcom bnxt driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added support for 200G PAM4 link speed.</p></li>
+<li><p>Added support for RSS hash level selection.</p></li>
+<li><p>Updated HWRM structures to 1.10.1.70 version.</p></li>
+<li><p>Added TRUFLOW support for Stingray devices.</p></li>
+<li><p>Added support for representors on MAIA cores of SR.</p></li>
+<li><p>Added support for VXLAN decap offload using rte_flow.</p></li>
+<li><p>Added support to indicate native rte_flow API thread safety.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Cisco enic driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for VF representors with single-queue Tx/Rx and flow API</p></li>
+<li><p>Added support for egress PORT_ID action</p></li>
+<li><p>Added support for non-zero priorities for group 0 flows</p></li>
+<li><p>Added support for VXLAN decap combined with VLAN pop</p></li>
+</ul>
+</li>
+<li><p><strong>Added hns3 FEC PMD, for supporting query and config FEC mode.</strong></p>
+<p>Added the FEC PMD which provides functions for querying FEC capabilities and
+current FEC mode from a device. A PMD for configuring FEC mode is also provided.</p>
+</li>
+<li><p><strong>Updated the Intel iavf driver.</strong></p>
+<p>Updated the iavf PMD with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added support for flexible descriptor metadata extraction.</p></li>
+<li><p>Added support for outer IP hash of GTPC and GTPU.</p></li>
+<li><p>Added support of AVX512 instructions in Rx and Tx path.</p></li>
+<li><p>Added support for up to 256 queue pairs per VF.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel ixgbe driver.</strong></p>
+<p>Updated the Intel ixgbe driver to use write combining stores.</p>
+</li>
+<li><p><strong>Updated Intel i40e driver.</strong></p>
+<p>Updated the Intel i40e driver to use write combining stores.</p>
+</li>
+<li><p><strong>Updated Intel ice driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for write combining stores.</p></li>
+<li><p>Added ACL filter support for the Intel DCF.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Mellanox mlx5 driver.</strong></p>
+<p>Updated the Mellanox mlx5 driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added vectorized Multi-Packet Rx Queue burst.</p></li>
+<li><p>Added support for 2 new miniCQE formats: Flow Tag and L3/L4 header.</p></li>
+<li><p>Added support for PMD level multiple-thread flow insertion.</p></li>
+<li><p>Added support for matching on fragmented/non-fragmented IPv4/IPv6 packets.</p></li>
+<li><p>Added support for QinQ packets matching.</p></li>
+<li><p>Added support for the new VLAN fields <code class="docutils literal notranslate"><span class="pre">has_vlan</span></code> in the Ethernet item
+and <code class="docutils literal notranslate"><span class="pre">has_more_vlan</span></code> in the VLAN item.</p></li>
+<li><p>Updated the supported timeout for Age action to the maximal value supported
+by the rte_flow API.</p></li>
+<li><p>Added support for Age action query.</p></li>
+<li><p>Added support for multi-ports hairpin.</p></li>
+<li><p>Allow unknown link speed.</p></li>
+</ul>
+<p>Updated Mellanox mlx5 vDPA driver:</p>
+<ul class="simple">
+<li><p>Added support of vDPA VirtQ error handling.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Solarflare network PMD.</strong></p>
+<p>Updated the Solarflare <code class="docutils literal notranslate"><span class="pre">sfc_efx</span></code> driver with changes including:</p>
+<ul class="simple">
+<li><p>Added SR-IOV PF support</p></li>
+<li><p>Added Alveo SN1000 SmartNICs (EF100 architecture) support including
+flow API transfer rules for switch HW offload</p></li>
+<li><p>Added ARMv8 support</p></li>
+<li><p>Claimed flow API native thread safety</p></li>
+</ul>
+</li>
+<li><p><strong>Added Wangxun txgbe PMD.</strong></p>
+<p>Added a new PMD for Wangxun 10 Gigabit Ethernet NICs.</p>
+<p>See the <a class="reference internal" href="../nics/txgbe.html"><span class="doc">TXGBE Poll Mode Driver</span></a> for more details.</p>
+</li>
+<li><p><strong>Updated Virtio driver.</strong></p>
+<ul class="simple">
+<li><p>Added support for Vhost-vDPA backend to the Virtio-user PMD.</p></li>
+<li><p>Changed default link speed to unknown.</p></li>
+<li><p>Added support for the 200G link speed.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Memif PMD.</strong></p>
+<ul class="simple">
+<li><p>Added support for abstract socket addresses.</p></li>
+<li><p>Changed default socket address type to abstract.</p></li>
+</ul>
+</li>
+<li><p><strong>Added UDP/IPv4 GRO support for VxLAN and non-VxLAN packets.</strong></p>
+<p>For VxLAN packets, added inner UDP/IPv4 support.
+For non-VxLAN packets, added UDP/IPv4 support.</p>
+</li>
+<li><p><strong>Extended the flow-perf application.</strong></p>
+<ul class="simple">
+<li><p>Added support for user order instead of bit mask.
+Now the user can create any structure of rte_flow
+using the flow performance application with any order.
+Moreover the app also now starts to support inner
+items matching as well.</p></li>
+<li><p>Added header modify actions.</p></li>
+<li><p>Added flag action.</p></li>
+<li><p>Added raw encap/decap actions.</p></li>
+<li><p>Added VXLAN encap/decap actions.</p></li>
+<li><p>Added ICMP (code/type/identifier/sequence number) and ICMP6 (code/type) matching items.</p></li>
+<li><p>Added option to set port mask for insertion/deletion:
+<code class="docutils literal notranslate"><span class="pre">--portmask=N</span></code>
+where N represents the hexadecimal bitmask of the ports used.</p></li>
+</ul>
+</li>
+<li><p><strong>Added raw data-path APIs for cryptodev library.</strong></p>
+<p>Added raw data-path APIs to Cryptodev to help accelerate external libraries
+or applications which need to avail of fast cryptodev enqueue/dequeue
+operations but which do not necessarily need to depend on mbufs and
+cryptodev operation mempools.</p>
+</li>
+<li><p><strong>Updated the aesni_mb crypto PMD.</strong></p>
+<ul class="simple">
+<li><p>Added support for intel-ipsec-mb version 0.55.</p></li>
+<li><p>Added support for AES-ECB 128, 192 and 256.</p></li>
+<li><p>Added support for ZUC-EEA3/EIA3 algorithms.</p></li>
+<li><p>Added support for SNOW3G-UEA2/UIA2 algorithms.</p></li>
+<li><p>Added support for KASUMI-F8/F9 algorithms.</p></li>
+<li><p>Added support for Chacha20-Poly1305.</p></li>
+<li><p>Added support for AES-256 CCM algorithm.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the aesni_gcm crypto PMD.</strong></p>
+<ul class="simple">
+<li><p>Added SGL support for AES-GMAC.</p></li>
+</ul>
+</li>
+<li><p><strong>Added Broadcom BCMFS symmetric crypto PMD.</strong></p>
+<p>Added a symmetric crypto PMD for Broadcom FlexSparc crypto units.
+See <a class="reference internal" href="../cryptodevs/bcmfs.html"><span class="doc">Broadcom FlexSparc Crypto Poll Mode Driver</span></a> guide for more details on this new PMD.</p>
+</li>
+<li><p><strong>Updated NXP DPAA2_SEC crypto PMD.</strong></p>
+<ul class="simple">
+<li><p>Added DES-CBC support for cipher_only, chain and ipsec protocol.</p></li>
+<li><p>Added support for non-HMAC auth algorithms
+(MD5, SHA1, SHA224, SHA256, SHA384, SHA512).</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Marvell NITROX symmetric crypto PMD.</strong></p>
+<ul class="simple">
+<li><p>Added AES-GCM support.</p></li>
+<li><p>Added cipher only offload support.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Marvell OCTEON TX2 crypto PMD.</strong></p>
+<ul class="simple">
+<li><p>Updated the OCTEON TX2 crypto PMD lookaside protocol offload for IPsec with
+IPv6 support.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Intel QAT PMD.</strong></p>
+<ul class="simple">
+<li><p>Added Raw Data-path APIs support.</p></li>
+<li><p>Added support for write combining stores.</p></li>
+</ul>
+</li>
+<li><p><strong>Added Intel ACC100 bbdev PMD.</strong></p>
+<p>Added a new <code class="docutils literal notranslate"><span class="pre">acc100</span></code> bbdev driver for the Intel® ACC100 accelerator
+also known as Mount Bryce.  See the
+<a class="reference internal" href="../bbdevs/acc100.html"><span class="doc">Intel(R) ACC100 and ACC101 5G/4G FEC Poll Mode Drivers</span></a> BBDEV guide for more details on this new driver.</p>
+</li>
+<li><p><strong>Updated rte_security library to support SDAP.</strong></p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_security_pdcp_xform</span></code> in <code class="docutils literal notranslate"><span class="pre">rte_security</span></code> lib is updated to enable
+5G NR processing of SDAP headers in PMDs.</p>
+</li>
+<li><p><strong>Added Marvell OCTEON TX2 regex PMD.</strong></p>
+<p>Added a new PMD for the hardware regex offload block for OCTEON TX2 SoC.</p>
+<p>See <code class="docutils literal notranslate"><span class="pre">regexdevs/octeontx2</span></code> for more details.</p>
+</li>
+<li><p><strong>Updated Software Eventdev driver.</strong></p>
+<p>Added performance tuning arguments to allow tuning the scheduler for
+better throughput in high core count use cases.</p>
+</li>
+<li><p><strong>Added a new driver for the Intel Dynamic Load Balancer v1.0 device.</strong></p>
+<p>Added the new <code class="docutils literal notranslate"><span class="pre">dlb</span></code> eventdev driver for the Intel DLB V1.0 device.</p>
+</li>
+<li><p><strong>Added a new driver for the Intel Dynamic Load Balancer v2.0 device.</strong></p>
+<p>Added the new <code class="docutils literal notranslate"><span class="pre">dlb2</span></code> eventdev driver for the Intel DLB V2.0 device. See the
+<a class="reference internal" href="../eventdevs/dlb2.html"><span class="doc">Driver for the Intel® Dynamic Load Balancer (DLB)</span></a> eventdev guide for more details on this new driver.</p>
+</li>
+<li><p><strong>Added Ice Lake (Gen4) support for Intel NTB.</strong></p>
+<p>Added NTB device support (4th generation) for the Intel Ice Lake platform.</p>
+</li>
+<li><p><strong>Updated ioat rawdev driver.</strong></p>
+<p>The ioat rawdev driver has been updated and enhanced. Changes include:</p>
+<ul class="simple">
+<li><p>Added support for Intel® Data Streaming Accelerator hardware.  For
+more information, see <a class="reference external" href="https://01.org/blogs/2019/introducing-intel-data-streaming-accelerator">Introducing the Intel Data Streaming Accelerator
+(Intel DSA)</a>.</p></li>
+<li><p>Added support for the fill operation via the API <code class="docutils literal notranslate"><span class="pre">rte_ioat_enqueue_fill()</span></code>,
+where the hardware fills an area of memory with a repeating pattern.</p></li>
+<li><p>Added a per-device configuration flag to disable management
+of user-provided completion handles.</p></li>
+<li><p>Renamed the <code class="docutils literal notranslate"><span class="pre">rte_ioat_do_copies()</span></code> API to <code class="docutils literal notranslate"><span class="pre">rte_ioat_perform_ops()</span></code>,
+and renamed the <code class="docutils literal notranslate"><span class="pre">rte_ioat_completed_copies()</span></code> API to <code class="docutils literal notranslate"><span class="pre">rte_ioat_completed_ops()</span></code>
+to better reflect the APIs’ purposes, and remove the implication that
+they are limited to copy operations only.
+Note: The old API is still provided but marked as deprecated in the code.</p></li>
+<li><p>Added a new API <code class="docutils literal notranslate"><span class="pre">rte_ioat_fence()</span></code> to add a fence between operations.
+This API replaces the <code class="docutils literal notranslate"><span class="pre">fence</span></code> flag parameter in the <code class="docutils literal notranslate"><span class="pre">rte_ioat_enqueue_copies()</span></code> function,
+and is clearer as there is no ambiguity as to whether the flag should be
+set on the last operation before the fence or the first operation after it.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the pipeline library for alignment with the P4 language.</strong></p>
+<p>Added a new Software Switch (SWX) pipeline type that provides more
+flexibility through APIs and feature alignment with the P4 language.
+Some enhancements are:</p>
+<ul class="simple">
+<li><p>The packet headers, meta-data, actions, tables and pipelines are
+dynamically defined instead of selected from a pre-defined set.</p></li>
+<li><p>The actions and the pipeline are defined with instructions.</p></li>
+<li><p>Extern objects and functions can be plugged into the pipeline.</p></li>
+<li><p>Transaction-oriented table updates.</p></li>
+</ul>
+</li>
+<li><p><strong>Added new AVX512 specific classify algorithms for ACL library.</strong></p>
+<ul class="simple">
+<li><p>Added new <code class="docutils literal notranslate"><span class="pre">RTE_ACL_CLASSIFY_AVX512X16</span></code> vector implementation,
+which can process up to 16 flows in parallel. Requires AVX512 support.</p></li>
+<li><p>Added new <code class="docutils literal notranslate"><span class="pre">RTE_ACL_CLASSIFY_AVX512X32</span></code> vector implementation,
+which can process up to 32 flows in parallel. Requires AVX512 support.</p></li>
+</ul>
+</li>
+<li><p><strong>Added AVX512 lookup implementation for FIB.</strong></p>
+<p>Added a AVX512 lookup functions implementation into FIB and FIB6 libraries.</p>
+</li>
+<li><p><strong>Added support to update subport bandwidth dynamically.</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Added new API <code class="docutils literal notranslate"><span class="pre">rte_sched_port_subport_profile_add</span></code> to add new
+subport bandwidth profiles to the subport profile table at runtime.</p></li>
+<li><p>Added support to update the subport rate dynamically.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Updated FIPS validation sample application.</strong></p>
+<ul class="simple">
+<li><p>Added scatter gather support.</p></li>
+<li><p>Added NIST GCMVS complaint GMAC test method support.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated l3wfd-acl sample application.</strong></p>
+<ul class="simple">
+<li><p>Added new optional parameter <code class="docutils literal notranslate"><span class="pre">--eth-dest</span></code> for the <code class="docutils literal notranslate"><span class="pre">l3fwd-acl</span></code> to allow
+the user to specify the destination mac address for each ethernet port
+used.</p></li>
+<li><p>Replaced <code class="docutils literal notranslate"><span class="pre">--scalar</span></code> command-line option with <code class="docutils literal notranslate"><span class="pre">--alg=&lt;value&gt;</span></code>, to allow
+the user to select the desired classify method.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated vhost sample application.</strong></p>
+<p>Added vhost asynchronous APIs support, which demonstrates how the application
+can leverage IOAT DMA channels with vhost asynchronous APIs.
+See the <a class="reference internal" href="../sample_app_ug/vhost.html"><span class="doc">Vhost Sample Application</span></a> for more details.</p>
+</li>
+</ul>
+</section>
+<section id="removed-items">
+<h2><span class="section-number">11.2. </span>Removed Items</h2>
+<ul class="simple">
+<li><p>build: Support for the Make build system has been removed from DPDK.
+Meson is now the primary build system.
+Sample applications can still be built with Make standalone, using pkg-config.</p></li>
+<li><p>vhost: Dequeue zero-copy support has been removed.</p></li>
+<li><p>kernel: The module <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code> has been moved to the git repository
+<a class="reference external" href="https://git.dpdk.org/dpdk-kmods/">dpdk-kmods</a> in a new directory
+<code class="docutils literal notranslate"><span class="pre">linux/igb_uio</span></code>.</p></li>
+<li><p>Removed Python 2 support since it was sunsetted in January 2020. See
+<a class="reference external" href="https://www.python.org/doc/sunset-python-2/">Sunsetting Python 2</a></p></li>
+<li><p>Removed TEP termination sample application.</p></li>
+<li><p>Removed the deprecated <code class="docutils literal notranslate"><span class="pre">dpdk-setup.sh</span></code> script.</p></li>
+</ul>
+</section>
+<section id="api-changes">
+<h2><span class="section-number">11.3. </span>API Changes</h2>
+<ul>
+<li><p>build macros: The macros defining <code class="docutils literal notranslate"><span class="pre">RTE_MACHINE_CPUFLAG_*</span></code> have been removed.
+The information provided by these macros is now available through standard
+compiler macros.</p></li>
+<li><p>eal: Replaced the function <code class="docutils literal notranslate"><span class="pre">rte_get_master_lcore()</span></code> with
+<code class="docutils literal notranslate"><span class="pre">rte_get_main_lcore()</span></code>. The old function is deprecated.</p>
+<p>The iterator for worker lcores is also changed:
+<code class="docutils literal notranslate"><span class="pre">RTE_LCORE_FOREACH_SLAVE</span></code> is replaced with
+<code class="docutils literal notranslate"><span class="pre">RTE_LCORE_FOREACH_WORKER</span></code>.</p>
+</li>
+<li><p>eal: The definitions related to including and excluding devices
+have been changed from blacklist/whitelist to block/allow list.
+There are compatibility macros and command line mapping to accept
+the old values but applications and scripts are strongly encouraged
+to migrate to the new names.</p></li>
+<li><p>eal: The <code class="docutils literal notranslate"><span class="pre">rte_logs</span></code> struct and global symbol was made private
+and is no longer part of the API.</p></li>
+<li><p>eal: Made the <code class="docutils literal notranslate"><span class="pre">rte_dev_event</span></code> structure private to the EAL as no public API
+used it.</p></li>
+<li><p>eal: <code class="docutils literal notranslate"><span class="pre">rte_cio_rmb()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_cio_wmb()</span></code> were deprecated since 20.08
+and are removed in this release.</p></li>
+<li><p>mem: Removed the unioned field <code class="docutils literal notranslate"><span class="pre">phys_addr</span></code> from
+the structures <code class="docutils literal notranslate"><span class="pre">rte_memseg</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_memzone</span></code>.
+The field <code class="docutils literal notranslate"><span class="pre">iova</span></code> remains from the old unions.</p></li>
+<li><p>mempool: Removed the unioned fields <code class="docutils literal notranslate"><span class="pre">phys_addr</span></code> and <code class="docutils literal notranslate"><span class="pre">physaddr</span></code> from
+the structures <code class="docutils literal notranslate"><span class="pre">rte_mempool_memhdr</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_mempool_objhdr</span></code>.
+The field <code class="docutils literal notranslate"><span class="pre">iova</span></code> remains from the old unions.
+The flag name <code class="docutils literal notranslate"><span class="pre">MEMPOOL_F_NO_PHYS_CONTIG</span></code> is removed,
+while the aliased flag <code class="docutils literal notranslate"><span class="pre">MEMPOOL_F_NO_IOVA_CONTIG</span></code> is kept.</p></li>
+<li><p>mbuf: Removed the functions <code class="docutils literal notranslate"><span class="pre">rte_mbuf_data_dma_addr*</span></code>
+and the macros <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_mtophys*</span></code>.
+The same functionality is still available with the functions and macros
+having <code class="docutils literal notranslate"><span class="pre">iova</span></code> in their names instead of <code class="docutils literal notranslate"><span class="pre">dma_addr</span></code> or <code class="docutils literal notranslate"><span class="pre">mtophys</span></code>.</p></li>
+<li><p>mbuf: Removed the unioned field <code class="docutils literal notranslate"><span class="pre">buf_physaddr</span></code> from <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code>.
+The field <code class="docutils literal notranslate"><span class="pre">buf_iova</span></code> remains from the old union.</p></li>
+<li><p>mbuf: Removed the unioned field <code class="docutils literal notranslate"><span class="pre">refcnt_atomic</span></code> from
+the structures <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_mbuf_ext_shared_info</span></code>.
+The field <code class="docutils literal notranslate"><span class="pre">refcnt</span></code> remains from the old unions.</p></li>
+<li><p>mbuf: Removed the unioned fields <code class="docutils literal notranslate"><span class="pre">userdata</span></code> and <code class="docutils literal notranslate"><span class="pre">udata64</span></code>
+from the structure <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code>. It is replaced with dynamic fields.</p></li>
+<li><p>mbuf: Removed the field <code class="docutils literal notranslate"><span class="pre">seqn</span></code> from the structure <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code>.
+It is replaced with dynamic fields.</p></li>
+<li><p>mbuf: Removed the field <code class="docutils literal notranslate"><span class="pre">timestamp</span></code> from the structure <code class="docutils literal notranslate"><span class="pre">rte_mbuf</span></code>.
+It is replaced with the dynamic field RTE_MBUF_DYNFIELD_TIMESTAMP_NAME
+which was previously used only for Tx.</p></li>
+<li><p>pci: Removed the <code class="docutils literal notranslate"><span class="pre">rte_kernel_driver</span></code> enum defined in rte_dev.h and
+replaced with a private enum in the PCI subsystem.</p></li>
+<li><p>pci: Removed the PCI resources map API from the public API
+(<code class="docutils literal notranslate"><span class="pre">pci_map_resource</span></code> and <code class="docutils literal notranslate"><span class="pre">pci_unmap_resource</span></code>) and moved it to the
+PCI bus driver along with the PCI resources lists and associated structures
+(<code class="docutils literal notranslate"><span class="pre">pci_map</span></code>, <code class="docutils literal notranslate"><span class="pre">pci_msix_table</span></code>, <code class="docutils literal notranslate"><span class="pre">mapped_pci_resource</span></code> and
+<code class="docutils literal notranslate"><span class="pre">mapped_pci_res_list</span></code>).</p></li>
+<li><p>ethdev: Removed the <code class="docutils literal notranslate"><span class="pre">kdrv</span></code> field in the ethdev <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_data</span></code>
+structure as it gave no useful abstracted information to the applications.</p></li>
+<li><p>ethdev: <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_descriptor_done()</span></code> API has been deprecated.</p></li>
+<li><p>ethdev: Renamed basic statistics per queue. An underscore is inserted
+between the queue number and the rest of the xstat name:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_qN*</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">rx_qN_*</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_qN*</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">tx_qN_*</span></code></p></li>
+</ul>
+</li>
+<li><p>ethdev: Added capability to query age flow action.</p></li>
+<li><p>ethdev: Changed <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stop</span></code> return value from <code class="docutils literal notranslate"><span class="pre">void</span></code> to
+<code class="docutils literal notranslate"><span class="pre">int</span></code> to provide a way to report various error conditions.</p></li>
+<li><p>ethdev: Added <code class="docutils literal notranslate"><span class="pre">int</span></code> return type to <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_close()</span></code>.</p></li>
+<li><p>ethdev: Renamed internal functions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">_rte_eth_dev_callback_process()</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_callback_process()</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">_rte_eth_dev_reset</span></code> -&gt; <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_internal_reset()</span></code></p></li>
+</ul>
+</li>
+<li><p>ethdev: Modified field type of <code class="docutils literal notranslate"><span class="pre">base</span></code> and <code class="docutils literal notranslate"><span class="pre">nb_queue</span></code> in struct
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dcb_tc_queue_mapping</span></code> from <code class="docutils literal notranslate"><span class="pre">uint8_t</span></code> to <code class="docutils literal notranslate"><span class="pre">uint16_t</span></code>.
+As the data of <code class="docutils literal notranslate"><span class="pre">uint8_t</span></code> will be truncated when queue number in
+a TC is greater than 256.</p></li>
+<li><p>ethdev: Removed the legacy filter API, including
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_filter_supported()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_filter_ctrl()</span></code>.</p></li>
+<li><p>ethdev: Removed the legacy L2 tunnel configuration API, including
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_l2_tunnel_eth_type_conf()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_l2_tunnel_offload_set()</span></code>..</p></li>
+<li><p>vhost: Moved vDPA APIs from experimental to stable.</p></li>
+<li><p>vhost: Add a new function <code class="docutils literal notranslate"><span class="pre">rte_vhost_crypto_driver_start</span></code> to be called
+instead of <code class="docutils literal notranslate"><span class="pre">rte_vhost_driver_start</span></code> by crypto applications.</p></li>
+<li><p>cryptodev: The structure <code class="docutils literal notranslate"><span class="pre">rte_crypto_sym_vec</span></code> is updated to support both
+cpu_crypto synchronous operations and asynchronous raw data-path APIs.</p></li>
+<li><p>cryptodev: <code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_LIST_END</span></code> from <code class="docutils literal notranslate"><span class="pre">enum</span> <span class="pre">rte_crypto_aead_algorithm</span></code>,
+<code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_LIST_END</span></code> from <code class="docutils literal notranslate"><span class="pre">enum</span> <span class="pre">rte_crypto_cipher_algorithm</span></code> and
+<code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_LIST_END</span></code> from <code class="docutils literal notranslate"><span class="pre">enum</span> <span class="pre">rte_crypto_auth_algorithm</span></code>
+are removed to avoid future ABI breakage while adding new algorithms.</p></li>
+<li><p>scheduler: Renamed functions <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_slave_attach</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_slave_detach</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_slaves_get</span></code> to
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_worker_attach</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_worker_detach</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_scheduler_workers_get</span></code> accordingly.</p></li>
+<li><p>scheduler: Renamed the configuration value
+<code class="docutils literal notranslate"><span class="pre">RTE_CRYPTODEV_SCHEDULER_MAX_NB_SLAVES</span></code> to
+<code class="docutils literal notranslate"><span class="pre">RTE_CRYPTODEV_SCHEDULER_MAX_NB_WORKERS</span></code>.</p></li>
+<li><p>security: The <code class="docutils literal notranslate"><span class="pre">hfn_ovrd</span></code> field in <code class="docutils literal notranslate"><span class="pre">rte_security_pdcp_xform</span></code> is changed from
+<code class="docutils literal notranslate"><span class="pre">uint32_t</span></code> to <code class="docutils literal notranslate"><span class="pre">uint8_t</span></code> so that a new field <code class="docutils literal notranslate"><span class="pre">sdap_enabled</span></code> can be added
+to support SDAP.</p></li>
+<li><p>security: The API <code class="docutils literal notranslate"><span class="pre">rte_security_session_create</span></code> is updated to take two
+mempool objects: one for session and other for session private data.
+So the application need to create two mempools and get the size of session
+private data using API <code class="docutils literal notranslate"><span class="pre">rte_security_session_get_size</span></code> for private session
+mempool.</p></li>
+<li><p>ipsec: <code class="docutils literal notranslate"><span class="pre">RTE_SATP_LOG2_NUM</span></code> has been dropped from <code class="docutils literal notranslate"><span class="pre">enum</span></code> and
+subsequently moved <code class="docutils literal notranslate"><span class="pre">rte_ipsec</span></code> lib from experimental to stable.</p></li>
+<li><p>baseband/fpga_lte_fec: Renamed function <code class="docutils literal notranslate"><span class="pre">fpga_lte_fec_configure</span></code> to
+<code class="docutils literal notranslate"><span class="pre">rte_fpga_lte_fec_configure</span></code> and structure <code class="docutils literal notranslate"><span class="pre">fpga_lte_fec_conf</span></code> to
+<code class="docutils literal notranslate"><span class="pre">rte_fpga_lte_fec_conf</span></code>.</p></li>
+<li><p>baseband/fpga_5gnr_fec: Renamed function <code class="docutils literal notranslate"><span class="pre">fpga_5gnr_fec_configure</span></code> to
+<code class="docutils literal notranslate"><span class="pre">rte_fpga_5gnr_fec_configure</span></code> and structure <code class="docutils literal notranslate"><span class="pre">fpga_5gnr_fec_conf</span></code> to
+<code class="docutils literal notranslate"><span class="pre">rte_fpga_5gnr_fec_conf</span></code>.</p></li>
+<li><p>rawdev: Added a structure size parameter to the functions
+<code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_setup()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_conf_get()</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rte_rawdev_info_get()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_rawdev_configure()</span></code>,
+allowing limited driver type-checking and ABI compatibility.</p></li>
+<li><p>rawdev: Changed the return type of the function <code class="docutils literal notranslate"><span class="pre">rte_dev_info_get()</span></code>
+and the function <code class="docutils literal notranslate"><span class="pre">rte_rawdev_queue_conf_get()</span></code>
+from <code class="docutils literal notranslate"><span class="pre">void</span></code> to <code class="docutils literal notranslate"><span class="pre">int</span></code> allowing the return of error codes from drivers.</p></li>
+<li><p>rawdev: The running of a drivers <code class="docutils literal notranslate"><span class="pre">selftest()</span></code> function can now be done
+using the <code class="docutils literal notranslate"><span class="pre">rawdev_autotest</span></code> command in the <code class="docutils literal notranslate"><span class="pre">dpdk-test</span></code> binary. This
+command now calls the self-test function for each rawdev found on the
+system, and does not require a specific command per device type.
+Following this change, the <code class="docutils literal notranslate"><span class="pre">ioat_rawdev_autotest</span></code> command has been
+removed as no longer needed.</p></li>
+<li><p>raw/ioat: As noted above, the <code class="docutils literal notranslate"><span class="pre">rte_ioat_do_copies()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_ioat_completed_copies()</span></code> functions have been renamed to
+<code class="docutils literal notranslate"><span class="pre">rte_ioat_perform_ops()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_ioat_completed_ops()</span></code> respectively.</p></li>
+<li><p>stack: the experimental tag has been dropped from the stack library, and its
+interfaces are considered stable as of DPDK 20.11.</p></li>
+<li><p>bpf: <code class="docutils literal notranslate"><span class="pre">RTE_BPF_XTYPE_NUM</span></code> has been dropped from <code class="docutils literal notranslate"><span class="pre">rte_bpf_xtype</span></code>.</p></li>
+<li><p>gso: Changed <code class="docutils literal notranslate"><span class="pre">rte_gso_segment</span></code> behaviour and return value:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">pkt</span></code> is not saved to <code class="docutils literal notranslate"><span class="pre">pkts_out[0]</span></code> if not GSOed.</p></li>
+<li><p>Return 0 instead of 1 for the above case.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pkt</span></code> is not freed, no matter whether it is GSOed, leaving to the caller.</p></li>
+</ul>
+</li>
+<li><p>acl: <code class="docutils literal notranslate"><span class="pre">RTE_ACL_CLASSIFY_NUM</span></code> enum value has been removed.
+This enum value was not used inside DPDK, while it prevented the addition of new
+classify algorithms without causing an ABI breakage.</p></li>
+<li><p>sched: Added <code class="docutils literal notranslate"><span class="pre">subport_profile_id</span></code> as an argument
+to function <code class="docutils literal notranslate"><span class="pre">rte_sched_subport_config</span></code>.</p></li>
+<li><p>sched: Removed <code class="docutils literal notranslate"><span class="pre">tb_rate</span></code>, <code class="docutils literal notranslate"><span class="pre">tc_rate</span></code>, <code class="docutils literal notranslate"><span class="pre">tc_period</span></code> and <code class="docutils literal notranslate"><span class="pre">tb_size</span></code>
+from <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_sched_subport_params</span></code>.</p></li>
+</ul>
+</section>
+<section id="abi-changes">
+<h2><span class="section-number">11.4. </span>ABI Changes</h2>
+<ul class="simple">
+<li><p>eal: Removed the unimplemented function <code class="docutils literal notranslate"><span class="pre">rte_dump_registers()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ethdev</span></code> changes</p>
+<ul>
+<li><p>The following device operation function pointers moved
+from <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">eth_dev_ops</span></code> to <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_dev</span></code>:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">eth_rx_queue_count_t</span>&#160;&#160;&#160;&#160;&#160;&#160; <span class="pre">rx_queue_count;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">eth_rx_descriptor_done_t</span>&#160;&#160; <span class="pre">rx_descriptor_done;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">eth_rx_descriptor_status_t</span> <span class="pre">rx_descriptor_status;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">eth_tx_descriptor_status_t</span> <span class="pre">tx_descriptor_status;</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">eth_dev_ops</span></code> is no longer accessible by applications,
+which was already an internal data structure.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ethdev</span></code> internal functions are marked with <code class="docutils literal notranslate"><span class="pre">__rte_internal</span></code> tag.</p></li>
+<li><p>Added extensions’ attributes to struct <code class="docutils literal notranslate"><span class="pre">rte_flow_item_ipv6</span></code>.
+A set of additional values added to struct, indicating the existence of
+every defined extension header type.
+Applications should use the new values for identification of existing
+extensions in the packet header.</p></li>
+<li><p>Added fields <code class="docutils literal notranslate"><span class="pre">rx_seg</span></code> and <code class="docutils literal notranslate"><span class="pre">rx_nseg</span></code> to <code class="docutils literal notranslate"><span class="pre">rte_eth_rxconf</span></code> structure
+to provide extended description of the receiving buffer.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_hairpin_conf</span></code> has two new members:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span> <span class="pre">tx_explicit:1;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">uint32_t</span> <span class="pre">manual_bind:1;</span></code></p></li>
+</ul>
+</li>
+<li><p>Added new field <code class="docutils literal notranslate"><span class="pre">has_vlan</span></code> to structure <code class="docutils literal notranslate"><span class="pre">rte_flow_item_eth</span></code>,
+indicating that packet header contains at least one VLAN.</p></li>
+<li><p>Added new field <code class="docutils literal notranslate"><span class="pre">has_more_vlan</span></code> to the structure
+<code class="docutils literal notranslate"><span class="pre">rte_flow_item_vlan</span></code>, indicating that packet header contains
+at least one more VLAN, after this VLAN.</p></li>
+</ul>
+</li>
+<li><p>eventdev: The following structures are modified to support DLB/DLB2 PMDs
+and future extensions:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_event_dev_info</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_event_dev_config</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_event_port_conf</span></code></p></li>
+</ul>
+</li>
+<li><p>sched: Added new fields to <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_sched_subport_port_params</span></code>.</p></li>
+<li><p>lpm: Removed fields other than <code class="docutils literal notranslate"><span class="pre">tbl24</span></code> and <code class="docutils literal notranslate"><span class="pre">tbl8</span></code> from the struct
+<code class="docutils literal notranslate"><span class="pre">rte_lpm</span></code>. The removed fields were made internal.</p></li>
+</ul>
+</section>
+<section id="tested-platforms">
+<h2><span class="section-number">11.5. </span>Tested Platforms</h2>
+<ul class="simple">
+<li><p>Intel® platforms with Intel® NICs combinations</p>
+<ul>
+<li><p>CPU</p>
+<ul>
+<li><p>Intel® Atom™ CPU C3758 &#64; 2.20GHz</p></li>
+<li><p>Intel® Atom™ CPU C3858 &#64; 2.00GHz</p></li>
+<li><p>Intel® Atom™ CPU C3958 &#64; 2.00GHz</p></li>
+<li><p>Intel® Xeon® CPU D-1541 &#64; 2.10GHz</p></li>
+<li><p>Intel® Xeon® CPU D-1553N &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2680 0 &#64; 2.70GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2699 v3 &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2699 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel® Xeon® Gold 5218N CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Gold 6139 CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Gold 6252N CPU &#64; 2.30GHz</p></li>
+<li><p>Intel® Xeon® Platinum 8180 CPU &#64; 2.50GHz</p></li>
+<li><p>Intel® Xeon® Platinum 8280M CPU &#64; 2.70GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>CentOS 8.2</p></li>
+<li><p>Fedora 33</p></li>
+<li><p>FreeBSD 12.1</p></li>
+<li><p>OpenWRT 19.07.3</p></li>
+<li><p>Red Hat Enterprise Linux Server release 8.2</p></li>
+<li><p>Suse 15 SP1</p></li>
+<li><p>Ubuntu 18.04</p></li>
+<li><p>Ubuntu 20.04</p></li>
+<li><p>Ubuntu 20.10</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Intel® Ethernet Controller E810-C for SFP (4x25G）</p>
+<ul>
+<li><p>Firmware version: 2.30 0x80004dcf 1.2839.0</p></li>
+<li><p>Device id (pf/vf): 8086:1593 / 8086:1889</p></li>
+<li><p>Driver version: 1.3.0 (ice)</p></li>
+<li><p>OS Default DDP: 1.3.20.0</p></li>
+<li><p>COMMS DDP: 1.3.24.0</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller E810-C for QSFP (2x100G）</p>
+<ul>
+<li><p>Firmware version: 2.30 0x80004dd0 1.2839.0</p></li>
+<li><p>Device id (pf/vf): 8086:1592 / 8086:1889</p></li>
+<li><p>Driver version: 1.3.0 (ice)</p></li>
+<li><p>OS Default DDP: 1.3.20.0</p></li>
+<li><p>COMMS DDP: 1.3.24.0</p></li>
+</ul>
+</li>
+<li><p>Intel® 82599ES 10 Gigabit Ethernet Controller</p>
+<ul>
+<li><p>Firmware version: 0x61bf0001</p></li>
+<li><p>Device id (pf/vf): 8086:10fb / 8086:10ed</p></li>
+<li><p>Driver version: 5.7.1 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Connection X552/X557-AT 10GBASE-T</p>
+<ul>
+<li><p>Firmware version: 0x800003e7</p></li>
+<li><p>Device id (pf/vf): 8086:15ad / 8086:15a8</p></li>
+<li><p>Driver version: 5.1.0-k (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Controller 10G X550T</p>
+<ul>
+<li><p>Firmware version: 0x80000482</p></li>
+<li><p>Device id (pf): 8086:1563</p></li>
+<li><p>Driver version: 5.7.1 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter X710-DA4 (4x10G)</p>
+<ul>
+<li><p>Firmware version: 8.00 0x80008b82 1.2766.0</p></li>
+<li><p>Device id (pf/vf): 8086:1572 / 8086:154c</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Connection X722 for 10GbE SFP+ (4x10G)</p>
+<ul>
+<li><p>Firmware version: 5.00 0x800023c3 1.2766.0</p></li>
+<li><p>Device id (pf/vf): 8086:37d0 / 8086:37cd</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation Ethernet Connection X722 for 10GBASE-T (2x10G)</p>
+<ul>
+<li><p>Firmware version: 4.10 0x80001a7a</p></li>
+<li><p>Device id (pf/vf): 8086:37d2 / 8086:37cd</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter XXV710-DA2 (2x25G)</p>
+<ul>
+<li><p>Firmware version: 8.00 0x80008c1a 1.2766.0</p></li>
+<li><p>Device id (pf/vf): 8086:158b / 8086:154c</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter XL710-QDA2 (2X40G)</p>
+<ul>
+<li><p>Firmware version: 8.00 0x80008b82 1.2766.0</p></li>
+<li><p>Device id (pf/vf): 8086:1583 / 8086:154c</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation I350 Gigabit Network Connection</p>
+<ul>
+<li><p>Firmware version: 1.63, 0x80000cbc</p></li>
+<li><p>Device id (pf/vf): 8086:1521 / 8086:1520</p></li>
+<li><p>Driver version: 5.4.0-k (igb)</p></li>
+</ul>
+</li>
+<li><p>Intel® Corporation I210 Gigabit Network Connection</p>
+<ul>
+<li><p>Firmware version: 3.25, 0x800006eb</p></li>
+<li><p>Device id (pf): 8086:1533</p></li>
+<li><p>Driver version: 5.4.0-k (igb)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Controller 10-Gigabit X540-AT2</p>
+<ul>
+<li><p>Firmware version: 0x800005f9</p></li>
+<li><p>Device id (pf): 8086:1528</p></li>
+<li><p>Driver version: 5.1.0-k (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel® Ethernet Converged Network Adapter X710-T2L</p>
+<ul>
+<li><p>Firmware version: 8.00 0x80008d10 1.2766.0</p></li>
+<li><p>Device id (pf): 8086:15ff</p></li>
+<li><p>Driver version: 2.13.10 (i40e)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Intel® platforms with Mellanox® NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>Intel® Xeon® Gold 6154 CPU &#64; 3.00GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2697A v4 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2697 v3 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2670 0 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2640 &#64; 2.50GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 0 &#64; 2.00GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2620 v4 &#64; 2.10GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux release 8.2 (Ootpa)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.8 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.6 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.5 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.4 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.3 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.2 (Maipo)</p></li>
+<li><p>Ubuntu 20.04</p></li>
+<li><p>Ubuntu 18.04</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>SUSE Enterprise Linux 15 SP2</p></li>
+<li><p>SUSE Enterprise Linux 12 SP4</p></li>
+</ul>
+</li>
+<li><p>OFED:</p>
+<ul>
+<li><p>MLNX_OFED 5.2-0.3.3.0 and above</p></li>
+<li><p>MLNX_OFED 5.1-2.5.8.0</p></li>
+</ul>
+</li>
+<li><p>upstream kernel:</p>
+<ul>
+<li><p>Linux 5.10.0-rc2 and above</p></li>
+</ul>
+</li>
+<li><p>rdma-core:</p>
+<ul>
+<li><p>rdma-core-31.0-1 and above</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox® ConnectX®-3 Pro 40G MCX354A-FCC_Ax (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-3 Pro 40G MCX354A-FCCT (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-4 Lx 50G MCX4131A-GCAT (1x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-5 100G MCX516A-CCAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-5 100G MCX556A-EDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-5 Ex EN 100G MCX516A-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:1019</p></li>
+<li><p>Firmware version: 16.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-6 Dx EN 100G MCX623106AN-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:101d</p></li>
+<li><p>Firmware version: 22.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox® ConnectX®-6 Lx EN 25G MCX631102AN-ADAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x8</p></li>
+<li><p>Device ID: 15b3:101f</p></li>
+<li><p>Firmware version: 26.29.0470 and above</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Mellanox® BlueField® SmartNIC</p>
+<ul>
+<li><p>Mellanox® BlueField®-2 SmartNIC MT41686 - MBF2H332A-AEEOT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:a2d2</p></li>
+<li><p>Firmware version: 24.29.0476 and above</p></li>
+</ul>
+</li>
+<li><p>Embedded software:</p>
+<ul>
+<li><p>CentOS Linux release 7.6.1810 (AltArch)</p></li>
+<li><p>MLNX_OFED 5.2-0.3.2 and above</p></li>
+<li><p>DPDK application running on Arm cores</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Intel® platforms with Broadcom® NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>Intel® Xeon® Gold 6154 CPU &#64; 3.00GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2667 v3 &#64; 3.20GHz</p></li>
+<li><p>Intel® Xeon® CPU E5-2650 v2 &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® Gold 6142 CPU &#64; 2.60GHz</p></li>
+<li><p>Intel® Xeon® Silver 4110 CPU &#64; 2.10GHz</p></li>
+<li><p>Intel® Xeon® CPU E3-1270 v3 &#64; 3.50GHz</p></li>
+<li><p>Intel® Xeon® Gold 6134M CPU &#64; 3.20GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux Server release 8.1</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.6</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.5</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>Centos 8.1</p></li>
+<li><p>Centos 7.8</p></li>
+<li><p>Centos 7.7</p></li>
+</ul>
+</li>
+<li><p>upstream kernel:</p>
+<ul>
+<li><p>Linux 5.3.4</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Broadcom® NetXtreme-E® Series P225p (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Firmware version: 214.4.114.0 and above</p></li>
+</ul>
+</li>
+<li><p>Broadcom® NetXtreme-E® Series P425p (4x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Firmware version: 216.4.259.0 and above</p></li>
+</ul>
+</li>
+<li><p>Broadcom® NetXtreme-E® Series P2100G (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Firmware version: 216.1.259.0 and above</p></li>
+</ul>
+</li>
+<li><p>Broadcom® NetXtreme-E® Series P425p (4x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Firmware version: 216.1.259.0 and above</p></li>
+</ul>
+</li>
+<li><p>Broadcom® NetXtreme-E® Series P2100G (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Firmware version: 216.1.259.0 and above</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Broadcom® NetXtreme-S® Series SmartNIC</p>
+<ul>
+<li><p>Broadcom® NetXtreme-S® Series PS225-H16 SmartNIC (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Firmware version: 217.0.59.0, 218.1.63.0</p></li>
+</ul>
+</li>
+<li><p>Embedded software:</p>
+<ul>
+<li><p>Broadcom Yocto Linux</p></li>
+<li><p>Kernel version: 4.14.174</p></li>
+<li><p>DPDK application running on 8 Arm Cortex-A72 cores</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Release Notes</a><ul>
+      <li>Previous: <a href="release_21_02.html" title="previous chapter"><span class="section-number">10. </span>DPDK Release 21.02</a></li>
+      <li>Next: <a href="release_20_08.html" title="next chapter"><span class="section-number">12. </span>DPDK Release 20.08</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rel_notes/release_20_11.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

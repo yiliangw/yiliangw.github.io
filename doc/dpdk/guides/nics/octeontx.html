@@ -1,0 +1,288 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>48. OCTEON TX Poll Mode driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="49. Libpcap and Ring Based Poll Mode Drivers" href="pcap_ring.html" />
+    <link rel="prev" title="47. OCTEON TX EP Poll Mode driver" href="octeon_ep.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="octeon-tx-poll-mode-driver">
+<h1><span class="section-number">48. </span>OCTEON TX Poll Mode driver</h1>
+<p>The OCTEON TX ETHDEV PMD (<strong>librte_net_octeontx</strong>) provides poll mode ethdev
+driver support for the inbuilt network device found in the <strong>Cavium OCTEON TX</strong>
+SoC family as well as their virtual functions (VF) in SR-IOV context.</p>
+<p>More information can be found at <a class="reference external" href="http://www.cavium.com/OCTEON-TX_ARM_Processors.html">Cavium, Inc Official Website</a>.</p>
+<section id="supported-octeon-tx-socs">
+<h2><span class="section-number">48.1. </span>Supported OCTEON TX SoCs</h2>
+<ul class="simple">
+<li><p>CN83xx</p></li>
+</ul>
+</section>
+<section id="features">
+<h2><span class="section-number">48.2. </span>Features</h2>
+<p>Features of the OCTEON TX Ethdev PMD are:</p>
+<ul class="simple">
+<li><p>Packet type information</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Jumbo frames</p></li>
+<li><p>Scatter-Gather IO support</p></li>
+<li><p>Link state information</p></li>
+<li><p>MAC/VLAN filtering</p></li>
+<li><p>MTU update</p></li>
+<li><p>SR-IOV VF</p></li>
+<li><p>Multiple queues for TX</p></li>
+<li><p>Lock-free Tx queue</p></li>
+<li><p>HW offloaded <cite>ethdev Rx queue</cite> to <cite>eventdev event queue</cite> packet injection</p></li>
+</ul>
+</section>
+<section id="unsupported-features">
+<h2><span class="section-number">48.3. </span>Unsupported features</h2>
+<p>The features supported by the device and not yet supported by this PMD include:</p>
+<ul class="simple">
+<li><p>Receive Side Scaling (RSS)</p></li>
+<li><p>Scattered and gather for TX and RX</p></li>
+<li><p>Ingress classification support</p></li>
+<li><p>Egress hierarchical scheduling, traffic shaping, and marking</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">48.4. </span>Prerequisites</h2>
+<p>See <a class="reference internal" href="../platform/octeontx.html"><span class="doc">OCTEON TX Board Support Package</span></a> for setup information.</p>
+</section>
+<section id="configuration">
+<h2><span class="section-number">48.5. </span>Configuration</h2>
+<section id="driver-compilation-and-testing">
+<h3><span class="section-number">48.5.1. </span>Driver compilation and testing</h3>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+<ol class="arabic">
+<li><p>Running testpmd:</p>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to run testpmd.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -c 700 \</span>
+<span class="go">          --base-virtaddr=0x100000000000 \</span>
+<span class="go">          --mbuf-pool-ops-name=&quot;octeontx_fpavf&quot; \</span>
+<span class="go">          --vdev=&#39;event_octeontx&#39; \</span>
+<span class="go">          --vdev=&#39;eth_octeontx,nr_port=2&#39; \</span>
+<span class="go">          -- --rxq=1 --txq=1 --nb-core=2 \</span>
+<span class="go">          --total-num-mbufs=16384 -i</span>
+<span class="go">.....</span>
+<span class="go">EAL: Detected 24 lcore(s)</span>
+<span class="go">EAL: Probing VFIO support...</span>
+<span class="go">EAL: VFIO support initialized</span>
+<span class="go">.....</span>
+<span class="go">EAL: PCI device 0000:07:00.1 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 177d:a04b octeontx_ssovf</span>
+<span class="go">.....</span>
+<span class="go">EAL: PCI device 0001:02:00.7 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 177d:a0dd octeontx_pkivf</span>
+<span class="go">.....</span>
+<span class="go">EAL: PCI device 0001:03:01.0 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 177d:a049 octeontx_pkovf</span>
+<span class="go">.....</span>
+<span class="go">PMD: octeontx_probe(): created ethdev eth_octeontx for port 0</span>
+<span class="go">PMD: octeontx_probe(): created ethdev eth_octeontx for port 1</span>
+<span class="go">.....</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:0F:B7:11:94:46</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Port 1: 00:0F:B7:11:94:47</span>
+<span class="go">.....</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 40000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 40000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+<section id="initialization">
+<h2><span class="section-number">48.6. </span>Initialization</h2>
+<p>The OCTEON TX ethdev PMD is exposed as a vdev device which consists of a set
+of PKI and PKO PCIe VF devices. On EAL initialization,
+PKI/PKO PCIe VF devices will be probed and then the vdev device can be created
+from the application code, or from the EAL command line based on
+the number of probed/bound PKI/PKO PCIe VF device to DPDK by</p>
+<ul class="simple">
+<li><p>Invoking <code class="docutils literal notranslate"><span class="pre">rte_vdev_init(&quot;eth_octeontx&quot;)</span></code> from the application</p></li>
+<li><p>Using <code class="docutils literal notranslate"><span class="pre">--vdev=&quot;eth_octeontx&quot;</span></code> in the EAL options, which will call
+rte_vdev_init() internally</p></li>
+</ul>
+<section id="device-arguments">
+<h3><span class="section-number">48.6.1. </span>Device arguments</h3>
+<p>Each ethdev port is mapped to a physical port(LMAC), Application can specify
+the number of interesting ports with <code class="docutils literal notranslate"><span class="pre">nr_ports</span></code> argument.</p>
+</section>
+<section id="dependency">
+<h3><span class="section-number">48.6.2. </span>Dependency</h3>
+<p><code class="docutils literal notranslate"><span class="pre">eth_octeontx</span></code> PMD is depend on <code class="docutils literal notranslate"><span class="pre">event_octeontx</span></code> eventdev device and
+<code class="docutils literal notranslate"><span class="pre">octeontx_fpavf</span></code> external mempool handler.</p>
+<p>Example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_dpdk_application --mbuf-pool-ops-name=&quot;octeontx_fpavf&quot; \</span>
+<span class="go">            --vdev=&#39;event_octeontx&#39; \</span>
+<span class="go">            --vdev=&quot;eth_octeontx,nr_port=2&quot;</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="limitations">
+<h2><span class="section-number">48.7. </span>Limitations</h2>
+<section id="octeontx-fpavf-external-mempool-handler-dependency">
+<h3><span class="section-number">48.7.1. </span><code class="docutils literal notranslate"><span class="pre">octeontx_fpavf</span></code> external mempool handler dependency</h3>
+<p>The OCTEON TX SoC family NIC has inbuilt HW assisted external mempool manager.
+This driver will only work with <code class="docutils literal notranslate"><span class="pre">octeontx_fpavf</span></code> external mempool handler
+as it is the most performance effective way for packet allocation and Tx buffer
+recycling on OCTEON TX SoC platform.</p>
+</section>
+<section id="crc-stripping">
+<h3><span class="section-number">48.7.2. </span>CRC stripping</h3>
+<p>The OCTEON TX SoC family NICs strip the CRC for every packets coming into the
+host interface irrespective of the offload configuration.</p>
+</section>
+<section id="maximum-packet-length">
+<h3><span class="section-number">48.7.3. </span>Maximum packet length</h3>
+<p>The OCTEON TX SoC family NICs support a maximum of a 32K jumbo frame. The value
+is fixed and cannot be changed. So, even when the <code class="docutils literal notranslate"><span class="pre">rxmode.mtu</span></code>
+member of <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_eth_conf</span></code> is set to a value lower than 32k, frames
+up to 32k bytes can still reach the host interface.</p>
+</section>
+<section id="maximum-mempool-size">
+<h3><span class="section-number">48.7.4. </span>Maximum mempool size</h3>
+<p>The maximum mempool size supplied to Rx queue setup should be less than 128K.
+When running testpmd on OCTEON TX the application can limit the number of mbufs
+by using the option <code class="docutils literal notranslate"><span class="pre">--total-num-mbufs=131072</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="octeon_ep.html" title="previous chapter"><span class="section-number">47. </span>OCTEON TX EP Poll Mode driver</a></li>
+      <li>Next: <a href="pcap_ring.html" title="next chapter"><span class="section-number">49. </span>Libpcap and Ring Based Poll Mode Drivers</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/octeontx.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

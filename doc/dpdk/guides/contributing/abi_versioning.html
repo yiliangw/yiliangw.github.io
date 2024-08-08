@@ -1,0 +1,718 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. ABI Versioning &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. DPDK Documentation Guidelines" href="documentation.html" />
+    <link rel="prev" title="3. ABI Policy" href="abi_policy.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="abi-versioning">
+<span id="id1"></span><h1><span class="section-number">4. </span>ABI Versioning</h1>
+<p>This document details the mechanics of ABI version management in DPDK.</p>
+<section id="what-is-a-library-s-soname">
+<span id="what-is-soname"></span><h2><span class="section-number">4.1. </span>What is a library’s soname?</h2>
+<p>System libraries usually adopt the familiar major and minor version naming
+convention, where major versions (e.g. <code class="docutils literal notranslate"><span class="pre">librte_eal</span> <span class="pre">21.x,</span> <span class="pre">22.x</span></code>) are presumed
+to be ABI incompatible with each other and minor versions (e.g. <code class="docutils literal notranslate"><span class="pre">librte_eal</span>
+<span class="pre">21.1,</span> <span class="pre">21.2</span></code>) are presumed to be ABI compatible. A library’s <a class="reference external" href="https://en.wikipedia.org/wiki/Soname">soname</a>. is typically used to provide backward
+compatibility information about a given library, describing the lowest common
+denominator ABI supported by the library. The soname or logical name for the
+library, is typically comprised of the library’s name and major version e.g.
+<code class="docutils literal notranslate"><span class="pre">librte_eal.so.21</span></code>.</p>
+<p>During an application’s build process, a library’s soname is noted as a runtime
+dependency of the application. This information is then used by the <a class="reference external" href="https://en.wikipedia.org/wiki/Dynamic_linker">dynamic
+linker</a> when resolving the
+applications dependencies at runtime, to load a library supporting the correct
+ABI version. The library loaded at runtime therefore, may be a minor revision
+supporting the same major ABI version (e.g. <code class="docutils literal notranslate"><span class="pre">librte_eal.21.2</span></code>), as the library
+used to link the application (e.g <code class="docutils literal notranslate"><span class="pre">librte_eal.21.0</span></code>).</p>
+</section>
+<section id="major-abi-versions">
+<span id="id2"></span><h2><span class="section-number">4.2. </span>Major ABI versions</h2>
+<p>An ABI version change to a given library, especially in core libraries such as
+<code class="docutils literal notranslate"><span class="pre">librte_mbuf</span></code>, may cause an implicit ripple effect on the ABI of it’s
+consuming libraries, causing ABI breakages. There may however be no explicit
+reason to bump a dependent library’s ABI version, as there may have been no
+obvious change to the dependent library’s API, even though the library’s ABI
+compatibility will have been broken.</p>
+<p>This interdependence of DPDK libraries, means that ABI versioning of libraries
+is more manageable at a project level, with all project libraries sharing a
+<strong>single ABI version</strong>. In addition, the need to maintain a stable ABI for some
+number of releases as described in the section <a class="reference internal" href="abi_policy.html"><span class="doc">ABI Policy</span></a>, means
+that ABI version increments need to carefully planned and managed at a project
+level.</p>
+<p>Major ABI versions are therefore declared typically aligned with an LTS release
+and is then supported some number of subsequent releases, shared across all
+libraries. This means that a single project level ABI version, reflected in all
+individual library’s soname, library filenames and associated version maps
+persists over multiple releases.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ head ./lib/acl/version.map
+DPDK_21 {
+       global:
+...
+
+$ head ./lib/eal/version.map
+DPDK_21 {
+       global:
+...
+</pre></div>
+</div>
+<p>When an ABI change is made between major ABI versions to a given library, a new
+section is added to that library’s version map describing the impending new ABI
+version, as described in the section <a class="reference internal" href="#example-abi-macro-usage"><span class="std std-ref">Examples of ABI Macro use</span></a>. The
+library’s soname and filename however do not change, e.g. <code class="docutils literal notranslate"><span class="pre">libacl.so.21</span></code>, as
+ABI compatibility with the last major ABI version continues to be preserved for
+that library.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ head ./lib/acl/version.map
+DPDK_21 {
+       global:
+...
+
+DPDK_22 {
+       global:
+
+} DPDK_21;
+...
+
+$ head ./lib/eal/version.map
+DPDK_21 {
+       global:
+...
+</pre></div>
+</div>
+<p>However when a new ABI version is declared, for example DPDK <code class="docutils literal notranslate"><span class="pre">22</span></code>, old
+deprecated functions may be safely removed at this point and the entire old
+major ABI version removed, see the section <a class="reference internal" href="#deprecating-entire-abi"><span class="std std-ref">Deprecating an entire ABI version</span></a> on
+how this may be done.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ head ./lib/acl/version.map
+DPDK_22 {
+       global:
+...
+
+$ head ./lib/eal/version.map
+DPDK_22 {
+       global:
+...
+</pre></div>
+</div>
+<p>At the same time, the major ABI version is changed atomically across all
+libraries by incrementing the major version in the ABI_VERSION file. This is
+done globally for all libraries.</p>
+<section id="minor-abi-versions">
+<h3><span class="section-number">4.2.1. </span>Minor ABI versions</h3>
+<p>Each non-LTS release will also increment minor ABI version, to permit multiple
+DPDK versions being installed alongside each other. Both stable and
+experimental ABI’s are versioned using the global version file that is updated
+at the start of each release cycle, and are managed at the project level.</p>
+</section>
+</section>
+<section id="versioning-macros">
+<h2><span class="section-number">4.3. </span>Versioning Macros</h2>
+<p>When a symbol is exported from a library to provide an API, it also provides a
+calling convention (ABI) that is embodied in its name, return type and
+arguments. Occasionally that function may need to change to accommodate new
+functionality or behavior. When that occurs, it is may be required to allow for
+backward compatibility for a time with older binaries that are dynamically
+linked to the DPDK.</p>
+<p>To support backward compatibility the <code class="docutils literal notranslate"><span class="pre">rte_function_versioning.h</span></code>
+header file provides macros to use when updating exported functions. These
+macros are used in conjunction with the <code class="docutils literal notranslate"><span class="pre">version.map</span></code> file for
+a given library to allow multiple versions of a symbol to exist in a shared
+library so that older binaries need not be immediately recompiled.</p>
+<p>The macros exported are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">VERSION_SYMBOL(b,</span> <span class="pre">e,</span> <span class="pre">n)</span></code>: Creates a symbol version table entry binding
+versioned symbol <code class="docutils literal notranslate"><span class="pre">b&#64;DPDK_n</span></code> to the internal function <code class="docutils literal notranslate"><span class="pre">be</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">BIND_DEFAULT_SYMBOL(b,</span> <span class="pre">e,</span> <span class="pre">n)</span></code>: Creates a symbol version entry instructing
+the linker to bind references to symbol <code class="docutils literal notranslate"><span class="pre">b</span></code> to the internal symbol
+<code class="docutils literal notranslate"><span class="pre">be</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">MAP_STATIC_SYMBOL(f,</span> <span class="pre">p)</span></code>: Declare the prototype <code class="docutils literal notranslate"><span class="pre">f</span></code>, and map it to the
+fully qualified function <code class="docutils literal notranslate"><span class="pre">p</span></code>, so that if a symbol becomes versioned, it
+can still be mapped back to the public symbol name.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">__vsym</span></code>:  Annotation to be used in a declaration of the internal symbol
+<code class="docutils literal notranslate"><span class="pre">be</span></code> to signal that it is being used as an implementation of a particular
+version of symbol <code class="docutils literal notranslate"><span class="pre">b</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">VERSION_SYMBOL_EXPERIMENTAL(b,</span> <span class="pre">e)</span></code>: Creates a symbol version table entry
+binding versioned symbol <code class="docutils literal notranslate"><span class="pre">b&#64;EXPERIMENTAL</span></code> to the internal function <code class="docutils literal notranslate"><span class="pre">be</span></code>.
+The macro is used when a symbol matures to become part of the stable ABI, to
+provide an alias to experimental until the next major ABI version.</p></li>
+</ul>
+<section id="examples-of-abi-macro-use">
+<span id="example-abi-macro-usage"></span><h3><span class="section-number">4.3.1. </span>Examples of ABI Macro use</h3>
+<section id="updating-a-public-api">
+<h4><span class="section-number">4.3.1.1. </span>Updating a public API</h4>
+<p>Assume we have a function as follows</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Create an acl context object for apps to</span>
+<span class="cm"> * manipulate</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Assume that struct rte_acl_ctx is a private structure, and that a developer
+wishes to enhance the acl api so that a debugging flag can be enabled on a
+per-context basis.  This requires an addition to the structure (which, being
+private, is safe), but it also requires modifying the code as follows</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Create an acl context object for apps to</span>
+<span class="cm"> * manipulate</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">debug</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note also that, being a public function, the header file prototype must also be
+changed, as must all the call sites, to reflect the new ABI footprint.  We will
+maintain previous ABI versions that are accessible only to previously compiled
+binaries.</p>
+<p>The addition of a parameter to the function is ABI breaking as the function is
+public, and existing application may use it in its current form. However, the
+compatibility macros in DPDK allow a developer to use symbol versioning so that
+multiple functions can be mapped to the same public symbol based on when an
+application was linked to it. To see how this is done, we start with the
+requisite libraries version map file. Initially the version map file for the acl
+library looks like this</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_21 {
+     global:
+
+     rte_acl_add_rules;
+     rte_acl_build;
+     rte_acl_classify;
+     rte_acl_classify_alg;
+     rte_acl_classify_scalar;
+     rte_acl_create;
+     rte_acl_dump;
+     rte_acl_find_existing;
+     rte_acl_free;
+     rte_acl_ipv4vlan_add_rules;
+     rte_acl_ipv4vlan_build;
+     rte_acl_list_dump;
+     rte_acl_reset;
+     rte_acl_reset_rules;
+     rte_acl_set_ctx_classify;
+
+     local: *;
+};
+</pre></div>
+</div>
+<p>This file needs to be modified as follows</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_21 {
+     global:
+
+     rte_acl_add_rules;
+     rte_acl_build;
+     rte_acl_classify;
+     rte_acl_classify_alg;
+     rte_acl_classify_scalar;
+     rte_acl_create;
+     rte_acl_dump;
+     rte_acl_find_existing;
+     rte_acl_free;
+     rte_acl_ipv4vlan_add_rules;
+     rte_acl_ipv4vlan_build;
+     rte_acl_list_dump;
+     rte_acl_reset;
+     rte_acl_reset_rules;
+     rte_acl_set_ctx_classify;
+
+     local: *;
+};
+
+DPDK_22 {
+     global:
+     rte_acl_create;
+
+} DPDK_21;
+</pre></div>
+</div>
+<p>The addition of the new block tells the linker that a new version node
+<code class="docutils literal notranslate"><span class="pre">DPDK_22</span></code> is available, which contains the symbol rte_acl_create, and inherits
+the symbols from the DPDK_21 node. This list is directly translated into a
+list of exported symbols when DPDK is compiled as a shared library.</p>
+<p>Next, we need to specify in the code which function maps to the rte_acl_create
+symbol at which versions.  First, at the site of the initial symbol definition,
+we need to update the function so that it is uniquely named, and not in conflict
+with the public symbol name</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="o">-</span><span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="o">+</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__vsym</span><span class="w"></span>
+<span class="o">+</span><span class="n">rte_acl_create_v21</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="kt">size_t</span><span class="w"> </span><span class="n">sz</span><span class="p">;</span><span class="w"></span>
+<span class="w">       </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="p">;</span><span class="w"></span>
+<span class="w">       </span><span class="p">...</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note that the base name of the symbol was kept intact, as this is conducive to
+the macros used for versioning symbols and we have annotated the function as
+<code class="docutils literal notranslate"><span class="pre">__vsym</span></code>, an implementation of a versioned symbol . That is our next step,
+mapping this new symbol name to the initial symbol name at version node 21.
+Immediately after the function, we add the VERSION_SYMBOL macro.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_function_versioning.h&gt;</span><span class="cp"></span>
+
+<span class="p">...</span><span class="w"></span>
+<span class="n">VERSION_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v21</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Remembering to also add the rte_function_versioning.h header to the requisite c
+file where these changes are being made. The macro instructs the linker to
+create a new symbol <code class="docutils literal notranslate"><span class="pre">rte_acl_create&#64;DPDK_21</span></code>, which matches the symbol created
+in older builds, but now points to the above newly named function. We have now
+mapped the original rte_acl_create symbol to the original function (but with a
+new name).</p>
+<p>Please see the section <a class="reference internal" href="#enabling-versioning-macros"><span class="std std-ref">Enabling versioning macros</span></a> to enable this macro in the meson/ninja build.
+Next, we need to create the new <code class="docutils literal notranslate"><span class="pre">v22</span></code> version of the symbol. We create a new
+function name, with the <code class="docutils literal notranslate"><span class="pre">v22</span></code> suffix, and implement it appropriately.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__vsym</span><span class="w"></span>
+<span class="n">rte_acl_create_v22</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">debug</span><span class="p">);</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="n">ctx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_acl_create_v21</span><span class="p">(</span><span class="n">param</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">     </span><span class="n">ctx</span><span class="o">-&gt;</span><span class="n">debug</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">debug</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">     </span><span class="k">return</span><span class="w"> </span><span class="n">ctx</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This code serves as our new API call. Its the same as our old call, but adds the
+new parameter in place. Next we need to map this function to the new default
+symbol <code class="docutils literal notranslate"><span class="pre">rte_acl_create&#64;DPDK_22</span></code>. To do this, immediately after the function,
+we add the BIND_DEFAULT_SYMBOL macro.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_function_versioning.h&gt;</span><span class="cp"></span>
+
+<span class="p">...</span><span class="w"></span>
+<span class="n">BIND_DEFAULT_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v22</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The macro instructs the linker to create the new default symbol
+<code class="docutils literal notranslate"><span class="pre">rte_acl_create&#64;DPDK_22</span></code>, which points to the above newly named function.</p>
+<p>We finally modify the prototype of the call in the public header file,
+such that it contains both versions of the symbol and the public API.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__vsym</span><span class="w"></span>
+<span class="n">rte_acl_create_v21</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__vsym</span><span class="w"></span>
+<span class="n">rte_acl_create_v22</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">debug</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>And that’s it, on the next shared library rebuild, there will be two versions of
+rte_acl_create, an old DPDK_21 version, used by previously built applications,
+and a new DPDK_22 version, used by future built applications.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><strong>Before you leave</strong>, please take care reviewing the sections on
+<a class="reference internal" href="#mapping-static-symbols"><span class="std std-ref">mapping static symbols</span></a>,
+<a class="reference internal" href="#enabling-versioning-macros"><span class="std std-ref">enabling versioning macros</span></a>,
+and <a class="reference internal" href="#abi-deprecation"><span class="std std-ref">ABI deprecation</span></a>.</p>
+</div>
+</section>
+<section id="mapping-static-symbols">
+<span id="id3"></span><h4><span class="section-number">4.3.1.2. </span>Mapping static symbols</h4>
+<p>Now we’ve taken what was a public symbol, and duplicated it into two uniquely
+and differently named symbols. We’ve then mapped each of those back to the
+public symbol <code class="docutils literal notranslate"><span class="pre">rte_acl_create</span></code> with different version tags. This only applies
+to dynamic linking, as static linking has no notion of versioning. That leaves
+this code in a position of no longer having a symbol simply named
+<code class="docutils literal notranslate"><span class="pre">rte_acl_create</span></code> and a static build will fail on that missing symbol.</p>
+<p>To correct this, we can simply map a function of our choosing back to the public
+symbol in the static build with the <code class="docutils literal notranslate"><span class="pre">MAP_STATIC_SYMBOL</span></code> macro.  Generally the
+assumption is that the most recent version of the symbol is the one you want to
+map.  So, back in the C file where, immediately after <code class="docutils literal notranslate"><span class="pre">rte_acl_create_v22</span></code> is
+defined, we add this</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">__vsym</span><span class="w"></span>
+<span class="n">rte_acl_create_v22</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">debug</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">MAP_STATIC_SYMBOL</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">debug</span><span class="p">),</span><span class="w"> </span><span class="n">rte_acl_create_v22</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>That tells the compiler that, when building a static library, any calls to the
+symbol <code class="docutils literal notranslate"><span class="pre">rte_acl_create</span></code> should be linked to <code class="docutils literal notranslate"><span class="pre">rte_acl_create_v22</span></code></p>
+</section>
+<section id="enabling-versioning-macros">
+<span id="id4"></span><h4><span class="section-number">4.3.1.3. </span>Enabling versioning macros</h4>
+<p>Finally, we need to indicate to the <a class="reference internal" href="../prog_guide/build-sdk-meson.html"><span class="doc">meson/ninja build system</span></a> to enable versioning macros when building the
+library or driver. In the libraries or driver where we have added symbol
+versioning, in the <code class="docutils literal notranslate"><span class="pre">meson.build</span></code> file we add the following</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>use_function_versioning = true
+</pre></div>
+</div>
+<p>at the start of the head of the file. This will indicate to the tool-chain to
+enable the function version macros when building.</p>
+</section>
+<section id="aliasing-experimental-symbols">
+<span id="id5"></span><h4><span class="section-number">4.3.1.4. </span>Aliasing experimental symbols</h4>
+<p>In situations in which an <code class="docutils literal notranslate"><span class="pre">experimental</span></code> symbol has been stable for some time,
+and it becomes a candidate for promotion to the stable ABI. At this time, when
+promoting the symbol, the maintainer may choose to provide an alias to the
+<code class="docutils literal notranslate"><span class="pre">experimental</span></code> symbol version, so as not to break consuming applications.
+This alias is then dropped in the next major ABI version.</p>
+<p>The process to provide an alias to <code class="docutils literal notranslate"><span class="pre">experimental</span></code> is similar to that, of
+<a class="reference internal" href="#example-abi-macro-usage"><span class="std std-ref">symbol versioning</span></a> described above.
+Assume we have an experimental function <code class="docutils literal notranslate"><span class="pre">rte_acl_create</span></code> as follows:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_compat.h&gt;</span><span class="cp"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Create an acl context object for apps to</span>
+<span class="cm"> * manipulate</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="n">__rte_experimental</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In the map file, experimental symbols are listed as part of the <code class="docutils literal notranslate"><span class="pre">EXPERIMENTAL</span></code>
+version node.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_21 {
+     global:
+     ...
+
+     local: *;
+};
+
+EXPERIMENTAL {
+     global:
+
+     rte_acl_create;
+};
+</pre></div>
+</div>
+<p>When we promote the symbol to the stable ABI, we simply strip the
+<code class="docutils literal notranslate"><span class="pre">__rte_experimental</span></code> annotation from the function and move the symbol from the
+<code class="docutils literal notranslate"><span class="pre">EXPERIMENTAL</span></code> node, to the node of the next major ABI version as follow.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Create an acl context object for apps to</span>
+<span class="cm"> * manipulate</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>We then update the map file, adding the symbol <code class="docutils literal notranslate"><span class="pre">rte_acl_create</span></code>
+to the <code class="docutils literal notranslate"><span class="pre">DPDK_22</span></code> version node.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_21 {
+     global:
+     ...
+
+     local: *;
+};
+
+DPDK_22 {
+     global:
+
+     rte_acl_create;
+} DPDK_21;
+</pre></div>
+</div>
+<p>Although there are strictly no guarantees or commitments associated with
+<a class="reference internal" href="abi_policy.html#experimental-apis"><span class="std std-ref">experimental symbols</span></a>, a maintainer may wish to offer
+an alias to experimental. The process to add an alias to experimental,
+is similar to the symbol versioning process. Assuming we have an experimental
+symbol as before, we now add the symbol to both the <code class="docutils literal notranslate"><span class="pre">EXPERIMENTAL</span></code>
+and <code class="docutils literal notranslate"><span class="pre">DPDK_22</span></code> version nodes.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_compat.h&gt;</span><span class="c1">;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_function_versioning.h&gt;</span><span class="cp"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Create an acl context object for apps to</span>
+<span class="cm"> * manipulate</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="p">...</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">__rte_experimental</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create_e</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="n">rte_acl_create</span><span class="p">(</span><span class="n">param</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">VERSION_SYMBOL_EXPERIMENTAL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_e</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_ctx</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_acl_create_v22</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_acl_param</span><span class="w"> </span><span class="o">*</span><span class="n">param</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="n">rte_acl_create</span><span class="p">(</span><span class="n">param</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+<span class="n">BIND_DEFAULT_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v22</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In the map file, we map the symbol to both the <code class="docutils literal notranslate"><span class="pre">EXPERIMENTAL</span></code>
+and <code class="docutils literal notranslate"><span class="pre">DPDK_22</span></code> version nodes.</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>DPDK_21 {
+     global:
+     ...
+
+     local: *;
+};
+
+DPDK_22 {
+     global:
+
+     rte_acl_create;
+} DPDK_21;
+
+EXPERIMENTAL {
+     global:
+
+     rte_acl_create;
+};
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Please note, similar to <a class="reference internal" href="#example-abi-macro-usage"><span class="std std-ref">symbol versioning</span></a>,
+when aliasing to experimental you will also need to take care of
+<a class="reference internal" href="#mapping-static-symbols"><span class="std std-ref">mapping static symbols</span></a>.</p>
+</div>
+</section>
+<section id="deprecating-part-of-a-public-api">
+<span id="abi-deprecation"></span><h4><span class="section-number">4.3.1.5. </span>Deprecating part of a public API</h4>
+<p>Lets assume that you’ve done the above updates, and in preparation for the next
+major ABI version you decide you would like to retire the old version of the
+function. After having gone through the ABI deprecation announcement process,
+removal is easy. Start by removing the symbol from the requisite version map
+file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  DPDK_21 {
+       global:
+
+       rte_acl_add_rules;
+       rte_acl_build;
+       rte_acl_classify;
+       rte_acl_classify_alg;
+       rte_acl_classify_scalar;
+       rte_acl_dump;
+-      rte_acl_create
+       rte_acl_find_existing;
+       rte_acl_free;
+       rte_acl_ipv4vlan_add_rules;
+       rte_acl_ipv4vlan_build;
+       rte_acl_list_dump;
+       rte_acl_reset;
+       rte_acl_reset_rules;
+       rte_acl_set_ctx_classify;
+
+       local: *;
+  };
+
+  DPDK_22 {
+       global:
+       rte_acl_create;
+  } DPDK_21;
+</pre></div>
+</div>
+<p>Next remove the corresponding versioned export.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">VERSION_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v21</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Note that the internal function definition could also be removed, but its used
+in our example by the newer version <code class="docutils literal notranslate"><span class="pre">v22</span></code>, so we leave it in place and declare
+it as static. This is a coding style choice.</p>
+</section>
+<section id="deprecating-an-entire-abi-version">
+<span id="deprecating-entire-abi"></span><h4><span class="section-number">4.3.1.6. </span>Deprecating an entire ABI version</h4>
+<p>While removing a symbol from an ABI may be useful, it is more practical to
+remove an entire version node at once, as is typically done at the declaration
+of a major ABI version. If a version node completely specifies an API, then
+removing part of it, typically makes it incomplete. In those cases it is better
+to remove the entire node.</p>
+<p>To do this, start by modifying the version map file, such that all symbols from
+the node to be removed are merged into the next node in the map.</p>
+<p>In the case of our map above, it would transform to look as follows</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  DPDK_22 {
+       global:
+
+       rte_acl_add_rules;
+       rte_acl_build;
+       rte_acl_classify;
+       rte_acl_classify_alg;
+       rte_acl_classify_scalar;
+       rte_acl_dump;
+       rte_acl_create
+       rte_acl_find_existing;
+       rte_acl_free;
+       rte_acl_ipv4vlan_add_rules;
+       rte_acl_ipv4vlan_build;
+       rte_acl_list_dump;
+       rte_acl_reset;
+       rte_acl_reset_rules;
+       rte_acl_set_ctx_classify;
+
+       local: *;
+};
+</pre></div>
+</div>
+<p>Then any uses of BIND_DEFAULT_SYMBOL that pointed to the old node should be
+updated to point to the new version node in any header files for all affected
+symbols.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="o">-</span><span class="n">BIND_DEFAULT_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v21</span><span class="p">,</span><span class="w"> </span><span class="mi">21</span><span class="p">);</span><span class="w"></span>
+<span class="o">+</span><span class="n">BIND_DEFAULT_SYMBOL</span><span class="p">(</span><span class="n">rte_acl_create</span><span class="p">,</span><span class="w"> </span><span class="n">_v22</span><span class="p">,</span><span class="w"> </span><span class="mi">22</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Lastly, any VERSION_SYMBOL macros that point to the old version nodes
+should be removed, taking care to preserve any code that is shared
+with the new version node.</p>
+</section>
+</section>
+</section>
+<section id="running-the-abi-validator">
+<h2><span class="section-number">4.4. </span>Running the ABI Validator</h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">devtools</span></code> directory in the DPDK source tree contains a utility program,
+<code class="docutils literal notranslate"><span class="pre">check-abi.sh</span></code>, for validating the DPDK ABI based on the libabigail
+<a class="reference external" href="https://sourceware.org/libabigail/manual/abidiff.html">abidiff utility</a>.</p>
+<p>The syntax of the <code class="docutils literal notranslate"><span class="pre">check-abi.sh</span></code> utility is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>devtools/check-abi.sh &lt;refdir&gt; &lt;newdir&gt;
+</pre></div>
+</div>
+<p>Where &lt;refdir&gt; specifies the directory housing the reference build of DPDK,
+and &lt;newdir&gt; specifies the DPDK build directory to check the ABI of.</p>
+<p>The ABI compatibility is automatically verified when using a build script
+from <code class="docutils literal notranslate"><span class="pre">devtools</span></code>, if the variable <code class="docutils literal notranslate"><span class="pre">DPDK_ABI_REF_VERSION</span></code> is set with a tag,
+as described in <a class="reference internal" href="patches.html#integrated-abi-check"><span class="std std-ref">ABI check recommendations</span></a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="abi_policy.html" title="previous chapter"><span class="section-number">3. </span>ABI Policy</a></li>
+      <li>Next: <a href="documentation.html" title="next chapter"><span class="section-number">5. </span>DPDK Documentation Guidelines</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/abi_versioning.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

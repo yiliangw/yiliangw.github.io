@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>46. Packet Capture Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="47. Multi-process Support" href="multi_proc_support.html" />
+    <link rel="prev" title="45. Packet Capture Next Generation Library" href="pcapng_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packet-capture-library">
+<h1><span class="section-number">46. </span>Packet Capture Library</h1>
+<p>The DPDK <code class="docutils literal notranslate"><span class="pre">pdump</span></code> library provides a framework for packet capturing in DPDK.
+The library does the complete copy of the Rx and Tx mbufs to a new mempool and
+hence it slows down the performance of the applications, so it is recommended
+to use this library for debugging purposes.</p>
+<p>The library uses a generic multi process channel to facilitate communication
+between primary and secondary process for enabling/disabling packet capture on
+ports.</p>
+<p>The library provides the following APIs to initialize the packet capture framework, to enable
+or disable the packet capture, and to uninitialize it.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_init()</span></code>:
+This API initializes the packet capture framework.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_enable()</span></code>:
+This API enables the packet capture on a given port and queue.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_enable_bpf()</span></code>
+This API enables the packet capture on a given port and queue.
+It also allows setting an optional filter using DPDK BPF interpreter
+and setting the captured packet length.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_enable_by_deviceid()</span></code>:
+This API enables the packet capture on a given device id (<code class="docutils literal notranslate"><span class="pre">vdev</span> <span class="pre">name</span> <span class="pre">or</span> <span class="pre">pci</span> <span class="pre">address</span></code>) and queue.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_enable_bpf_by_deviceid()</span></code>
+This API enables the packet capture on a given device id (<code class="docutils literal notranslate"><span class="pre">vdev</span> <span class="pre">name</span> <span class="pre">or</span> <span class="pre">pci</span> <span class="pre">address</span></code>) and queue.
+It also allows setting an optional filter using DPDK BPF interpreter
+and setting the captured packet length.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_disable()</span></code>:
+This API disables the packet capture on a given port and queue.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_disable_by_deviceid()</span></code>:
+This API disables the packet capture on a given device id (<code class="docutils literal notranslate"><span class="pre">vdev</span> <span class="pre">name</span> <span class="pre">or</span> <span class="pre">pci</span> <span class="pre">address</span></code>) and queue.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rte_pdump_uninit()</span></code>:
+This API uninitializes the packet capture framework.</p></li>
+</ul>
+<section id="operation">
+<h2><span class="section-number">46.1. </span>Operation</h2>
+<p>The primary process using <code class="docutils literal notranslate"><span class="pre">librte_pdump</span></code> is responsible for initializing the packet
+capture framework. The packet capture framework, as part of its initialization, creates the
+multi process channel to facilitate communication with secondary process, so the
+secondary process <code class="docutils literal notranslate"><span class="pre">app/pdump</span></code> tool is responsible for enabling and disabling the packet capture on ports.</p>
+</section>
+<section id="implementation-details">
+<h2><span class="section-number">46.2. </span>Implementation Details</h2>
+<p>The library API <code class="docutils literal notranslate"><span class="pre">rte_pdump_init()</span></code>, initializes the packet capture framework by creating the multi process
+channel using <code class="docutils literal notranslate"><span class="pre">rte_mp_action_register()</span></code> API. The primary process will listen to secondary process requests
+to enable or disable the packet capture over the multi process channel.</p>
+<p>The library APIs <code class="docutils literal notranslate"><span class="pre">rte_pdump_enable()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_pdump_enable_by_deviceid()</span></code> enables the packet capture.
+For the calls to these APIs from secondary process, the library creates the “pdump enable” request and sends
+the request to the primary process over the multi process channel. The primary process takes this request
+and enables the packet capture by registering the Ethernet RX and TX callbacks for the given port or device_id
+and queue combinations. Then the primary process will mirror the packets to the new mempool and enqueue them to
+the rte_ring that secondary process have passed to these APIs.</p>
+<p>The packet ring supports one of two formats.
+The default format enqueues copies of the original packets into the rte_ring.
+If the <code class="docutils literal notranslate"><span class="pre">RTE_PDUMP_FLAG_PCAPNG</span></code> is set, the mbuf data is extended
+with header and trailer to match the format of Pcapng enhanced packet block.
+The enhanced packet block has meta-data such as the timestamp, port and queue
+the packet was captured on.
+It is up to the application consuming the packets from the ring
+to select the format desired.</p>
+<p>The library APIs <code class="docutils literal notranslate"><span class="pre">rte_pdump_disable()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_pdump_disable_by_deviceid()</span></code> disables the packet capture.
+For the calls to these APIs from secondary process, the library creates the “pdump disable” request and sends
+the request to the primary process over the multi process channel. The primary process takes this request and
+disables the packet capture by removing the Ethernet RX and TX callbacks for the given port or device_id and
+queue combinations.</p>
+<p>The library API <code class="docutils literal notranslate"><span class="pre">rte_pdump_uninit()</span></code>, uninitializes the packet capture framework by calling <code class="docutils literal notranslate"><span class="pre">rte_mp_action_unregister()</span></code>
+function.</p>
+</section>
+<section id="use-case-packet-capturing">
+<h2><span class="section-number">46.3. </span>Use Case: Packet Capturing</h2>
+<p>The DPDK <code class="docutils literal notranslate"><span class="pre">app/dpdk-dumpcap</span></code> utility uses this library
+to capture packets in DPDK.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="pcapng_lib.html" title="previous chapter"><span class="section-number">45. </span>Packet Capture Next Generation Library</a></li>
+      <li>Next: <a href="multi_proc_support.html" title="next chapter"><span class="section-number">47. </span>Multi-process Support</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/pdump_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

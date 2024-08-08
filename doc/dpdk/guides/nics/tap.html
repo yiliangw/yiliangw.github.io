@@ -1,0 +1,420 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>54. Tun|Tap Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="55. ThunderX NICVF Poll Mode Driver" href="thunderx.html" />
+    <link rel="prev" title="53. Soft NIC Poll Mode Driver" href="softnic.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="tun-tap-poll-mode-driver">
+<h1><span class="section-number">54. </span>Tun|Tap Poll Mode Driver</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_eth_tap.c</span></code> PMD creates a device using TAP interfaces on the
+local host. The PMD allows for DPDK and the host to communicate using a raw
+device interface on the host and in the DPDK application.</p>
+<p>The device created is a TAP device, which sends/receives packet in a raw
+format with a L2 header. The usage for a TAP PMD is for connectivity to the
+local host using a TAP interface. When the TAP PMD is initialized it will
+create a number of tap devices in the host accessed via <code class="docutils literal notranslate"><span class="pre">ifconfig</span> <span class="pre">-a</span></code> or
+<code class="docutils literal notranslate"><span class="pre">ip</span></code> command. The commands can be used to assign and query the virtual like
+device.</p>
+<p>These TAP interfaces can be used with Wireshark or tcpdump or Pktgen-DPDK
+along with being able to be used as a network connection to the DPDK
+application. The method enable one or more interfaces is to use the
+<code class="docutils literal notranslate"><span class="pre">--vdev=net_tap0</span></code> option on the DPDK application command line. Each
+<code class="docutils literal notranslate"><span class="pre">--vdev=net_tap1</span></code> option given will create an interface named dtap0, dtap1,
+and so on.</p>
+<p>The interface name can be changed by adding the <code class="docutils literal notranslate"><span class="pre">iface=foo0</span></code>, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev=net_tap0,iface=foo0 --vdev=net_tap1,iface=foo1, ...
+</pre></div>
+</div>
+<p>Normally the PMD will generate a random MAC address, but when testing or with
+a static configuration the developer may need a fixed MAC address style.
+Using the option <code class="docutils literal notranslate"><span class="pre">mac=fixed</span></code> you can create a fixed known MAC address:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev=net_tap0,mac=fixed
+</pre></div>
+</div>
+<p>The MAC address will have a fixed value with the last octet incrementing by one
+for each interface string containing <code class="docutils literal notranslate"><span class="pre">mac=fixed</span></code>. The MAC address is formatted
+as 02:’d’:’t’:’a’:’p’:[00-FF]. Convert the characters to hex and you get the
+actual MAC address: <code class="docutils literal notranslate"><span class="pre">02:64:74:61:70:[00-FF]</span></code>.</p>
+<blockquote>
+<div><p>–vdev=net_tap0,mac=”02:64:74:61:70:11”</p>
+</div></blockquote>
+<p>The MAC address will have a user value passed as string. The MAC address is in
+format with delimiter <code class="docutils literal notranslate"><span class="pre">:</span></code>. The string is byte converted to hex and you get
+the actual MAC address: <code class="docutils literal notranslate"><span class="pre">02:64:74:61:70:11</span></code>.</p>
+<p>It is possible to specify a remote netdevice to capture packets from by adding
+<code class="docutils literal notranslate"><span class="pre">remote=foo1</span></code>, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev=net_tap,iface=tap0,remote=foo1
+</pre></div>
+</div>
+<p>If a <code class="docutils literal notranslate"><span class="pre">remote</span></code> is set, the tap MAC address will be set to match the remote one
+just after netdevice creation. Using TC rules, traffic from the remote netdevice
+will be redirected to the tap. If the tap is in promiscuous mode, then all
+packets will be redirected. In allmulti mode, all multicast packets will be
+redirected.</p>
+<p>Using the remote feature is especially useful for capturing traffic from a
+netdevice that has no support in the DPDK. It is possible to add explicit
+rte_flow rules on the tap PMD to capture specific traffic (see next section for
+examples).</p>
+<p>After the DPDK application is started you can send and receive packets on the
+interface using the standard rx_burst/tx_burst APIs in DPDK. From the host
+point of view you can use any host tool like tcpdump, Wireshark, ping, Pktgen
+and others to communicate with the DPDK application. The DPDK application may
+not understand network protocols like IPv4/6, UDP or TCP unless the
+application has been written to understand these protocols.</p>
+<p>If you need the interface as a real network interface meaning running and has
+a valid IP address then you can do this with the following commands:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo ip link set dtap0 up; sudo ip addr add 192.168.0.250/24 dev dtap0
+sudo ip link set dtap1 up; sudo ip addr add 192.168.1.250/24 dev dtap1
+</pre></div>
+</div>
+<p>Please change the IP addresses as you see fit.</p>
+<p>If routing is enabled on the host you can also communicate with the DPDK App
+over the internet via a standard socket layer application as long as you
+account for the protocol handling in the application.</p>
+<p>If you have a Network Stack in your DPDK application or something like it you
+can utilize that stack to handle the network protocols. Plus you would be able
+to address the interface using an IP address assigned to the internal
+interface.</p>
+<p>Normally, when the DPDK application exits,
+the TAP device is marked down and is removed.
+But this behaviour can be overridden by the use of the persist flag, example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev=net_tap0,iface=tap0,persist ...
+</pre></div>
+</div>
+<p>The TUN PMD allows user to create a TUN device on host. The PMD allows user
+to transmit and receive packets via DPDK API calls with L3 header and payload.
+The devices in host can be accessed via <code class="docutils literal notranslate"><span class="pre">ifconfig</span></code> or <code class="docutils literal notranslate"><span class="pre">ip</span></code> command. TUN
+interfaces are passed to DPDK <code class="docutils literal notranslate"><span class="pre">rte_eal_init</span></code> arguments as <code class="docutils literal notranslate"><span class="pre">--vdev=net_tunX</span></code>,
+where X stands for unique id, example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--vdev=net_tun0 --vdev=net_tun1,iface=foo1, ...
+</pre></div>
+</div>
+<p>Unlike TAP PMD, TUN PMD does not support user arguments as <code class="docutils literal notranslate"><span class="pre">MAC</span></code> or <code class="docutils literal notranslate"><span class="pre">remote</span></code> user
+options. Default interface name is <code class="docutils literal notranslate"><span class="pre">dtunX</span></code>, where X stands for unique id.</p>
+<section id="flow-api-support">
+<h2><span class="section-number">54.1. </span>Flow API support</h2>
+<p>The tap PMD supports major flow API pattern items and actions, when running on
+linux kernels above 4.2 (“Flower” classifier required).
+The kernel support can be checked with this command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>zcat /proc/config.gz | ( grep &#39;CLS_FLOWER=&#39; || echo &#39;not supported&#39; ) |
+tee -a /dev/stderr | grep -q &#39;=m&#39; &amp;&amp;
+lsmod | ( grep cls_flower || echo &#39;try modprobe cls_flower&#39; )
+</pre></div>
+</div>
+<p>Supported items:</p>
+<ul class="simple">
+<li><p>eth: src and dst (with variable masks), and eth_type (0xffff mask).</p></li>
+<li><p>vlan: vid, pcp, but not eid. (requires kernel 4.9)</p></li>
+<li><p>ipv4/6: src and dst (with variable masks), and ip_proto (0xffff mask).</p></li>
+<li><p>udp/tcp: src and dst port (0xffff) mask.</p></li>
+</ul>
+<p>Supported actions:</p>
+<ul class="simple">
+<li><p>DROP</p></li>
+<li><p>QUEUE</p></li>
+<li><p>PASSTHRU</p></li>
+<li><p>RSS (requires kernel 4.9)</p></li>
+</ul>
+<p>It is generally not possible to provide a “last” item. However, if the “last”
+item, once masked, is identical to the masked spec, then it is supported.</p>
+<p>Only IPv4/6 and MAC addresses can use a variable mask. All other items need a
+full mask (exact match).</p>
+<p>As rules are translated to TC, it is possible to show them with something like:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tc -s filter show dev tap1 parent 1:
+</pre></div>
+</div>
+<section id="examples-of-testpmd-flow-rules">
+<h3><span class="section-number">54.1.1. </span>Examples of testpmd flow rules</h3>
+<p>Drop packets for destination IP 192.0.2.1:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 priority 1 ingress pattern eth / ipv4 dst is 192.0.2.1 \
+         / end actions drop / end
+</pre></div>
+</div>
+<p>Ensure packets from a given MAC address are received on a queue 2:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 priority 2 ingress pattern eth src is 06:05:04:03:02:01 \
+         / end actions queue index 2 / end
+</pre></div>
+</div>
+<p>Drop UDP packets in vlan 3:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 priority 3 ingress pattern eth / vlan vid is 3 / \
+         ipv4 proto is 17 / end actions drop / end
+</pre></div>
+</div>
+<p>Distribute IPv4 TCP packets using RSS to a given MAC address over queues 0-3:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 priority 4 ingress pattern eth dst is 0a:0b:0c:0d:0e:0f \
+         / ipv4 / tcp / end actions rss queues 0 1 2 3 end / end
+</pre></div>
+</div>
+</section>
+</section>
+<section id="multi-process-sharing">
+<h2><span class="section-number">54.2. </span>Multi-process sharing</h2>
+<p>It is possible to attach an existing TAP device in a secondary process,
+by declaring it as a vdev with the same name as in the primary process,
+and without any parameter.</p>
+<p>The port attached in a secondary process will give access to the
+statistics and the queues.
+Therefore it can be used for monitoring or Rx/Tx processing.</p>
+<p>The IPC synchronization of Rx/Tx queues is currently limited:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Maximum 8 queues shared</p></li>
+<li><p>Synchronized on probing, but not on later port update</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="example">
+<h2><span class="section-number">54.3. </span>Example</h2>
+<p>The following is a simple example of using the TAP PMD with the Pktgen
+packet generator. It requires that the <code class="docutils literal notranslate"><span class="pre">socat</span></code> utility is installed on the
+test system.</p>
+<p>Build DPDK, then pull down Pktgen and build pktgen using the DPDK SDK/Target
+used to build the dpdk you pulled down.</p>
+<p>Run pktgen from the pktgen directory in a terminal with a commandline like the
+following:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo ./app/app/x86_64-native-linux-gcc/app/pktgen -l 1-5 -n 4        \
+ --proc-type auto --log-level debug --socket-mem 512,512 --file-prefix pg   \
+ --vdev=net_tap0 --vdev=net_tap1 -b 05:00.0 -b 05:00.1                  \
+ -b 04:00.0 -b 04:00.1 -b 04:00.2 -b 04:00.3                            \
+ -b 81:00.0 -b 81:00.1 -b 81:00.2 -b 81:00.3                            \
+ -b 82:00.0 -b 83:00.0 -- -T -P -m [2:3].0 -m [4:5].1                   \
+ -f themes/black-yellow.theme
+</pre></div>
+</div>
+<p>Verify with <code class="docutils literal notranslate"><span class="pre">ifconfig</span> <span class="pre">-a</span></code> command in a different xterm window, should have a
+<code class="docutils literal notranslate"><span class="pre">dtap0</span></code> and <code class="docutils literal notranslate"><span class="pre">dtap1</span></code> interfaces created.</p>
+<p>Next set the links for the two interfaces to up via the commands below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo ip link set dtap0 up; sudo ip addr add 192.168.0.250/24 dev dtap0
+sudo ip link set dtap1 up; sudo ip addr add 192.168.1.250/24 dev dtap1
+</pre></div>
+</div>
+<p>Then use socat to create a loopback for the two interfaces:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo socat interface:dtap0 interface:dtap1
+</pre></div>
+</div>
+<p>Then on the Pktgen command line interface you can start sending packets using
+the commands <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">0</span></code> and <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">1</span></code> or you can start both at the same
+time with <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">all</span></code>. The command <code class="docutils literal notranslate"><span class="pre">str</span></code> is an alias for <code class="docutils literal notranslate"><span class="pre">start</span> <span class="pre">all</span></code> and
+<code class="docutils literal notranslate"><span class="pre">stp</span></code> is an alias for <code class="docutils literal notranslate"><span class="pre">stop</span> <span class="pre">all</span></code>.</p>
+<p>While running you should see the 64 byte counters increasing to verify the
+traffic is being looped back. You can use <code class="docutils literal notranslate"><span class="pre">set</span> <span class="pre">all</span> <span class="pre">size</span> <span class="pre">XXX</span></code> to change the
+size of the packets after you stop the traffic. Use pktgen <code class="docutils literal notranslate"><span class="pre">help</span></code>
+command to see a list of all commands. You can also use the <code class="docutils literal notranslate"><span class="pre">-f</span></code> option to
+load commands at startup in command line or Lua script in pktgen.</p>
+</section>
+<section id="rss-specifics">
+<h2><span class="section-number">54.4. </span>RSS specifics</h2>
+<p>Packet distribution in TAP is done by the kernel which has a default
+distribution. This feature is adding RSS distribution based on eBPF code.
+The default eBPF code calculates RSS hash based on Toeplitz algorithm for
+a fixed RSS key. It is calculated on fixed packet offsets. For IPv4 and IPv6 it
+is calculated over src/dst addresses (8 or 32 bytes for IPv4 or IPv6
+respectively) and src/dst TCP/UDP ports (4 bytes).</p>
+<p>The RSS algorithm is written in file <code class="docutils literal notranslate"><span class="pre">tap_bpf_program.c</span></code> which
+does not take part in TAP PMD compilation. Instead this file is compiled
+in advance to eBPF object file. The eBPF object file is then parsed and
+translated into eBPF byte code in the format of C arrays of eBPF
+instructions. The C array of eBPF instructions is part of TAP PMD tree and
+is taking part in TAP PMD compilation. At run time the C arrays are uploaded to
+the kernel via BPF system calls and the RSS hash is calculated by the
+kernel.</p>
+<p>It is possible to support different RSS hash algorithms by updating file
+<code class="docutils literal notranslate"><span class="pre">tap_bpf_program.c</span></code>  In order to add a new RSS hash algorithm follow these
+steps:</p>
+<ol class="arabic">
+<li><p>Write the new RSS implementation in file <code class="docutils literal notranslate"><span class="pre">tap_bpf_program.c</span></code></p>
+<p>BPF programs which are uploaded to the kernel correspond to
+C functions under different ELF sections.</p>
+</li>
+<li><p>Install <code class="docutils literal notranslate"><span class="pre">LLVM</span></code> library and <code class="docutils literal notranslate"><span class="pre">clang</span></code> compiler versions 3.7 and above</p></li>
+<li><p>Use make to compile  <cite>tap_bpf_program.c`</cite> via <code class="docutils literal notranslate"><span class="pre">LLVM</span></code> into an object file
+and extract the resulting instructions into <code class="docutils literal notranslate"><span class="pre">tap_bpf_insn.h</span></code>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cd bpf; make
+</pre></div>
+</div>
+</li>
+<li><p>Recompile the TAP PMD.</p></li>
+</ol>
+<p>The C arrays are uploaded to the kernel using BPF system calls.</p>
+<p><code class="docutils literal notranslate"><span class="pre">tc</span></code> (traffic control) is a well known user space utility program used to
+configure the Linux kernel packet scheduler. It is usually packaged as
+part of the <code class="docutils literal notranslate"><span class="pre">iproute2</span></code> package.
+Since commit 11c39b5e9 (“tc: add eBPF support to f_bpf”) <code class="docutils literal notranslate"><span class="pre">tc</span></code> can be used
+to uploads eBPF code to the kernel and can be patched in order to print the
+C arrays of eBPF instructions just before calling the BPF system call.
+Please refer to <code class="docutils literal notranslate"><span class="pre">iproute2</span></code> package file <code class="docutils literal notranslate"><span class="pre">lib/bpf.c</span></code> function
+<code class="docutils literal notranslate"><span class="pre">bpf_prog_load()</span></code>.</p>
+<p>An example utility for eBPF instruction generation in the format of C arrays will
+be added in next releases</p>
+<p>TAP reports on supported RSS functions as part of dev_infos_get callback:
+<code class="docutils literal notranslate"><span class="pre">RTE_ETH_RSS_IP</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_ETH_RSS_UDP</span></code> and <code class="docutils literal notranslate"><span class="pre">RTE_ETH_RSS_TCP</span></code>.
+<strong>Known limitation:</strong> TAP supports all of the above hash functions together
+and not in partial combinations.</p>
+</section>
+<section id="systems-supporting-flow-api">
+<h2><span class="section-number">54.5. </span>Systems supporting flow API</h2>
+<ul class="simple">
+<li><p>“tc flower” classifier requires linux kernel above 4.2</p></li>
+<li><p>eBPF/RSS requires linux kernel above 4.9</p></li>
+</ul>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 47%" />
+<col style="width: 53%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>RH7.3</p></td>
+<td><p>No flow rule support</p></td>
+</tr>
+<tr class="row-even"><td><p>RH7.4</p></td>
+<td><p>No RSS action support</p></td>
+</tr>
+<tr class="row-odd"><td><p>RH7.5</p></td>
+<td><p>No RSS action support</p></td>
+</tr>
+<tr class="row-even"><td><p>SLES 15,
+kernel 4.12</p></td>
+<td><p>No limitation</p></td>
+</tr>
+<tr class="row-odd"><td><p>Azure Ubuntu 16.04,
+kernel 4.13</p></td>
+<td><p>No limitation</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="limitations">
+<h2><span class="section-number">54.6. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Rx/Tx must have the same number of queues.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="softnic.html" title="previous chapter"><span class="section-number">53. </span>Soft NIC Poll Mode Driver</a></li>
+      <li>Next: <a href="thunderx.html" title="next chapter"><span class="section-number">55. </span>ThunderX NICVF Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/tap.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

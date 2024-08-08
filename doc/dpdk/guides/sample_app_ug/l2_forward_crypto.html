@@ -1,0 +1,367 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>14. L2 Forwarding with Crypto Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="15. L2 Forwarding Sample Application (in Real and Virtualized Environments) with core load statistics." href="l2_forward_job_stats.html" />
+    <link rel="prev" title="13. Packet copying using DMAdev library" href="dma.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="l2-forwarding-with-crypto-sample-application">
+<span id="l2-fwd-crypto-app"></span><h1><span class="section-number">14. </span>L2 Forwarding with Crypto Sample Application</h1>
+<p>The L2 Forwarding with Crypto (l2fwd-crypto) sample application is a simple example of packet processing using
+the Data Plane Development Kit (DPDK), in conjunction with the Cryptodev library.</p>
+<section id="overview">
+<h2><span class="section-number">14.1. </span>Overview</h2>
+<p>The L2 Forwarding with Crypto sample application performs a crypto operation (cipher/hash)
+specified by the user from command line (or using the default values),
+with a crypto device capable of doing that operation,
+for each packet that is received on an RX_PORT and performs L2 forwarding.
+The destination port is the adjacent port from the enabled portmask, that is,
+if the first four ports are enabled (portmask 0xf),
+ports 0 and 1 forward into each other, and ports 2 and 3 forward into each other.
+Also, if MAC addresses updating is enabled, the MAC addresses are affected as follows:</p>
+<ul class="simple">
+<li><p>The source MAC address is replaced by the TX_PORT MAC address</p></li>
+<li><p>The destination MAC address is replaced by  02:00:00:00:00:TX_PORT_ID</p></li>
+</ul>
+</section>
+<section id="compiling-the-application">
+<h2><span class="section-number">14.2. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+<p>The application is located in the <code class="docutils literal notranslate"><span class="pre">l2fwd-crypt</span></code> sub-directory.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">14.3. </span>Running the Application</h2>
+<p>The application requires a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-l2fwd-crypto [EAL options] -- [-p PORTMASK] [-q NQ] [-s] [-T PERIOD] /</span>
+<span class="go">[--cdev_type HW/SW/ANY] [--chain HASH_CIPHER/CIPHER_HASH/CIPHER_ONLY/HASH_ONLY/AEAD] /</span>
+<span class="go">[--cipher_algo ALGO] [--cipher_op ENCRYPT/DECRYPT] [--cipher_dataunit_len SIZE] /</span>
+<span class="go">[--cipher_key KEY] [--cipher_key_random_size SIZE] [--cipher_iv IV] /</span>
+<span class="go">[--cipher_iv_random_size SIZE] /</span>
+<span class="go">[--auth_algo ALGO] [--auth_op GENERATE/VERIFY] [--auth_key KEY] /</span>
+<span class="go">[--auth_key_random_size SIZE] [--auth_iv IV] [--auth_iv_random_size SIZE] /</span>
+<span class="go">[--aead_algo ALGO] [--aead_op ENCRYPT/DECRYPT] [--aead_key KEY] /</span>
+<span class="go">[--aead_key_random_size SIZE] [--aead_iv] [--aead_iv_random_size SIZE] /</span>
+<span class="go">[--aad AAD] [--aad_random_size SIZE] /</span>
+<span class="go">[--digest size SIZE] [--sessionless] [--cryptodev_mask MASK] /</span>
+<span class="go">[--mac-updating] [--no-mac-updating]</span>
+</pre></div>
+</div>
+<p>where,</p>
+<ul>
+<li><p>p PORTMASK: A hexadecimal bitmask of the ports to configure. (Default is all the ports.)</p></li>
+<li><p>q NQ: A number of queues (=ports) per lcore. (Default is 1.)</p></li>
+<li><p>s: manage all ports from a single core.</p></li>
+<li><p>T PERIOD: statistics will be refreshed each PERIOD seconds.</p>
+<p>(0 to disable, 10 default, 86400 maximum.)</p>
+</li>
+<li><p>cdev_type: select preferred crypto device type: HW, SW or anything (ANY).</p>
+<p>(Default is ANY.)</p>
+</li>
+<li><p>chain: select the operation chaining to perform: Cipher-&gt;Hash (CIPHER_HASH),</p>
+<p>Hash-&gt;Cipher (HASH_CIPHER), Cipher (CIPHER_ONLY), Hash (HASH_ONLY)</p>
+<p>or AEAD (AEAD).</p>
+<p>(Default is Cipher-&gt;Hash.)</p>
+</li>
+<li><p>cipher_algo: select the ciphering algorithm. (Default is aes-cbc.)</p></li>
+<li><p>cipher_op: select the ciphering operation to perform: ENCRYPT or DECRYPT.</p>
+<p>(Default is ENCRYPT.)</p>
+</li>
+<li><p>cipher_dataunit_len: set the length of the cipher data-unit.</p></li>
+<li><p>cipher_key: set the ciphering key to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>cipher_key_random_size: set the size of the ciphering key,</p>
+<p>which will be generated randomly.</p>
+<p>Note that if –cipher_key is used, this will be ignored.</p>
+</li>
+<li><p>cipher_iv: set the cipher IV to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>cipher_iv_random_size: set the size of the cipher IV, which will be generated randomly.</p>
+<p>Note that if –cipher_iv is used, this will be ignored.</p>
+</li>
+<li><p>auth_algo: select the authentication algorithm. (Default is sha1-hmac.)</p></li>
+<li><p>auth_op: select the authentication operation to perform: GENERATE or VERIFY.</p>
+<p>(Default is GENERATE.)</p>
+</li>
+<li><p>auth_key: set the authentication key to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>auth_key_random_size: set the size of the authentication key,</p>
+<p>which will be generated randomly.</p>
+<p>Note that if –auth_key is used, this will be ignored.</p>
+</li>
+<li><p>auth_iv: set the auth IV to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>auth_iv_random_size: set the size of the auth IV, which will be generated randomly.</p>
+<p>Note that if –auth_iv is used, this will be ignored.</p>
+</li>
+<li><p>aead_algo: select the AEAD algorithm. (Default is aes-gcm.)</p></li>
+<li><p>aead_op: select the AEAD operation to perform: ENCRYPT or DECRYPT.</p>
+<p>(Default is ENCRYPT.)</p>
+</li>
+<li><p>aead_key: set the AEAD key to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>aead_key_random_size: set the size of the AEAD key,</p>
+<p>which will be generated randomly.</p>
+<p>Note that if –aead_key is used, this will be ignored.</p>
+</li>
+<li><p>aead_iv: set the AEAD IV to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>aead_iv_random_size: set the size of the AEAD IV, which will be generated randomly.</p>
+<p>Note that if –aead_iv is used, this will be ignored.</p>
+</li>
+<li><p>aad: set the AAD to be used. Bytes have to be separated with “:”.</p></li>
+<li><p>aad_random_size: set the size of the AAD, which will be generated randomly.</p>
+<p>Note that if –aad is used, this will be ignored.</p>
+</li>
+<li><p>digest_size: set the size of the digest to be generated/verified.</p></li>
+<li><p>sessionless: no crypto session will be created.</p></li>
+<li><p>cryptodev_mask: A hexadecimal bitmask of the cryptodevs to be used by the
+application.</p>
+<p>(Default is all cryptodevs.)</p>
+</li>
+<li><p>[no-]mac-updating: Enable or disable MAC addresses updating. (Enabled by default.)</p></li>
+</ul>
+<p>The application requires that crypto devices capable of performing
+the specified crypto operation are available on application initialization.
+This means that HW crypto device/s must be bound to a DPDK driver or
+a SW crypto device/s (virtual crypto PMD) must be created (using –vdev).</p>
+<p>To run the application in linux environment with 2 lcores, 2 ports and 2 crypto devices, issue the command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-l2fwd-crypto -l <span class="m">0</span>-1 --vdev <span class="s2">&quot;crypto_aesni_mb0&quot;</span> <span class="se">\</span>
+--vdev <span class="s2">&quot;crypto_aesni_mb1&quot;</span> -- -p 0x3 --chain CIPHER_HASH <span class="se">\</span>
+--cipher_op ENCRYPT --cipher_algo aes-cbc <span class="se">\</span>
+--cipher_key <span class="m">00</span>:01:02:03:04:05:06:07:08:09:0a:0b:0c:0d:0e:0f <span class="se">\</span>
+--auth_op GENERATE --auth_algo aes-xcbc-mac <span class="se">\</span>
+--auth_key <span class="m">10</span>:11:12:13:14:15:16:17:18:19:1a:1b:1c:1d:1e:1f
+</pre></div>
+</div>
+<p>Refer to the <em>DPDK Getting Started Guide</em> for general information on running applications
+and the Environment Abstraction Layer (EAL) options.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">l2fwd-crypto</span></code> sample application requires IPv4 packets for crypto operation.</p></li>
+<li><p>If multiple Ethernet ports are passed, then equal number of crypto devices are to be passed.</p></li>
+<li><p>All crypto devices shall use the same session.</p></li>
+</ul>
+</div>
+</section>
+<section id="explanation">
+<h2><span class="section-number">14.4. </span>Explanation</h2>
+<p>The L2 forward with Crypto application demonstrates the performance of a crypto operation
+on a packet received on an RX PORT before forwarding it to a TX PORT.</p>
+<p>The following figure illustrates a sample flow of a packet in the application,
+from reception until transmission.</p>
+<figure class="align-default" id="id1">
+<span id="figure-l2-fwd-encrypt-flow"></span><img alt="../_images/l2_fwd_encrypt_flow.svg" src="../_images/l2_fwd_encrypt_flow.svg" /><figcaption>
+<p><span class="caption-number">Fig. 14.1 </span><span class="caption-text">Encryption flow through the L2 Forwarding with Crypto Application</span></p>
+</figcaption>
+</figure>
+<p>The following sections provide some explanation of the application.</p>
+<section id="crypto-operation-specification">
+<h3><span class="section-number">14.4.1. </span>Crypto operation specification</h3>
+<p>All the packets received in all the ports get transformed by the crypto device/s
+(ciphering and/or authentication).
+The crypto operation to be performed on the packet is parsed from the command line.
+(Go to “Running the Application” section for all the options.)</p>
+<p>If no parameter is passed, the default crypto operation is:</p>
+<ul class="simple">
+<li><p>Encryption with AES-CBC with 128 bit key.</p></li>
+<li><p>Authentication with SHA1-HMAC (generation).</p></li>
+<li><p>Keys, IV and AAD are generated randomly.</p></li>
+</ul>
+<p>There are two methods to pass keys, IV and ADD from the command line:</p>
+<ul>
+<li><p>Passing the full key, separated bytes by “:”:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--cipher_key 00:11:22:33:44
+</pre></div>
+</div>
+</li>
+<li><p>Passing the size, so key is generated randomly:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--cipher_key_random_size 16
+</pre></div>
+</div>
+</li>
+</ul>
+<dl class="simple">
+<dt><strong>Note</strong>:</dt><dd><p>If full key is passed (first method) and the size is passed as well (second method),
+the latter will be ignored.</p>
+</dd>
+</dl>
+<p>Size of these keys are checked (regardless the method), before starting the app,
+to make sure that it is supported by the crypto devices.</p>
+</section>
+<section id="crypto-device-initialization">
+<h3><span class="section-number">14.4.2. </span>Crypto device initialization</h3>
+<p>Once the encryption operation is defined, crypto devices are initialized.
+The crypto devices must be either bound to a DPDK driver (if they are physical devices)
+or created using the EAL option –vdev (if they are virtual devices),
+when running the application.</p>
+<p>The initialize_cryptodevs() function performs the device initialization.
+It iterates through the list of the available crypto devices and
+checks which ones are capable of performing the operation.
+Each device has a set of capabilities associated with it,
+which are stored in the device info structure, so the function checks if the operation
+is within the structure of each device.</p>
+<p>The following code checks if the device supports the specified cipher algorithm
+(similar for the authentication algorithm):</p>
+<p>If a capable crypto device is found, key sizes are checked to see if they are supported
+(cipher key and IV for the ciphering):</p>
+<p>After all the checks, the device is configured and it is added to the
+crypto device list.</p>
+<dl class="simple">
+<dt><strong>Note</strong>:</dt><dd><p>The number of crypto devices that supports the specified crypto operation
+must be at least the number of ports to be used.</p>
+</dd>
+</dl>
+</section>
+<section id="session-creation">
+<h3><span class="section-number">14.4.3. </span>Session creation</h3>
+<p>The crypto operation has a crypto session associated to it, which contains
+information such as the transform chain to perform (e.g. ciphering then hashing),
+pointers to the keys, lengths… etc.</p>
+<p>This session is created and is later attached to the crypto operation:</p>
+</section>
+<section id="crypto-operation-creation">
+<h3><span class="section-number">14.4.4. </span>Crypto operation creation</h3>
+<p>Given N packets received from an RX PORT, N crypto operations are allocated
+and filled:</p>
+<p>After filling the crypto operation (including session attachment),
+the mbuf which will be transformed is attached to it:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>op-&gt;sym-&gt;m_src = m;
+</pre></div>
+</div>
+<p>Since no destination mbuf is set, the source mbuf will be overwritten
+after the operation is done (in-place).</p>
+</section>
+<section id="crypto-operation-enqueuing-dequeuing">
+<h3><span class="section-number">14.4.5. </span>Crypto operation enqueuing/dequeuing</h3>
+<p>Once the operation has been created, it has to be enqueued in one of the crypto devices.
+Before doing so, for performance reasons, the operation stays in a buffer.
+When the buffer has enough operations (MAX_PKT_BURST), they are enqueued in the device,
+which will perform the operation at that moment:</p>
+<p>After this, the operations are dequeued from the device, and the transformed mbuf
+is extracted from the operation. Then, the operation is freed and the mbuf is
+forwarded as it is done in the L2 forwarding application.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="dma.html" title="previous chapter"><span class="section-number">13. </span>Packet copying using DMAdev library</a></li>
+      <li>Next: <a href="l2_forward_job_stats.html" title="next chapter"><span class="section-number">15. </span>L2 Forwarding Sample Application (in Real and Virtualized Environments) with core load statistics.</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/l2_forward_crypto.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

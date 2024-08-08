@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Baseband Device Drivers &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Baseband Device Supported Functionality Matrices" href="overview.html" />
+    <link rel="prev" title="60. Poll Mode Driver for Paravirtual VMXNET3 NIC" href="../nics/vmxnet3.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="baseband-device-drivers">
+<h1>Baseband Device Drivers</h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">1. Baseband Device Supported Functionality Matrices</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="overview.html#supported-feature-flags">1.1. Supported Feature Flags</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="null.html">2. BBDEV null Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="null.html#limitations">2.1. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="null.html#installation">2.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="null.html#initialization">2.3. Initialization</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="turbo_sw.html">3. SW Turbo Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="turbo_sw.html#features">3.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="turbo_sw.html#limitations">3.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="turbo_sw.html#installation">3.3. Installation</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fpga_lte_fec.html">4. Intel(R) FPGA LTE FEC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fpga_lte_fec.html#features">4.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_lte_fec.html#limitations">4.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_lte_fec.html#installation">4.3. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_lte_fec.html#initialization">4.4. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_lte_fec.html#test-application">4.5. Test Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fpga_5gnr_fec.html">5. Intel(R) FPGA 5GNR FEC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fpga_5gnr_fec.html#features">5.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_5gnr_fec.html#limitations">5.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_5gnr_fec.html#installation">5.3. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_5gnr_fec.html#initialization">5.4. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fpga_5gnr_fec.html#test-application">5.5. Test Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="acc100.html">6. Intel(R) ACC100 and ACC101 5G/4G FEC Poll Mode Drivers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="acc100.html#features">6.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acc100.html#installation">6.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acc100.html#initialization">6.3. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="acc100.html#test-application">6.4. Test Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vrb1.html">7. Intel® vRAN Boost Poll Mode Driver (PMD)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vrb1.html#features">7.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb1.html#installation">7.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb1.html#initialization">7.3. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb1.html#test-application">7.4. Test Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vrb2.html">8. Intel® vRAN Boost v2 Poll Mode Driver (PMD)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vrb2.html#features">8.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb2.html#installation">8.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb2.html#initialization">8.3. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vrb2.html#test-application">8.4. Test Application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="la12xx.html">9. NXP LA12xx Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#features">9.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#installation">9.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#initialization">9.3. Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#prerequisites">9.4. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#enabling-logs">9.5. Enabling logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="la12xx.html#test-application">9.6. Test Application</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../nics/vmxnet3.html" title="previous chapter"><span class="section-number">60. </span>Poll Mode Driver for Paravirtual VMXNET3 NIC</a></li>
+      <li>Next: <a href="overview.html" title="next chapter"><span class="section-number">1. </span>Baseband Device Supported Functionality Matrices</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/bbdevs/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

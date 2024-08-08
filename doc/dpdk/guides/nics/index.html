@@ -1,0 +1,1210 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Network Interface Controller Drivers &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Overview of Networking Drivers" href="overview.html" />
+    <link rel="prev" title="4. Testpmd Runtime Functions" href="../testpmd_app_ug/testpmd_funcs.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="network-interface-controller-drivers">
+<h1>Network Interface Controller Drivers</h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="overview.html">1. Overview of Networking Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">2. Features Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="features.html#speed-capabilities">2.1. Speed capabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#link-status">2.2. Link status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#link-status-event">2.3. Link status event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#removal-event">2.4. Removal event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#queue-status-event">2.5. Queue status event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rx-interrupt">2.6. Rx interrupt</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#lock-free-tx-queue">2.7. Lock-free Tx queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#fast-mbuf-free">2.8. Fast mbuf free</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#free-tx-mbuf-on-demand">2.9. Free Tx mbuf on demand</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#queue-start-stop">2.10. Queue start/stop</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#mtu-update">2.11. MTU update</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#scattered-rx">2.12. Scattered Rx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#buffer-split-on-rx">2.13. Buffer split on Rx</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#lro">2.14. LRO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#tso">2.15. TSO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#promiscuous-mode">2.16. Promiscuous mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#allmulticast-mode">2.17. Allmulticast mode</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#unicast-mac-filter">2.18. Unicast MAC filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#multicast-mac-filter">2.19. Multicast MAC filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rss-hash">2.20. RSS hash</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#inner-rss">2.21. Inner RSS</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rss-key-update">2.22. RSS key update</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rss-reta-update">2.23. RSS reta update</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#vmdq">2.24. VMDq</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#sr-iov">2.25. SR-IOV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#dcb">2.26. DCB</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#vlan-filter">2.27. VLAN filter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#flow-control">2.28. Flow control</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rate-limitation">2.29. Rate limitation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#inline-crypto">2.30. Inline crypto</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#inline-protocol">2.31. Inline protocol</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#crc-offload">2.32. CRC offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#vlan-offload">2.33. VLAN offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#qinq-offload">2.34. QinQ offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#fec">2.35. FEC</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#ip-reassembly">2.36. IP reassembly</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#l3-checksum-offload">2.37. L3 checksum offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#l4-checksum-offload">2.38. L4 checksum offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#timestamp-offload">2.39. Timestamp offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#macsec-offload">2.40. MACsec offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#inner-l3-checksum">2.41. Inner L3 checksum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#inner-l4-checksum">2.42. Inner L4 checksum</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#shared-rx-queue">2.43. Shared Rx queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#packet-type-parsing">2.44. Packet type parsing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#timesync">2.45. Timesync</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rx-descriptor-status">2.46. Rx descriptor status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#tx-descriptor-status">2.47. Tx descriptor status</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#basic-stats">2.48. Basic stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#extended-stats">2.49. Extended stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#stats-per-queue">2.50. Stats per queue</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#congestion-management">2.51. Congestion management</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#fw-version">2.52. FW version</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#eeprom-dump">2.53. EEPROM dump</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#module-eeprom-dump">2.54. Module EEPROM dump</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#registers-dump">2.55. Registers dump</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#led">2.56. LED</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#multiprocess-aware">2.57. Multiprocess aware</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#freebsd">2.58. FreeBSD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#linux">2.59. Linux</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#windows">2.60. Windows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#armv7">2.61. ARMv7</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#armv8">2.62. ARMv8</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#loongarch64">2.63. LoongArch64</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#power8">2.64. Power8</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#rv64">2.65. rv64</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#x86-32">2.66. x86-32</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#x86-64">2.67. x86-64</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#usage-doc">2.68. Usage doc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#design-doc">2.69. Design doc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#perf-doc">2.70. Perf doc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#runtime-rx-queue-setup">2.71. Runtime Rx queue setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#runtime-tx-queue-setup">2.72. Runtime Tx queue setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#burst-mode-info">2.73. Burst mode info</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#pmd-power-management-using-monitor-addresses">2.74. PMD power management using monitor addresses</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html#other-dev-ops-not-represented-by-a-feature">2.75. Other dev ops not represented by a Feature</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="build_and_test.html">3. Compiling and testing a PMD for a NIC</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="build_and_test.html#driver-compilation">3.1. Driver Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="build_and_test.html#running-testpmd-in-linux">3.2. Running testpmd in Linux</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="af_packet.html">4. AF_PACKET Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="af_packet.html#options-and-inherent-limitations">4.1. Options and inherent limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="af_packet.html#prerequisites">4.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="af_packet.html#set-up-an-af-packet-interface">4.3. Set up an af_packet interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="af_packet.html#features-and-limitations">4.4. Features and Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="af_xdp.html">5. AF_XDP Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="af_xdp.html#prerequisites">5.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="af_xdp.html#options">5.2. Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#iface">5.2.1. iface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#start-queue">5.2.2. start_queue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#queue-count">5.2.3. queue_count</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#shared-umem">5.2.4. shared_umem</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#xdp-prog">5.2.5. xdp_prog</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#busy-budget">5.2.6. busy_budget</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#force-copy">5.2.7. force_copy</a></li>
+<li class="toctree-l3"><a class="reference internal" href="af_xdp.html#use-cni">5.2.8. use_cni</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="af_xdp.html#limitations">5.3. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ark.html">6. ARK Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#overview">6.1. Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#device-parameters">6.2. Device Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#data-path-interface">6.3. Data Path Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#configuration-information">6.4. Configuration Information</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#dynamic-pmd-extension">6.5. Dynamic PMD Extension</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ark.html#extension-example">6.5.1. Extension Example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ark.html#compiling-extension">6.5.2. Compiling Extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ark.html#enabling-extension">6.5.3. Enabling Extension</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#building-dpdk">6.6. Building DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#supported-ark-rtl-pcie-instances">6.7. Supported ARK RTL PCIe Instances</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#arkville-rtl-core-configurations">6.8. Arkville RTL Core Configurations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#dpdk-and-arkville-firmware-versioning">6.9. DPDK and Arkville Firmware Versioning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#supported-operating-systems">6.10. Supported Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#supported-features">6.11. Supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#unsupported-features">6.12. Unsupported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#pre-requisites">6.13. Pre-Requisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ark.html#usage-example">6.14. Usage Example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="atlantic.html">7. Aquantia Atlantic DPDK Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="atlantic.html#supported-chipsets-and-nics">7.1. Supported Chipsets and NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="atlantic.html#supported-features">7.2. Supported features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="atlantic.html#experimental-api-features">7.3. Experimental API features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="atlantic.html#limitations-or-known-issues">7.4. Limitations or Known issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="atlantic.html#mtu-setting">7.4.1. MTU setting</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="avp.html">8. AVP Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="avp.html#features-and-limitations-of-the-avp-pmd">8.1. Features and Limitations of the AVP PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="avp.html#prerequisites">8.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="avp.html#launching-a-vm-with-an-avp-type-network-attachment">8.3. Launching a VM with an AVP type network attachment</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="axgbe.html">9. AXGBE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="axgbe.html#supported-features">9.1. Supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="axgbe.html#building-dpdk">9.2. Building DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="axgbe.html#prerequisites-and-pre-conditions">9.3. Prerequisites and Pre-conditions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="axgbe.html#usage-example">9.4. Usage Example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bnx2x.html">10. BNX2X Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#supported-features">10.1. Supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#non-supported-features">10.2. Non-supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#co-existence-considerations">10.3. Co-existence considerations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#supported-qlogic-nics">10.4. Supported QLogic NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#prerequisites">10.5. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#pre-installation-configuration">10.6. Pre-Installation Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnx2x.html#config-options">10.6.1. Config Options</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#driver-compilation-and-testing">10.7. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#jumbo-limitation">10.8. Jumbo: Limitation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnx2x.html#sr-iov-prerequisites-and-sample-application-notes">10.9. SR-IOV: Prerequisites and sample Application Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="bnxt.html">11. BNXT Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#cpu-support">11.1. CPU Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#kernel-dependency">11.2. Kernel Dependency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#running-bnxt-pmd">11.3. Running BNXT PMD</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#running-on-vf">11.3.1. Running on VF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#running-on-pf">11.3.2. Running on PF</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#features">11.4. Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#port-control">11.4.1. Port Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#packet-filtering">11.4.2. Packet Filtering</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#stateless-offloads">11.4.3. Stateless Offloads</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#vlan-insert-strip">11.4.4. VLAN Insert/Strip</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#time-synchronization">11.4.5. Time Synchronization</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#statistics-collection">11.4.6. Statistics Collection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#generic-flow-offload">11.4.7. Generic Flow Offload</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#flow-apis-items-and-actions">11.5. Flow APIs, Items, and Actions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#flow-persistency">11.6. Flow Persistency</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#virtual-function-port-representors">11.7. Virtual Function Port Representors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#application-support">11.8. Application Support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#firmware">11.8.1. Firmware</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#multiple-processes">11.8.2. Multiple Processes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#runtime-queue-setup">11.8.3. Runtime Queue Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#descriptor-status">11.8.4. Descriptor Status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#bonding">11.8.5. Bonding</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#vector-processing">11.9. Vector Processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#performance-report">11.10. Performance Report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#supported-network-adapters">11.11. Supported Network Adapters</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#bcm57400-netxtreme-ereg-family-of-ethernet-network-controllers">11.11.1. BCM57400 NetXtreme-E® Family of Ethernet Network Controllers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#bcm57500-netxtreme-ereg-family-of-ethernet-network-controllers">11.11.2. BCM57500 NetXtreme-E® Family of Ethernet Network Controllers</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#supported-firmware-versions">11.12. Supported Firmware Versions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="bnxt.html#supported-apis">11.13. Supported APIs</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#rte-eth-apis">11.13.1. rte_eth APIs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#rte-flow-apis">11.13.2. rte_flow APIs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#rte-flow-items">11.13.3. rte_flow Items</a></li>
+<li class="toctree-l3"><a class="reference internal" href="bnxt.html#rte-flow-actions">11.13.4. rte_flow Actions</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cnxk.html">12. CNXK Poll Mode driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#features">12.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#prerequisites">12.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#driver-compilation-and-testing">12.3. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#runtime-config-options">12.4. Runtime Config Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#limitations">12.5. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#mempool-cnxk-external-mempool-handler-dependency">12.5.1. <code class="docutils literal notranslate"><span class="pre">mempool_cnxk</span></code> external mempool handler dependency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#mempool-cnxk-rte-mempool-cache-sizes-for-cn10k">12.5.2. <code class="docutils literal notranslate"><span class="pre">mempool_cnxk</span></code> rte_mempool cache sizes for CN10K</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#crc-stripping">12.5.3. CRC stripping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#rte-flow-gre-support">12.5.4. RTE flow GRE support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#rte-flow-action-represented-port-support">12.5.5. RTE flow action represented_port support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#rte-flow-action-port-id-support">12.5.6. RTE flow action port_id support</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#custom-protocols-supported-in-rte-flow">12.5.7. Custom protocols supported in RTE Flow</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#rte-flow-mark-item-support">12.5.8. RTE Flow mark item support</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#inline-device-support-for-cn10k">12.6. Inline device support for CN10K</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cnxk.html#runtime-config-options-for-inline-device">12.6.1. Runtime Config Options for inline device</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cnxk.html#debugging-options">12.7. Debugging Options</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cpfl.html">13. CPFL Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cpfl.html#linux-prerequisites">13.1. Linux Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpfl.html#recommended-matching-list">13.2. Recommended Matching List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpfl.html#configuration">13.3. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cpfl.html#runtime-configuration">13.3.1. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cpfl.html#driver-compilation-and-testing">13.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cpfl.html#features">13.5. Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cpfl.html#vector-pmd">13.5.1. Vector PMD</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cpfl.html#hairpin-queue">13.5.2. Hairpin queue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cpfl.html#flow-offload">13.5.3. Flow offload</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cxgbe.html">14. CXGBE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#supported-chelsio-t5-nics">14.1. Supported Chelsio T5 NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#supported-chelsio-t6-nics">14.2. Supported Chelsio T6 NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#supported-sr-iov-chelsio-nics">14.3. Supported SR-IOV Chelsio NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#features">14.4. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#prerequisites">14.5. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#runtime-configuration">14.6. Runtime Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#common-runtime-options">14.6.1. Common Runtime Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#cxgbe-vf-only-runtime-options">14.6.2. CXGBE VF Only Runtime Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#cxgbe-pf-only-runtime-options">14.6.3. CXGBE PF Only Runtime Options</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#driver-compilation-and-testing">14.7. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#linux">14.8. Linux</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#linux-installation">14.8.1. Linux Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#running-testpmd">14.8.2. Running testpmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#configuring-sr-iov-virtual-functions">14.8.3. Configuring SR-IOV Virtual Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#freebsd">14.9. FreeBSD</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#freebsd-installation">14.9.1. FreeBSD Installation</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#id3">14.9.2. Running testpmd</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#sample-application-notes">14.10. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#enable-disable-flow-control">14.10.1. Enable/Disable Flow Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#jumbo-mode">14.10.2. Jumbo Mode</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#hardware-configuration-and-debugging">14.11. Hardware Configuration and Debugging</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cxgbe.html#firmware-configuration-file">14.11.1. Firmware Configuration File</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cxgbe.html#limitations">14.12. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dpaa.html">15. DPAA Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#nxp-dpaa-data-path-acceleration-architecture-gen-1">15.1. NXP DPAA (Data Path Acceleration Architecture - Gen 1)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#dpaa-overview">15.1.1. DPAA Overview</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#dpaa-dpdk-poll-mode-driver-overview">15.2. DPAA DPDK - Poll Mode Driver Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#dpaa-bus-driver">15.2.1. DPAA Bus driver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#dpaa-nic-driver-pmd">15.2.2. DPAA NIC Driver (PMD)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#dpaa-mempool-driver">15.2.3. DPAA Mempool Driver</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#allowing-blocking">15.3. Allowing &amp; Blocking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#supported-dpaa-socs">15.4. Supported DPAA SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#prerequisites">15.5. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#configuration">15.6. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#environment-variables">15.6.1. Environment Variables</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#driver-compilation-and-testing">15.7. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#fman-config">15.8. FMAN Config</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#fmc-fman-configuration-tool">15.8.1. FMC - FMAN Configuration Tool</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#fmlib">15.8.2. FMLIB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#vsp-virtual-storage-profile">15.8.3. VSP (Virtual Storage Profile)</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa.html#limitations">15.9. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#platform-requirement">15.9.1. Platform Requirement</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#maximum-packet-length">15.9.2. Maximum packet length</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa.html#multiprocess-support">15.9.3. Multiprocess Support</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dpaa2.html">16. DPAA2 Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#nxp-dpaa2-data-path-acceleration-architecture-gen2">16.1. NXP DPAA2 (Data Path Acceleration Architecture Gen2)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpaa2-overview">16.1.1. DPAA2 Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#overview-of-dpaa2-objects">16.1.2. Overview of DPAA2 Objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpaa2-objects-for-an-ethernet-network-interface">16.1.3. DPAA2 Objects for an Ethernet Network Interface</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#object-connections">16.1.4. Object Connections</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#interrupts">16.1.5. Interrupts</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#dpaa2-dpdk-poll-mode-driver-overview">16.2. DPAA2 DPDK - Poll Mode Driver Overview</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpaa2-bus-driver">16.2.1. DPAA2 bus driver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpio-driver">16.2.2. DPIO driver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpbp-based-mempool-driver">16.2.3. DPBP based Mempool driver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#dpaa2-nic-driver">16.2.4. DPAA2 NIC Driver</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#supported-dpaa2-socs">16.3. Supported DPAA2 SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#prerequisites">16.4. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#driver-compilation-and-testing">16.5. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#enabling-logs">16.6. Enabling logs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#allowing-blocking">16.7. Allowing &amp; Blocking</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#running-secondary-debug-app-without-blocklist">16.8. Running secondary debug app without blocklist</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#limitations">16.9. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#platform-requirement">16.9.1. Platform Requirement</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#maximum-packet-length">16.9.2. Maximum packet length</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#other-limitations">16.9.3. Other Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="dpaa2.html#traffic-management-api">16.10. Traffic Management API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#supported-features">16.10.1. Supported Features</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dpaa2.html#usage-example">16.10.2. Usage example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="e1000em.html">17. Driver for VM Emulated Devices</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="e1000em.html#validated-hypervisors">17.1. Validated Hypervisors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="e1000em.html#recommended-guest-operating-system-in-virtual-machine">17.2. Recommended Guest Operating System in Virtual Machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="e1000em.html#setting-up-a-kvm-virtual-machine">17.3. Setting Up a KVM Virtual Machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="e1000em.html#known-limitations-of-emulated-devices">17.4. Known Limitations of Emulated Devices</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ena.html">18. ENA Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#supported-ena-adapters">18.1. Supported ENA adapters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#supported-features">18.2. Supported features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#overview">18.3. Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#management-interface">18.4. Management Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#data-path-interface">18.5. Data Path Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#configuration">18.6. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ena.html#runtime-configuration">18.6.1. Runtime Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ena.html#ena-configuration-parameters">18.6.2. ENA Configuration Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#building-dpdk">18.7. Building DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#supported-operating-systems">18.8. Supported Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#prerequisites">18.9. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ena.html#usage-example">18.10. Usage example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="enetc.html">19. ENETC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#enetc-overview">19.1. ENETC Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#supported-enetc-socs">19.2. Supported ENETC SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#enetc-features">19.3. ENETC Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#nic-driver-pmd">19.4. NIC Driver (PMD)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#prerequisites">19.5. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetc.html#driver-compilation-and-testing">19.6. Driver compilation and testing</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="enetfec.html">20. ENETFEC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#enetfec-overview">20.1. ENETFEC Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#supported-enetfec-socs">20.2. Supported ENETFEC SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#enetfec-features">20.3. ENETFEC Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#prerequisites">20.4. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#driver-compilation-and-testing">20.5. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enetfec.html#limitations">20.6. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="enic.html">21. ENIC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#supported-cisco-vic-adapters">21.1. Supported Cisco VIC adapters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#supported-features">21.2. Supported features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#how-to-obtain-enic-pmd-integrated-dpdk">21.3. How to obtain ENIC PMD integrated DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#configuration-information">21.4. Configuration information</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#sr-iov-mode-utilization">21.5. SR-IOV mode utilization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#generic-flow-api-support">21.6. Generic Flow API support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#overlay-offload">21.7. Overlay Offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#ingress-vlan-rewrite">21.8. Ingress VLAN Rewrite</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#vectorized-rx-handler">21.9. Vectorized Rx Handler</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#b-completion-queue-entry">21.10. 64B Completion Queue Entry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#limitations">21.11. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#how-to-build-the-suite">21.12. How to build the suite</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#supported-operating-systems">21.13. Supported Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#known-bugs-and-unsupported-features-in-this-release">21.14. Known bugs and unsupported features in this release</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#prerequisites">21.15. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enic.html#additional-reference">21.16. Additional Reference</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fail_safe.html">22. Fail-safe poll mode driver library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#features">22.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#using-the-fail-safe-pmd-from-the-eal-command-line">22.2. Using the Fail-safe PMD from the EAL command line</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fail_safe.html#fail-safe-command-line-parameters">22.2.1. Fail-safe command line parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fail_safe.html#usage-example">22.2.2. Usage example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#using-the-fail-safe-pmd-from-an-application">22.3. Using the Fail-safe PMD from an application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#plug-in-feature">22.4. Plug-in feature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#plug-out-feature">22.5. Plug-out feature</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fail_safe.html#fail-safe-glossary">22.6. Fail-safe glossary</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="fm10k.html">23. FM10K Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="fm10k.html#ftag-based-forwarding-of-fm10k">23.1. FTAG Based Forwarding of FM10K</a></li>
+<li class="toctree-l2"><a class="reference internal" href="fm10k.html#vector-pmd-for-fm10k">23.2. Vector PMD for FM10K</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#rx-constraints">23.2.1. RX Constraints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#tx-constraint">23.2.2. TX Constraint</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="fm10k.html#limitations">23.3. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#switch-manager">23.3.1. Switch manager</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#support-for-switch-restart">23.3.2. Support for Switch Restart</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#crc-stripping">23.3.3. CRC stripping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#maximum-packet-length">23.3.4. Maximum packet length</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#statistic-polling-frequency">23.3.5. Statistic Polling Frequency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fm10k.html#interrupt-mode">23.3.6. Interrupt mode</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="gve.html">24. GVE poll mode driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="gve.html#features-and-limitations">24.1. Features and Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="hinic.html">25. HINIC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="hinic.html#features">25.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hinic.html#prerequisites">25.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hinic.html#driver-compilation-and-testing">25.3. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hinic.html#limitations-or-known-issues">25.4. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="hns3.html">26. HNS3 Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#features">26.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#prerequisites">26.2. Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#link-status-event-pre-conditions">26.2.1. Link status event Pre-conditions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#configuration">26.3. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#compilation-options">26.3.1. Compilation Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#runtime-configuration">26.3.2. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#driver-compilation-and-testing">26.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#sample-application-notes">26.5. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#vlan-filter">26.5.1. VLAN filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#flow-director">26.5.2. Flow Director</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#generic-flow-api">26.5.3. Generic flow API</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#statistics">26.6. Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#performance-tuning">26.7. Performance tuning</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#hardware-configuration">26.7.1. Hardware configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#queue-depth-configuration">26.7.2. Queue depth configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#io-burst-configuration">26.7.3. IO burst configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#queue-number-configuration">26.7.4. Queue number configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#hugepage-configuration">26.7.5. Hugepage configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="hns3.html#cpu-core-isolation">26.7.6. CPU core isolation</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="hns3.html#limitations-or-known-issues">26.8. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="i40e.html">27. I40E Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#features">27.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#linux-prerequisites">27.2. Linux Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#windows-prerequisites">27.3. Windows Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#kernel-driver-and-firmware-matching-list">27.4. Kernel driver and Firmware Matching List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#configuration">27.5. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#compilation-options">27.5.1. Compilation Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#runtime-configuration">27.5.2. Runtime Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#vector-rx-pre-conditions">27.5.3. Vector RX Pre-conditions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#driver-compilation-and-testing">27.6. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#sr-iov-prerequisites-and-sample-application-notes">27.7. SR-IOV: Prerequisites and sample Application Notes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#sample-application-notes">27.8. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#vlan-filter">27.8.1. Vlan filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#flow-director">27.8.2. Flow Director</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#floating-veb">27.8.3. Floating VEB</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#dynamic-device-personalization-ddp">27.8.4. Dynamic Device Personalization (DDP)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#input-set-configuration">27.8.5. Input set configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#queue-region-configuration">27.8.6. Queue region configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#generic-flow-api">27.8.7. Generic flow API</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#limitations-or-known-issues">27.9. Limitations or Known issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#mpls-packet-classification">27.9.1. MPLS packet classification</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#receive-packets-with-ethertype-0x88a8">27.9.2. Receive packets with Ethertype 0x88A8</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#incorrect-rx-statistics-when-packet-is-oversize">27.9.3. Incorrect Rx statistics when packet is oversize</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#rx-tx-statistics-may-be-incorrect-when-register-overflowed">27.9.4. RX/TX statistics may be incorrect when register overflowed</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#vf-tc-max-bandwidth-setting">27.9.5. VF &amp; TC max bandwidth setting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#tc-tx-scheduling-mode-setting">27.9.6. TC TX scheduling mode setting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#dcb-function">27.9.7. DCB function</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#global-configuration-warning">27.9.8. Global configuration warning</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#cloud-filter">27.9.9. Cloud Filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#mirror-rule-limitation-for-x722">27.9.10. Mirror rule limitation for X722</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#testpmd-driver-specific-commands">27.10. Testpmd driver specific commands</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#rss-queue-region">27.10.1. RSS queue region</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-promisc-for-vf">27.10.2. set promisc (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-allmulticast-for-vf">27.10.3. set allmulticast (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-broadcast-mode-for-vf">27.10.4. set broadcast mode (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#vlan-set-tag-for-vf">27.10.5. vlan set tag (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-tx-max-bandwidth-for-vf">27.10.6. set tx max bandwidth (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-tc-tx-min-bandwidth-for-vf">27.10.7. set tc tx min bandwidth (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-tc-tx-max-bandwidth-for-vf">27.10.8. set tc tx max bandwidth (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#set-tc-strict-link-priority-mode">27.10.9. set tc strict link priority mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#ddp-add">27.10.10. ddp add</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#ddp-del">27.10.11. ddp del</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#ddp-get-list">27.10.12. ddp get list</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#ddp-get-info">27.10.13. ddp get info</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#ptype-mapping">27.10.14. ptype mapping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#show-port-pctype-mapping">27.10.15. show port pctype mapping</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#high-performance-of-small-packets-on-40gbe-nic">27.11. High Performance of Small Packets on 40GbE NIC</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#use-16-bytes-rx-descriptor-size">27.11.1. Use 16 Bytes RX Descriptor Size</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#input-set-requirement-of-each-pctype-for-fdir">27.11.2. Input set requirement of each pctype for FDIR</a></li>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#vlan-related-features-miss-when-fw-8-4">27.11.3. Vlan related Features miss when FW &gt;= 8.4</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="i40e.html#example-of-getting-best-performance-with-l3fwd-example">27.12. Example of getting best performance with l3fwd example</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="i40e.html#tx-bytes-affected-by-the-link-status-change">27.12.1. Tx bytes affected by the link status change</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ice.html">28. ICE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#linux-prerequisites">28.1. Linux Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#windows-prerequisites">28.2. Windows Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#kernel-driver-ddp-and-firmware-matching-list">28.3. Kernel driver, DDP and Firmware Matching List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#configuration">28.4. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#runtime-configuration">28.4.1. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#driver-compilation-and-testing">28.5. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#features">28.6. Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#vector-pmd">28.6.1. Vector PMD</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#malicious-driver-detection-mdd">28.6.2. Malicious driver detection (MDD)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#device-config-function-dcf">28.6.3. Device Config Function (DCF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#generic-flow-support">28.6.4. Generic Flow Support</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#sample-application-notes">28.7. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ice.html#vlan-filter">28.7.1. Vlan filter</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ice.html#limitations-or-known-issues">28.8. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="idpf.html">29. IDPF Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="idpf.html#linux-prerequisites">29.1. Linux Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="idpf.html#recommended-matching-list">29.2. Recommended Matching List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="idpf.html#configuration">29.3. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="idpf.html#runtime-configuration">29.3.1. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="idpf.html#driver-compilation-and-testing">29.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="idpf.html#features">29.5. Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="idpf.html#vector-pmd">29.5.1. Vector PMD</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="igb.html">30. IGB Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="igb.html#supported-chipsets-and-nics">30.1. Supported Chipsets and NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="igb.html#features">30.2. Features</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="igc.html">31. IGC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="igc.html#supported-chipsets-and-nics">31.1. Supported Chipsets and NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="igc.html#driver-compilation-and-testing">31.2. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="igc.html#sample-application-notes">31.3. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="igc.html#vlan-filter">31.3.1. Vlan filter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="igc.html#flow-director">31.3.2. Flow Director</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="intel_vf.html">32. Intel Virtual Function Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#sr-iov-mode-utilization-in-a-dpdk-environment">32.1. SR-IOV Mode Utilization in a DPDK Environment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#physical-and-virtual-function-infrastructure">32.1.1. Physical and Virtual Function Infrastructure</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#validated-hypervisors">32.1.2. Validated Hypervisors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#expected-guest-operating-system-in-virtual-machine">32.1.3. Expected Guest Operating System in Virtual Machine</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#setting-up-a-kvm-virtual-machine-monitor">32.2. Setting Up a KVM Virtual Machine Monitor</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#dpdk-sr-iov-pmd-pf-vf-driver-usage-model">32.3. DPDK SR-IOV PMD PF/VF Driver Usage Model</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#fast-host-based-packet-processing">32.3.1. Fast Host-based Packet Processing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#sr-iov-pf-vf-approach-for-inter-vm-communication">32.4. SR-IOV (PF/VF) Approach for Inter-VM Communication</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#windows-support">32.5. Windows Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#inline-ipsec-support">32.6. Inline IPsec Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="intel_vf.html#limitations-or-knowing-issues">32.7. Limitations or Knowing issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#byte-rx-descriptor-setting-is-not-available">32.7.1. 16 Byte RX Descriptor setting is not available</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#i40e-vf-performance-is-impacted-by-pci-extended-tag-setting">32.7.2. i40e: VF performance is impacted by PCI extended tag setting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#i40e-vlan-strip-of-vf">32.7.3. i40e: Vlan strip of VF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#i40e-vlan-filtering-of-vf">32.7.4. i40e: Vlan filtering of VF</a></li>
+<li class="toctree-l3"><a class="reference internal" href="intel_vf.html#ice-vf-inserts-vlan-tag-incorrectly-on-avx-512-tx-path">32.7.5. ice: VF inserts VLAN tag incorrectly on AVX-512 Tx path</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ionic.html">33. IONIC Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ionic.html#identifying-the-adapter">33.1. Identifying the Adapter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ionic.html#firmware-support">33.2. Firmware Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ionic.html#runtime-configuration">33.3. Runtime Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ionic.html#building-dpdk">33.4. Building DPDK</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ipn3ke.html">34. IPN3KE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ipn3ke.html#prerequisites">34.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ipn3ke.html#configuration">34.2. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ipn3ke.html#runtime-configuration">34.2.1. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ipn3ke.html#driver-compilation-and-testing">34.3. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ipn3ke.html#sample-application-notes">34.4. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ipn3ke.html#packet-tx-rx-with-fpga-pass-through-image">34.4.1. Packet TX/RX with FPGA Pass-through image</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ipn3ke.html#hqos-and-flow-acceleration">34.4.2. HQoS and flow acceleration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ipn3ke.html#limitations-or-known-issues">34.5. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ixgbe.html">35. IXGBE Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#supported-chipsets-and-nics">35.1. Supported Chipsets and NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#vector-pmd-for-ixgbe">35.2. Vector PMD for IXGBE</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#rx-constraints">35.2.1. RX Constraints</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#tx-constraint">35.2.2. TX Constraint</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#application-programming-interface">35.3. Application Programming Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#sample-application-notes">35.4. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#l3fwd">35.4.1. l3fwd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#load-balancer">35.4.2. load_balancer</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#limitations-or-known-issues">35.5. Limitations or Known issues</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#malicious-driver-detection-not-supported">35.5.1. Malicious Driver Detection not Supported</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#statistics">35.5.2. Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#mtu-setting">35.5.3. MTU setting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#vf-mac-address-setting">35.5.4. VF MAC address setting</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#x550-does-not-support-legacy-interrupt-mode">35.5.5. X550 does not support legacy interrupt mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#rss-isn-t-supported-when-qinq-is-enabled">35.5.6. RSS isn’t supported when QinQ is enabled</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#udp-with-zero-checksum-is-reported-as-error">35.5.7. UDP with zero checksum is reported as error</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#inline-crypto-processing-support">35.6. Inline crypto processing support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#virtual-function-port-representors">35.7. Virtual Function Port Representors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ixgbe.html#testpmd-driver-specific-commands">35.8. Testpmd driver specific commands</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-split-drop-enable-for-vf">35.8.1. set split drop enable (for VF)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-macsec-offload">35.8.2. set macsec offload</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-macsec-sc">35.8.3. set macsec sc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-macsec-sa">35.8.4. set macsec sa</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-tc-tx-min-bandwidth">35.8.5. set tc tx min bandwidth</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#port-config-bypass">35.8.6. port config bypass</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-bypass-mode">35.8.7. set bypass mode</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-bypass-event">35.8.8. set bypass event</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#set-bypass-timeout">35.8.9. set bypass timeout</a></li>
+<li class="toctree-l3"><a class="reference internal" href="ixgbe.html#show-bypass-config">35.8.10. show bypass config</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mana.html">36. MANA poll mode driver library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mana.html#prerequisites">36.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mana.html#driver-compilation-and-testing">36.2. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mana.html#runtime-configuration">36.3. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="memif.html">37. Memif Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="memif.html#shared-memory">37.1. Shared memory</a></li>
+<li class="toctree-l2"><a class="reference internal" href="memif.html#zero-copy-client">37.2. Zero-copy client</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="memif.html#example-testpmd">37.2.1. Example: testpmd</a></li>
+<li class="toctree-l3"><a class="reference internal" href="memif.html#example-testpmd-and-vpp">37.2.2. Example: testpmd and VPP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="memif.html#example-testpmd-memif-loopback">37.2.3. Example: testpmd memif loopback</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mlx4.html">38. NVIDIA MLX4 Ethernet Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#implementation-details">38.1. Implementation details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#configuration">38.2. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#compilation-options">38.2.1. Compilation options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#environment-variables">38.2.2. Environment variables</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#run-time-configuration">38.2.3. Run-time configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#kernel-module-parameters">38.2.4. Kernel module parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#limitations">38.3. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#prerequisites">38.4. Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#current-rdma-core-package-and-linux-kernel-recommended">38.4.1. Current RDMA core package and Linux kernel (recommended)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx4.html#nvidia-mlnx-ofed-as-a-fallback">38.4.2. NVIDIA MLNX_OFED as a fallback</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#quick-start-guide">38.5. Quick Start Guide</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#performance-tuning">38.6. Performance tuning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx4.html#usage-example">38.7. Usage example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mlx5.html">39. NVIDIA MLX5 Ethernet Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#supported-nics">39.1. Supported NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#design">39.2. Design</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#features">39.3. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#limitations">39.4. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#statistics">39.5. Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#compilation">39.6. Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#configuration">39.7. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#environment-configuration">39.7.1. Environment Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#firmware-configuration">39.7.2. Firmware configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#runtime-configuration">39.7.3. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#multiport-e-switch">39.8. Multiport E-Switch</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#requirements">39.8.1. Requirements</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#id1">39.8.2. Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#id2">39.8.3. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#sub-function">39.9. Sub-Function</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#sub-function-representor-support">39.9.1. Sub-Function representor support</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#performance-tuning">39.10. Performance tuning</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#rx-burst-functions">39.11. Rx burst functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#supported-hardware-offloads">39.12. Supported hardware offloads</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#notes-for-metadata">39.13. Notes for metadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#notes-for-rte-flow">39.14. Notes for rte_flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#notes-for-hairpin">39.15. Notes for hairpin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#notes-for-testpmd">39.16. Notes for testpmd</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#usage-example">39.17. Usage example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#how-to-dump-flows">39.18. How to dump flows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#how-to-share-a-meter-between-ports-in-the-same-switch-domain">39.19. How to share a meter between ports in the same switch domain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#how-to-use-meter-hierarchy">39.20. How to use meter hierarchy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#how-to-configure-a-vf-as-trusted">39.21. How to configure a VF as trusted</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#how-to-trace-tx-datapath">39.22. How to trace Tx datapath</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#host-shaper">39.23. Host shaper</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#dependency-on-mstflint-package">39.23.1. Dependency on mstflint package</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#available-descriptor-threshold-and-host-shaper">39.23.2. Available descriptor threshold and host shaper</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mlx5.html#testpmd-driver-specific-commands">39.24. Testpmd driver specific commands</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#port-attach-with-socket-path">39.24.1. port attach with socket path</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#port-map-external-rx-queue">39.24.2. port map external Rx queue</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mlx5.html#set-flow-engine-mode">39.24.3. Set Flow Engine Mode</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mvneta.html">40. MVNETA Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#features">40.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#limitations">40.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#prerequisites">40.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#runtime-configuration">40.4. Runtime Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#building-musdk">40.5. Building MUSDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#building-dpdk">40.6. Building DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvneta.html#usage-example">40.7. Usage Example</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="mvpp2.html">41. MVPP2 Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#features">41.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#limitations">41.2. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#prerequisites">41.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#building-musdk">41.4. Building MUSDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#building-dpdk">41.5. Building DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#usage-example">41.6. Usage Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#extended-stats">41.7. Extended stats</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#external-configuration">41.8. External Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#configuration-syntax">41.8.1. Configuration syntax</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#flow-api">41.9. Flow API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#supported-flow-actions">41.9.1. Supported flow actions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#supported-flow-items">41.9.2. Supported flow items</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#classifier-match-engine">41.9.3. Classifier match engine</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#flow-rules-usage-example">41.9.4. Flow rules usage example</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#id3">41.9.5. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#traffic-metering-and-policing">41.10. Traffic metering and policing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#id4">41.10.1. Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#id5">41.10.2. Usage example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="mvpp2.html#traffic-management-api">41.11. Traffic Management API</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#id6">41.11.1. Limitations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="mvpp2.html#id7">41.11.2. Usage example</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="netvsc.html">42. Netvsc poll mode driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="netvsc.html#features-and-limitations-of-hyper-v-pmd">42.1. Features and Limitations of Hyper-V PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netvsc.html#installation">42.2. Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netvsc.html#prerequisites">42.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="netvsc.html#runtime-configuration">42.4. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nfb.html">43. NFB poll mode driver library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#prerequisites">43.1. Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nfb.html#versions-of-the-packages">43.1.1. Versions of the packages</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#configuration">43.2. Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#using-the-nfb-pmd">43.3. Using the NFB PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#nfb-card-architecture">43.4. NFB card architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#limitations">43.5. Limitations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfb.html#example-of-usage">43.6. Example of usage</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nfp.html">44. NFP poll mode driver library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#dependencies">44.1. Dependencies</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#building-the-software">44.2. Building the software</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#driver-compilation-and-testing">44.3. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#using-the-pf">44.4. Using the PF</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#pf-multiport-support">44.5. PF multiport support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#pf-multiprocess-support">44.6. PF multiprocess support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#system-configuration">44.7. System configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#flow-offload">44.8. Flow offload</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nfp.html#metadata-format">44.9. Metadata Format</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nfp.html#nfd3">44.9.1. NFD3</a></li>
+<li class="toctree-l3"><a class="reference internal" href="nfp.html#nfdk">44.9.2. NFDk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="nfp.html#rx">44.9.3. RX</a></li>
+<li class="toctree-l3"><a class="reference internal" href="nfp.html#tx">44.9.4. TX</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ngbe.html">45. NGBE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ngbe.html#features">45.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ngbe.html#prerequisites">45.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ngbe.html#configuration">45.3. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="ngbe.html#dynamic-logging-parameters">45.3.1. Dynamic Logging Parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ngbe.html#driver-compilation-and-testing">45.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ngbe.html#limitations-or-known-issues">45.5. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="null.html">46. NULL Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="null.html#usage">46.1. Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="null.html#runtime-configuration">46.2. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="octeon_ep.html">47. OCTEON TX EP Poll Mode driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="octeon_ep.html#prerequisites">47.1. Prerequisites</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="octeontx.html">48. OCTEON TX Poll Mode driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#supported-octeon-tx-socs">48.1. Supported OCTEON TX SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#features">48.2. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#unsupported-features">48.3. Unsupported features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#prerequisites">48.4. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#configuration">48.5. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#driver-compilation-and-testing">48.5.1. Driver compilation and testing</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#initialization">48.6. Initialization</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#device-arguments">48.6.1. Device arguments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#dependency">48.6.2. Dependency</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="octeontx.html#limitations">48.7. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#octeontx-fpavf-external-mempool-handler-dependency">48.7.1. <code class="docutils literal notranslate"><span class="pre">octeontx_fpavf</span></code> external mempool handler dependency</a></li>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#crc-stripping">48.7.2. CRC stripping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#maximum-packet-length">48.7.3. Maximum packet length</a></li>
+<li class="toctree-l3"><a class="reference internal" href="octeontx.html#maximum-mempool-size">48.7.4. Maximum mempool size</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pcap_ring.html">49. Libpcap and Ring Based Poll Mode Drivers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pcap_ring.html#using-the-drivers-from-the-eal-command-line">49.1. Using the Drivers from the EAL Command Line</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="pcap_ring.html#libpcap-based-pmd">49.1.1. Libpcap-based PMD</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pcap_ring.html#rings-based-pmd">49.1.2. Rings-based PMD</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pcap_ring.html#using-the-poll-mode-driver-from-an-application">49.1.3. Using the Poll Mode Driver from an Application</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="pfe.html">50. PFE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#pfe-overview">50.1. PFE Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#supported-pfe-socs">50.2. Supported PFE SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#pfe-features">50.3. PFE Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#prerequisites">50.4. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#driver-compilation-and-testing">50.5. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pfe.html#limitations">50.6. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="qede.html">51. QEDE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#supported-qlogic-adapters">51.1. Supported QLogic Adapters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#supported-features">51.2. Supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#co-existence-considerations">51.3. Co-existence considerations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#prerequisites">51.4. Prerequisites</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="qede.html#performance-note">51.4.1. Performance note</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qede.html#compilation-options">51.4.2. Compilation Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="qede.html#config-notes">51.4.3. Config notes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#driver-compilation-and-testing">51.5. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#rte-flow-support">51.6. RTE Flow Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qede.html#sr-iov-prerequisites-and-sample-application-notes">51.7. SR-IOV: Prerequisites and Sample Application Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sfc_efx.html">52. Solarflare libefx-based Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#supported-nics">52.1. Supported NICs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#features">52.2. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#non-supported-features">52.3. Non-supported Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#limitations">52.4. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#equal-stride-super-buffer-mode">52.4.1. Equal stride super-buffer mode</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#tunnels-support">52.5. Tunnels support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#flow-api-support">52.6. Flow API support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#ethernet-destination-individual-group-match">52.6.1. Ethernet destination individual/group match</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#exceptions-to-flow-rules">52.6.2. Exceptions to flow rules</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#prerequisites">52.7. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sfc_efx.html#configuration">52.8. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#compilation-options">52.8.1. Compilation Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#runtime-configuration">52.8.2. Runtime Configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sfc_efx.html#dynamic-logging-parameters">52.8.3. Dynamic Logging Parameters</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="softnic.html">53. Soft NIC Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#flow">53.1. Flow</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#supported-operating-systems">53.2. Supported Operating Systems</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#runtime-configuration">53.3. Runtime Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#soft-nic-testing">53.4. Soft NIC testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#soft-nic-firmware">53.5. Soft NIC Firmware</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#qos-api-support">53.6. QoS API Support:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="softnic.html#flow-api-support">53.7. Flow API support:</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="softnic.html#example">53.7.1. Example:</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="tap.html">54. Tun|Tap Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#flow-api-support">54.1. Flow API support</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tap.html#examples-of-testpmd-flow-rules">54.1.1. Examples of testpmd flow rules</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#multi-process-sharing">54.2. Multi-process sharing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#example">54.3. Example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#rss-specifics">54.4. RSS specifics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#systems-supporting-flow-api">54.5. Systems supporting flow API</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tap.html#limitations">54.6. Limitations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="thunderx.html">55. ThunderX NICVF Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#supported-thunderx-socs">55.1. Supported ThunderX SoCs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#features">55.2. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#prerequisites">55.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#driver-compilation-and-testing">55.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#linux">55.5. Linux</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#sr-iov-prerequisites-and-sample-application-notes">55.5.1. SR-IOV: Prerequisites and sample Application Notes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#multiple-queue-set-per-dpdk-port-configuration">55.5.2. Multiple Queue Set per DPDK port configuration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#lbk-hw-access">55.5.3. LBK HW Access</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#example-device-binding">55.5.4. Example device binding</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#thunder-nic-vf-s">55.5.5. Thunder-nic VF’s</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#debugging-options">55.6. Debugging Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#runtime-configuration">55.7. Runtime Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#skip-data-bytes">55.7.1. skip_data_bytes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="thunderx.html#limitations">55.8. Limitations</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#crc-stripping">55.8.1. CRC stripping</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#maximum-packet-length">55.8.2. Maximum packet length</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#maximum-packet-segments">55.8.3. Maximum packet segments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="thunderx.html#id1">55.8.4. skip_data_bytes</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="txgbe.html">56. TXGBE Poll Mode Driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#features">56.1. Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#prerequisites">56.2. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#configuration">56.3. Configuration</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="txgbe.html#compilation-options">56.3.1. Compilation Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="txgbe.html#dynamic-logging-parameters">56.3.2. Dynamic Logging Parameters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="txgbe.html#runtime-configuration">56.3.3. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#driver-compilation-and-testing">56.4. Driver compilation and testing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#sample-application-notes">56.5. Sample Application Notes</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="txgbe.html#generic-flow-api">56.5.1. Generic flow API</a></li>
+<li class="toctree-l3"><a class="reference internal" href="txgbe.html#traffic-management-api">56.5.2. Traffic Management API</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="txgbe.html#limitations-or-known-issues">56.6. Limitations or Known issues</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vdev_netvsc.html">57. VDEV_NETVSC driver</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vdev_netvsc.html#implementation-details">57.1. Implementation details</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vdev_netvsc.html#runtime-configuration">57.2. Runtime Configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vhost.html">58. Poll Mode Driver that wraps vhost library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vhost.html#vhost-implementation-in-dpdk">58.1. Vhost Implementation in DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost.html#features-and-limitations-of-vhost-pmd">58.2. Features and Limitations of vhost PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost.html#runtime-configuration">58.3. Runtime Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost.html#vhost-pmd-event-handling">58.4. Vhost PMD event handling</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vhost.html#vhost-pmd-with-testpmd-application">58.5. Vhost PMD with testpmd application</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="virtio.html">59. Poll Mode Driver for Emulated Virtio NIC</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#virtio-implementation-in-dpdk">59.1. Virtio Implementation in DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#features-and-limitations-of-virtio-pmd">59.2. Features and Limitations of virtio PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#prerequisites">59.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#virtio-with-qemu-virtio-back-end">59.4. Virtio with qemu virtio Back End</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#virtio-pmd-rx-tx-callbacks">59.5. Virtio PMD Rx/Tx Callbacks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#interrupt-mode">59.6. Interrupt mode</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#prerequisites-for-rx-interrupts">59.6.1. Prerequisites for Rx interrupts</a></li>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#example">59.6.2. Example</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#runtime-configuration">59.7. Runtime Configuration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="virtio.html#virtio-paths-selection-and-usage">59.8. Virtio paths Selection and Usage</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#virtio-paths-selection">59.8.1. Virtio paths Selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#rx-tx-callbacks-of-each-virtio-path">59.8.2. Rx/Tx callbacks of each Virtio path</a></li>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#virtio-paths-support-status-from-release-to-release">59.8.3. Virtio paths Support Status from Release to Release</a></li>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#qemu-support-status">59.8.4. QEMU Support Status</a></li>
+<li class="toctree-l3"><a class="reference internal" href="virtio.html#how-to-debug">59.8.5. How to Debug</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vmxnet3.html">60. Poll Mode Driver for Paravirtual VMXNET3 NIC</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vmxnet3.html#vmxnet3-implementation-in-the-dpdk">60.1. VMXNET3 Implementation in the DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmxnet3.html#features-and-limitations-of-vmxnet3-pmd">60.2. Features and Limitations of VMXNET3 PMD</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmxnet3.html#prerequisites">60.3. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmxnet3.html#vmxnet3-with-a-native-nic-connected-to-a-vswitch">60.4. VMXNET3 with a Native NIC Connected to a vSwitch</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vmxnet3.html#vmxnet3-chaining-vms-connected-to-a-vswitch">60.5. VMXNET3 Chaining VMs Connected to a vSwitch</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../testpmd_app_ug/testpmd_funcs.html" title="previous chapter"><span class="section-number">4. </span>Testpmd Runtime Functions</a></li>
+      <li>Next: <a href="overview.html" title="next chapter"><span class="section-number">1. </span>Overview of Networking Drivers</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

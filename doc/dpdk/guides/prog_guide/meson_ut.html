@@ -1,0 +1,207 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>66. Running DPDK Unit Tests with Meson &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="67. Building Your Own Application" href="build_app.html" />
+    <link rel="prev" title="65. Installing DPDK Using the meson build system" href="build-sdk-meson.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="running-dpdk-unit-tests-with-meson">
+<h1><span class="section-number">66. </span>Running DPDK Unit Tests with Meson</h1>
+<p>This section describes how to run test cases with the DPDK meson build system.</p>
+<p>Steps to build and install DPDK using meson can be referred
+in <a class="reference internal" href="build-sdk-meson.html"><span class="doc">Installing DPDK Using the meson build system</span></a></p>
+<section id="grouping-of-test-cases">
+<h2><span class="section-number">66.1. </span>Grouping of test cases</h2>
+<p>Test cases have been classified into four different groups.</p>
+<ul class="simple">
+<li><p>Fast tests.</p></li>
+<li><p>Performance tests.</p></li>
+<li><p>Driver tests.</p></li>
+<li><p>Tests which produce lists of objects as output, and therefore that need
+manual checking.</p></li>
+</ul>
+<p>These tests can be run using the argument to <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> as
+<code class="docutils literal notranslate"><span class="pre">--suite</span> <span class="pre">project_name:label</span></code>.</p>
+<p>For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test -C &lt;build path&gt; --suite DPDK:fast-tests
+</pre></div>
+</div>
+<p>If the <code class="docutils literal notranslate"><span class="pre">&lt;build</span> <span class="pre">path&gt;</span></code> is current working directory,
+the <code class="docutils literal notranslate"><span class="pre">-C</span> <span class="pre">&lt;build</span> <span class="pre">path&gt;</span></code> option can be skipped as below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test --suite DPDK:fast-tests
+</pre></div>
+</div>
+<p>The project name is optional so the following is equivalent to the previous
+command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test --suite fast-tests
+</pre></div>
+</div>
+<p>If desired, additional arguments can be passed to the test run via the meson
+<code class="docutils literal notranslate"><span class="pre">--test-args</span></code> option.
+For example, tests will by default run on as many available cores as is needed
+for the test, starting with the lowest number core - generally core 0.
+To run the fast-tests suite using only cores 8 through 16, one can use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test --suite fast-tests --test-args=&quot;-l 8-16&quot;
+</pre></div>
+</div>
+<p>The meson command to list all available tests:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test --list
+</pre></div>
+</div>
+<p>Test cases are run serially by default for better stability.</p>
+<p>Arguments of <code class="docutils literal notranslate"><span class="pre">test()</span></code> that can be provided in meson.build are as below:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">is_parallel</span></code> is used to run test case either in parallel or non-parallel mode.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">timeout</span></code> is used to specify the timeout of test case.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">args</span></code> is used to specify test specific parameters (see note below).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">env</span></code> is used to specify test specific environment parameters.</p></li>
+</ul>
+<p>Note: the content of meson <code class="docutils literal notranslate"><span class="pre">--test-args</span></code> option and the content of <code class="docutils literal notranslate"><span class="pre">args</span></code>
+are appended when invoking the DPDK test binary.
+Because of this, it is recommended not to set any default coremask or memory
+configuration in per test <code class="docutils literal notranslate"><span class="pre">args</span></code> and rather let users select what best fits
+their environment. If a test can’t run, then it should be skipped, as described
+below.</p>
+</section>
+<section id="dealing-with-skipped-test-cases">
+<h2><span class="section-number">66.2. </span>Dealing with skipped test cases</h2>
+<p>Some unit test cases have a dependency on external libraries, driver modules
+or config flags, without which the test cases cannot be run. Such test cases
+will be reported as skipped if they cannot run. To enable those test cases,
+the user should ensure the required dependencies are met.
+Below are a few possible causes why tests may be skipped:</p>
+<ol class="arabic simple">
+<li><p>Optional external libraries are not found.</p></li>
+<li><p>Config flags for the dependent library are not enabled.</p></li>
+<li><p>Dependent driver modules are not installed on the system.</p></li>
+<li><p>Not enough processing cores. Some tests are skipped on machines with 2 or 4 cores.</p></li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="build-sdk-meson.html" title="previous chapter"><span class="section-number">65. </span>Installing DPDK Using the meson build system</a></li>
+      <li>Next: <a href="build_app.html" title="next chapter"><span class="section-number">67. </span>Building Your Own Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/meson_ut.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

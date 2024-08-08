@@ -1,0 +1,203 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. Running DPDK Applications &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Sample Applications User Guides" href="../sample_app_ug/index.html" />
+    <link rel="prev" title="3. Compiling the DPDK Target from Source" href="build_dpdk.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="running-dpdk-applications">
+<h1><span class="section-number">4. </span>Running DPDK Applications</h1>
+<section id="grant-lock-pages-in-memory-privilege">
+<h2><span class="section-number">4.1. </span>Grant <em>Lock pages in memory</em> Privilege</h2>
+<p>Use of hugepages (“large pages” in Windows terminology) requires
+<code class="docutils literal notranslate"><span class="pre">SeLockMemoryPrivilege</span></code> for the user running an application.</p>
+<ol class="arabic simple">
+<li><p>Open <em>Local Security Policy</em> snap-in, either:</p>
+<ul class="simple">
+<li><p>Control Panel / Computer Management / Local Security Policy;</p></li>
+<li><p>or Win+R, type <code class="docutils literal notranslate"><span class="pre">secpol</span></code>, press Enter.</p></li>
+</ul>
+</li>
+<li><p>Open <em>Local Policies / User Rights Assignment / Lock pages in memory.</em></p></li>
+<li><p>Add desired users or groups to the list of grantees.</p></li>
+<li><p>Privilege is applied upon next logon. In particular, if privilege has been
+granted to current user, a logoff is required before it is available.</p></li>
+</ol>
+<p>See <a class="reference external" href="https://docs.microsoft.com/en-us/windows/win32/memory/large-page-support">Large-Page Support</a> in MSDN for details.</p>
+</section>
+<section id="install-drivers">
+<h2><span class="section-number">4.2. </span>Install Drivers</h2>
+<p>Certain kernel-mode drivers are required to run DPDK applications.
+Refer to <a class="reference external" href="https://git.dpdk.org/dpdk-kmods/tree/windows">Windows documentation</a>
+in <code class="docutils literal notranslate"><span class="pre">dpdk-kmods</span></code> repository for common instructions on system setup,
+driver build and installation.
+The drivers are not signed, so signature enforcement has to be disabled.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Disabling driver signature enforcement weakens OS security.
+It is discouraged in production environments.</p>
+</div>
+<section id="virt2phys">
+<h3><span class="section-number">4.2.1. </span>virt2phys</h3>
+<p>Access to physical addresses is provided by a kernel-mode driver, virt2phys.
+It is mandatory for allocating physically-contiguous memory which is required
+by hardware PMDs.</p>
+<p>When loaded successfully, the driver is shown in <em>Device Manager</em> as <em>Virtual
+to physical address translator</em> device under <em>Kernel bypass</em> category.
+Installed driver persists across reboots.</p>
+<p>If DPDK is unable to communicate with the driver, a warning is printed
+on initialization (debug-level logs provide more details):</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>EAL: Cannot open virt2phys driver interface
+</pre></div>
+</div>
+</section>
+<section id="netuio">
+<h3><span class="section-number">4.2.2. </span>NetUIO</h3>
+<p>NetUIO kernel-mode driver provides access to the device hardware resources.
+It is mandatory for all hardware PMDs, except for mlx5 PMD.</p>
+<p>Refer to <a class="reference external" href="https://git.dpdk.org/dpdk-kmods/tree/windows/netuio/README.rst">NetUIO documentation</a>
+in <code class="docutils literal notranslate"><span class="pre">dpdk-kmods</span></code> repository for instructions to build and set up the driver.
+Devices supported by NetUIO are listed in <code class="docutils literal notranslate"><span class="pre">netuio.inf</span></code>.
+The list can be extended in order to try running DPDK with new devices.</p>
+</section>
+</section>
+<section id="run-the-helloworld-example">
+<h2><span class="section-number">4.3. </span>Run the <code class="docutils literal notranslate"><span class="pre">helloworld</span></code> Example</h2>
+<p>Navigate to the examples in the build directory and run <cite>dpdk-helloworld.exe</cite>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd C:\Users\me\dpdk\build\examples</span>
+<span class="go">dpdk-helloworld.exe -l 0-3</span>
+<span class="go">hello from core 1</span>
+<span class="go">hello from core 3</span>
+<span class="go">hello from core 0</span>
+<span class="go">hello from core 2</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Windows</a><ul>
+      <li>Previous: <a href="build_dpdk.html" title="previous chapter"><span class="section-number">3. </span>Compiling the DPDK Target from Source</a></li>
+      <li>Next: <a href="../sample_app_ug/index.html" title="next chapter">Sample Applications User Guides</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/windows_gsg/run_apps.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

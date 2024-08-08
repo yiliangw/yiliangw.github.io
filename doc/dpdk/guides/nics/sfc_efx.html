@@ -1,0 +1,540 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>52. Solarflare libefx-based Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="53. Soft NIC Poll Mode Driver" href="softnic.html" />
+    <link rel="prev" title="51. QEDE Poll Mode Driver" href="qede.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="solarflare-libefx-based-poll-mode-driver">
+<h1><span class="section-number">52. </span>Solarflare libefx-based Poll Mode Driver</h1>
+<p>The SFC EFX PMD (<strong>librte_net_sfc_efx</strong>) provides poll mode driver support
+for <strong>Solarflare SFN7xxx and SFN8xxx</strong> family of 10/40 Gbps adapters,
+<strong>Solarflare XtremeScale X2xxx</strong> family of 10/25/40/50/100 Gbps adapters and
+<strong>Alveo SN1000 SmartNICs</strong> family of 10/25/40/50/100 Gbps adapters.
+SFC EFX PMD has support for the latest Linux and FreeBSD operating systems.</p>
+<p>More information can be found at <a class="reference external" href="http://solarflare.com">Solarflare Communications website</a>.</p>
+<section id="supported-nics">
+<h2><span class="section-number">52.1. </span>Supported NICs</h2>
+<ul>
+<li><p>Xilinx Adapters:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Alveo SN1022 SmartNIC</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Solarflare XtremeScale Adapters:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Solarflare X2522 Dual Port SFP28 10/25GbE Adapter</p></li>
+<li><p>Solarflare X2541 Single Port QSFP28 10/25G/100G Adapter</p></li>
+<li><p>Solarflare X2542 Dual Port QSFP28 10/25G/100G Adapter</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Solarflare Flareon [Ultra] Server Adapters:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Solarflare SFN8522 Dual Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN8522M Dual Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN8042 Dual Port QSFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN8542 Dual Port QSFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN8722 Dual Port SFP+ OCP Server Adapter</p></li>
+<li><p>Solarflare SFN7002F Dual Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7004F Quad Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7042Q Dual Port QSFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7122F Dual Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7124F Quad Port SFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7142Q Dual Port QSFP+ Server Adapter</p></li>
+<li><p>Solarflare SFN7322F Precision Time Synchronization Server Adapter</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="features">
+<h2><span class="section-number">52.2. </span>Features</h2>
+<p>SFC EFX PMD has support for:</p>
+<ul class="simple">
+<li><p>Multiple transmit and receive queues</p></li>
+<li><p>Link state information including link status change interrupt</p></li>
+<li><p>IPv4/IPv6 TCP/UDP transmit checksum offload</p></li>
+<li><p>Inner IPv4/IPv6 TCP/UDP transmit checksum offload</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Extended statistics (see Solarflare Server Adapter User’s Guide for
+the statistics description)</p></li>
+<li><p>Basic flow control</p></li>
+<li><p>MTU update</p></li>
+<li><p>Jumbo frames up to 9K</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Allmulticast mode</p></li>
+<li><p>TCP segmentation offload (TSO) including VXLAN and GENEVE encapsulated</p></li>
+<li><p>Multicast MAC filter</p></li>
+<li><p>IPv4/IPv6 TCP/UDP receive checksum offload</p></li>
+<li><p>Inner IPv4/IPv6 TCP/UDP receive checksum offload</p></li>
+<li><p>Received packet type information</p></li>
+<li><p>Receive side scaling (RSS)</p></li>
+<li><p>RSS hash</p></li>
+<li><p>Scattered Rx DMA for packet that are larger that a single Rx descriptor</p></li>
+<li><p>Receive queue interrupts</p></li>
+<li><p>Deferred receive and transmit queue start</p></li>
+<li><p>Transmit VLAN insertion (if running firmware variant supports it)</p></li>
+<li><p>Flow API</p></li>
+<li><p>Loopback</p></li>
+<li><p>Configurable Rx CRC stripping (if running firmware variant supports it and
+if NIC is configured with single PF per port and without VFs, otherwise
+always stripped)</p></li>
+<li><p>SR-IOV PF</p></li>
+<li><p>Port representors (see :ref: switch_representation)</p></li>
+<li><p>VLAN stripping (if running firmware variant supports it)</p></li>
+</ul>
+</section>
+<section id="non-supported-features">
+<h2><span class="section-number">52.3. </span>Non-supported Features</h2>
+<p>The features not yet supported include:</p>
+<ul class="simple">
+<li><p>Priority-based flow control</p></li>
+<li><p>Header split on receive</p></li>
+<li><p>VLAN filtering</p></li>
+<li><p>LRO</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">52.4. </span>Limitations</h2>
+<p>Due to requirements on receive buffer alignment and usage of the receive
+buffer for the auxiliary packet information provided by the NIC up to
+extra 269 (14 bytes prefix plus up to 255 bytes for end padding) bytes may be
+required in the receive buffer.
+It should be taken into account when mbuf pool for receive is created.</p>
+<section id="equal-stride-super-buffer-mode">
+<h3><span class="section-number">52.4.1. </span>Equal stride super-buffer mode</h3>
+<p>When the receive queue uses equal stride super-buffer DMA mode, one HW Rx
+descriptor carries many Rx buffers which contiguously follow each other
+with some stride (equal to total size of rte_mbuf as mempool object).
+Each Rx buffer is an independent rte_mbuf.
+However dedicated mempool manager must be used when mempool for the Rx
+queue is created. The manager must support dequeue of the contiguous
+block of objects and provide mempool info API to get the block size.</p>
+<p>Another limitation of a equal stride super-buffer mode, imposed by the
+firmware, is that it allows for a single RSS context.</p>
+</section>
+</section>
+<section id="tunnels-support">
+<h2><span class="section-number">52.5. </span>Tunnels support</h2>
+<p>NVGRE, VXLAN and GENEVE tunnels are supported on SFN8xxx and X2xxx family
+adapters with full-feature firmware variant running.
+<strong>sfboot</strong> should be used to configure NIC to run full-feature firmware variant.
+See Solarflare Server Adapter User’s Guide for details.</p>
+<p>SFN8xxx and X2xxx family adapters provide either inner or outer packet classes.
+If adapter firmware advertises support for tunnels then the PMD
+configures the hardware to report inner classes, and outer classes are
+not reported in received packets.
+However, for VXLAN and GENEVE tunnels the PMD does report UDP as the
+outer layer 4 packet type.</p>
+<p>SFN8xxx and X2xxx family adapters report GENEVE packets as VXLAN.
+If UDP ports are configured for only one tunnel type then it is safe to
+treat VXLAN packet type indication as the corresponding UDP tunnel type.</p>
+</section>
+<section id="flow-api-support">
+<h2><span class="section-number">52.6. </span>Flow API support</h2>
+<p>Supported attributes:</p>
+<ul class="simple">
+<li><p>Ingress</p></li>
+<li><p>Transfer</p></li>
+</ul>
+<p>Supported pattern items (<strong>*non-transfer*</strong> rules):</p>
+<ul class="simple">
+<li><p>VOID</p></li>
+<li><p>ETH (exact match of source/destination addresses, individual/group match
+of destination address, EtherType in the outer frame and exact match of
+destination addresses, individual/group match of destination address in
+the inner frame)</p></li>
+<li><p>VLAN (exact match of VID, double-tagging is supported)</p></li>
+<li><p>IPV4 (exact match of source/destination addresses,
+IP transport protocol)</p></li>
+<li><p>IPV6 (exact match of source/destination addresses,
+IP transport protocol)</p></li>
+<li><p>TCP (exact match of source/destination ports)</p></li>
+<li><p>UDP (exact match of source/destination ports)</p></li>
+<li><p>VXLAN (exact match of VXLAN network identifier)</p></li>
+<li><p>GENEVE (exact match of virtual network identifier, only Ethernet (0x6558)
+protocol type is supported)</p></li>
+<li><p>NVGRE (exact match of virtual subnet ID)</p></li>
+</ul>
+<p>Supported actions (<strong>*non-transfer*</strong> rules):</p>
+<ul class="simple">
+<li><p>VOID</p></li>
+<li><p>QUEUE</p></li>
+<li><p>RSS</p></li>
+<li><p>DROP</p></li>
+<li><p>FLAG (supported only with ef10_essb Rx datapath)</p></li>
+<li><p>MARK (supported only with ef10_essb Rx datapath)</p></li>
+</ul>
+<p>Supported pattern items (<strong>*transfer*</strong> rules):</p>
+<ul class="simple">
+<li><p>PORT_REPRESENTOR (cannot repeat; conflicts with other traffic source items)</p></li>
+<li><p>REPRESENTED_PORT (cannot repeat; conflicts with other traffic source items)</p></li>
+<li><p>PORT_ID (cannot repeat; conflicts with other traffic source items)</p></li>
+<li><p>ETH</p></li>
+<li><p>VLAN (double-tagging is supported)</p></li>
+<li><p>IPV4 (source/destination addresses, IP transport protocol,
+type of service, time to live)</p></li>
+<li><p>IPV6 (source/destination addresses, IP transport protocol,
+traffic class, hop limit)</p></li>
+<li><p>TCP (source/destination ports, TCP header length + TCP flags)</p></li>
+<li><p>UDP (source/destination ports)</p></li>
+<li><p>VXLAN (exact match of VXLAN network identifier)</p></li>
+<li><p>GENEVE (exact match of virtual network identifier)</p></li>
+<li><p>NVGRE (exact match of virtual subnet ID)</p></li>
+</ul>
+<p>Supported actions (<strong>*transfer*</strong> rules):</p>
+<ul class="simple">
+<li><p>OF_POP_VLAN</p></li>
+<li><p>OF_PUSH_VLAN</p></li>
+<li><p>OF_VLAN_SET_VID</p></li>
+<li><p>OF_VLAN_SET_PCP</p></li>
+<li><p>SET_IPV4_DST</p></li>
+<li><p>SET_IPV4_SRC</p></li>
+<li><p>SET_MAC_DST</p></li>
+<li><p>SET_MAC_SRC</p></li>
+<li><p>SET_TP_DST</p></li>
+<li><p>SET_TP_SRC</p></li>
+<li><p>OF_DEC_NW_TTL</p></li>
+<li><p>DEC_TTL</p></li>
+<li><p>VXLAN_DECAP</p></li>
+<li><p>VXLAN_ENCAP</p></li>
+<li><p>FLAG</p></li>
+<li><p>MARK</p></li>
+<li><p>PF</p></li>
+<li><p>VF</p></li>
+<li><p>PORT_REPRESENTOR</p></li>
+<li><p>REPRESENTED_PORT</p></li>
+<li><p>PORT_ID</p></li>
+<li><p>COUNT</p></li>
+<li><p>INDIRECT</p></li>
+<li><p>DROP</p></li>
+</ul>
+<p>Validating flow rules depends on the firmware variant.</p>
+<p>The <a class="reference internal" href="../prog_guide/rte_flow.html#flow-isolated-mode"><span class="std std-ref">Flow isolated mode</span></a> is supported.</p>
+<p>The implementation is natively thread-safe.</p>
+<section id="ethernet-destination-individual-group-match">
+<h3><span class="section-number">52.6.1. </span>Ethernet destination individual/group match</h3>
+<p>Ethernet item supports I/G matching, if only the corresponding bit is set
+in the mask of destination address. If destination address in the spec is
+multicast, it matches all multicast (and broadcast) packets, otherwise it
+matches unicast packets that are not filtered by other flow rules.</p>
+</section>
+<section id="exceptions-to-flow-rules">
+<h3><span class="section-number">52.6.2. </span>Exceptions to flow rules</h3>
+<p>There is a list of exceptional flow rule patterns which will not be
+accepted by the PMD. A pattern will be rejected if at least one of the
+conditions is met:</p>
+<ul class="simple">
+<li><p>Filtering by IPv4 or IPv6 EtherType without pattern items of internet
+layer and above.</p></li>
+<li><p>The last item is IPV4 or IPV6, and it’s empty.</p></li>
+<li><p>Filtering by TCP or UDP IP transport protocol without pattern items of
+transport layer and above.</p></li>
+<li><p>The last item is TCP or UDP, and it’s empty.</p></li>
+</ul>
+</section>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">52.7. </span>Prerequisites</h2>
+<ul>
+<li><p>Requires firmware version:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>SFN7xxx: <strong>4.7.1.1001</strong> or higher</p></li>
+<li><p>SFN8xxx: <strong>6.0.2.1004</strong> or higher</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+<p>Visit <a class="reference external" href="https://support.solarflare.com">Solarflare Support Downloads</a> to get
+Solarflare Utilities (either Linux or FreeBSD) with the latest firmware.
+Follow instructions from Solarflare Server Adapter User’s Guide to
+update firmware and configure the adapter.</p>
+</section>
+<section id="configuration">
+<h2><span class="section-number">52.8. </span>Configuration</h2>
+<section id="compilation-options">
+<h3><span class="section-number">52.8.1. </span>Compilation Options</h3>
+<p>The following build-time options may be enabled on build time using
+<code class="docutils literal notranslate"><span class="pre">-Dc_args=</span></code> meson argument (e.g.  <code class="docutils literal notranslate"><span class="pre">-Dc_args=-DRTE_LIBRTE_SFC_EFX_DEBUG</span></code>).</p>
+<p>Please note that enabling debugging options may affect system performance.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_SFC_EFX_DEBUG</span></code> (undefined by default)</p>
+<p>Enable compilation of the extra run-time consistency checks.</p>
+</li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h3><span class="section-number">52.8.2. </span>Runtime Configuration</h3>
+<p>The following per-device parameters can be passed via EAL PCI device
+allow option like “-a 02:00.0,arg1=value1,…”.</p>
+<p>Case-insensitive 1/y/yes/on or 0/n/no/off may be used to specify
+boolean parameters value.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">class</span></code> [net|vdpa] (default <strong>net</strong>)</p>
+<p>Choose the mode of operation of ef100 device.
+<strong>net</strong> device will work as network device and will be probed by net/sfc driver.
+<strong>vdpa</strong> device will work as vdpa device and will be probed by vdpa/sfc driver.
+If this parameter is not specified then ef100 device will operate as
+network device.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">switch_mode</span></code> [legacy|switchdev] (see below for default)</p>
+<p>In legacy mode, NIC firmware provides Ethernet virtual bridging (EVB) API
+to configure switching inside NIC to deliver traffic to physical (PF) and
+virtual (VF) PCI functions. PF driver is responsible to build the
+infrastructure for VFs, and traffic goes to/from VF by default in accordance
+with MAC address assigned, permissions and filters installed by VF drivers.
+In switchdev mode VF traffic goes via port representor (if any) on PF, and
+software virtual switch (for example, Open vSwitch) makes the decision.
+Software virtual switch may install MAE rules to pass established traffic
+flows via hardware and offload software datapath as the result.
+Default is legacy, unless representors are specified, in which case switchdev
+is chosen.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">representor</span></code> parameter [list]</p>
+<p>Instantiate port representor Ethernet devices for specified Virtual
+Functions list.</p>
+<p>It is a standard parameter whose format is described in
+<a class="reference internal" href="../prog_guide/poll_mode_drv.html#ethernet-device-standard-device-arguments"><span class="std std-ref">Ethernet Device Standard Device Arguments</span></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_datapath</span></code> [auto|efx|ef10|ef10_essb] (default <strong>auto</strong>)</p>
+<p>Choose receive datapath implementation.
+<strong>auto</strong> allows the driver itself to make a choice based on firmware
+features available and required by the datapath implementation.
+<strong>efx</strong> chooses libefx-based datapath which supports Rx scatter.
+Supported for SFN7xxx, SFN8xxx and X2xxx family adapters only.
+<strong>ef10</strong> chooses EF10 (SFN7xxx, SFN8xxx, X2xxx) native datapath which is
+more efficient than libefx-based and provides richer packet type
+classification.
+<strong>ef10_essb</strong> chooses SFNX2xxx equal stride super-buffer datapath
+which may be used on DPDK firmware variant only
+(see notes about its limitations above).
+<strong>ef100</strong> chooses EF100 native datapath which is the only supported
+Rx datapath for EF100 architecture based NICs.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_datapath</span></code> [auto|efx|ef10|ef10_simple|ef100] (default <strong>auto</strong>)</p>
+<p>Choose transmit datapath implementation.
+<strong>auto</strong> allows the driver itself to make a choice based on firmware
+features available and required by the datapath implementation.
+<strong>efx</strong> chooses libefx-based datapath which supports VLAN insertion
+(full-feature firmware variant only), TSO and multi-segment mbufs.
+Mbuf segments may come from different mempools, and mbuf reference
+counters are treated responsibly.
+Supported for SFN7xxx, SFN8xxx and X2xxx family adapters only.
+<strong>ef10</strong> chooses EF10 (SFN7xxx, SFN8xxx, X2xxx) native datapath which is
+more efficient than libefx-based but has no VLAN insertion support yet.
+Mbuf segments may come from different mempools, and mbuf reference
+counters are treated responsibly.
+<strong>ef10_simple</strong> chooses EF10 (SFN7xxx, SFN8xxx, X2xxx) native datapath which
+is even more faster then <strong>ef10</strong> but does not support multi-segment
+mbufs, disallows multiple mempools and neglects mbuf reference counters.
+<strong>ef100</strong> chooses EF100 native datapath which supports multi-segment
+mbufs, VLAN insertion, inner/outer IPv4 and TCP/UDP checksum and TCP
+segmentation offloads including VXLAN and GENEVE IPv4/IPv6 tunnels.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">perf_profile</span></code> [auto|throughput|low-latency] (default <strong>throughput</strong>)</p>
+<p>Choose hardware tuning to be optimized for either throughput or
+low-latency.
+<strong>auto</strong> allows NIC firmware to make a choice based on
+installed licenses and firmware variant configured using <strong>sfboot</strong>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">stats_update_period_ms</span></code> [long] (default <strong>1000</strong>)</p>
+<p>Adjust period in milliseconds to update port hardware statistics.
+The accepted range is 0 to 65535. The value of <strong>0</strong> may be used
+to disable periodic statistics update. One should note that it’s
+only possible to set an arbitrary value on SFN8xxx and X2xxx provided that
+firmware version is 6.2.1.1033 or higher, otherwise any positive
+value will select a fixed update period of <strong>1000</strong> milliseconds</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fw_variant</span></code> [dont-care|full-feature|ultra-low-latency|
+capture-packed-stream|dpdk] (default <strong>dont-care</strong>)</p>
+<p>Choose the preferred firmware variant to use.
+The parameter is supported for SFN7xxX, SFN8xxx and X2xxx families only.
+In order for the selected option to have an effect, the <strong>sfboot</strong> utility
+must be configured with the <strong>auto</strong> firmware-variant option.
+The preferred firmware variant applies to all ports on the NIC.
+<strong>dont-care</strong> ensures that the driver can attach to an unprivileged function.
+The datapath firmware type to use is controlled by the <strong>sfboot</strong>
+utility.
+<strong>full-feature</strong> chooses full featured firmware.
+<strong>ultra-low-latency</strong> chooses firmware with fewer features but lower latency.
+<strong>capture-packed-stream</strong> chooses firmware for SolarCapture packed stream
+mode.
+<strong>dpdk</strong> chooses DPDK firmware with equal stride super-buffer Rx mode
+for higher Rx packet rate and packet marks support and firmware subvariant
+without checksumming on transmit for higher Tx packet rate if
+checksumming is not required.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rxd_wait_timeout_ns</span></code> [long] (default <strong>200 us</strong>)</p>
+<p>Adjust timeout in nanoseconds to head-of-line block to wait for
+Rx descriptors.
+The accepted range is 0 to 400 ms.
+Flow control should be enabled to make it work.
+The value of <strong>0</strong> disables it and packets are dropped immediately.
+When a packet is dropped because of no Rx descriptors,
+<code class="docutils literal notranslate"><span class="pre">rx_nodesc_drop_cnt</span></code> counter grows.
+The feature is supported only by the DPDK firmware variant when equal
+stride super-buffer Rx mode is used.</p>
+</li>
+</ul>
+</section>
+<section id="dynamic-logging-parameters">
+<h3><span class="section-number">52.8.3. </span>Dynamic Logging Parameters</h3>
+<p>One may leverage EAL option “–log-level” to change default levels
+for the log types supported by the driver. The option is used with
+an argument typically consisting of two parts separated by a colon.</p>
+<p>Level value is the last part which takes a symbolic name (or integer).
+Log type is the former part which may shell match syntax.
+Depending on the choice of the expression, the given log level may
+be used either for some specific log type or for a subset of types.</p>
+<p>SFC EFX PMD provides the following log types available for control:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.sfc.driver</span></code> (default level is <strong>notice</strong>)</p>
+<p>Affects driver-wide messages unrelated to any particular devices.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.sfc.main</span></code> (default level is <strong>notice</strong>)</p>
+<p>Matches a subset of per-port log types registered during runtime.
+A full name for a particular type may be obtained by appending a
+dot and a PCI device identifier (<code class="docutils literal notranslate"><span class="pre">XXXX:XX:XX.X</span></code>) to the prefix.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.sfc.mcdi</span></code> (default level is <strong>notice</strong>)</p>
+<p>Extra logging of the communication with the NIC’s management CPU.
+The format of the log is consumed by the Solarflare netlogdecode
+cross-platform tool. May be managed per-port, as explained above.</p>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="qede.html" title="previous chapter"><span class="section-number">51. </span>QEDE Poll Mode Driver</a></li>
+      <li>Next: <a href="softnic.html" title="next chapter"><span class="section-number">53. </span>Soft NIC Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/sfc_efx.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

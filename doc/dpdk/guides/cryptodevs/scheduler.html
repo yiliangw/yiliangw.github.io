@@ -1,0 +1,293 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>19. Cryptodev Scheduler Poll Mode Driver Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="20. SNOW 3G Crypto Poll Mode Driver" href="snow3g.html" />
+    <link rel="prev" title="18. Null Crypto Poll Mode Driver" href="null.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cryptodev-scheduler-poll-mode-driver-library">
+<h1><span class="section-number">19. </span>Cryptodev Scheduler Poll Mode Driver Library</h1>
+<p>Scheduler PMD is a software crypto PMD, which has the capabilities of
+attaching hardware and/or software cryptodevs, and distributes ingress
+crypto ops among them in a certain manner.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/scheduler-overview.svg" src="../_images/scheduler-overview.svg" /><figcaption>
+<p><span class="caption-number">Fig. 19.3 </span><span class="caption-text">Cryptodev Scheduler Overview</span></p>
+</figcaption>
+</figure>
+<p>The Cryptodev Scheduler PMD library (<strong>librte_crypto_scheduler</strong>) acts as
+a software crypto PMD and shares the same API provided by librte_cryptodev.
+The PMD supports attaching multiple crypto PMDs, software or hardware, as
+workers, and distributes the crypto workload to them with certain behavior.
+The behaviors are categorizes as different “modes”. Basically, a scheduling
+mode defines certain actions for scheduling crypto ops to its workers.</p>
+<p>The librte_crypto_scheduler library exports a C API which provides an API
+for attaching/detaching workers, set/get scheduling modes, and enable/disable
+crypto ops reordering.</p>
+<section id="limitations">
+<h2><span class="section-number">19.1. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Sessionless crypto operation is not supported</p></li>
+<li><p>OOP crypto operation is not supported when the crypto op reordering feature
+is enabled.</p></li>
+</ul>
+</section>
+<section id="initialization">
+<h2><span class="section-number">19.2. </span>Initialization</h2>
+<p>To use the PMD in an application, user must:</p>
+<ul class="simple">
+<li><p>Call rte_vdev_init(“crypto_scheduler”) within the application.</p></li>
+<li><p>Use –vdev=”crypto_scheduler” in the EAL options, which will call
+rte_vdev_init() internally.</p></li>
+</ul>
+<p>The following parameters (all optional) can be provided in the previous
+two calls:</p>
+<ul class="simple">
+<li><p>socket_id: Specify the socket where the memory for the device is going
+to be allocated (by default, socket_id will be the socket where the core
+that is creating the PMD is running on).</p></li>
+<li><p>max_nb_sessions: Specify the maximum number of sessions that can be
+created. This value may be overwritten internally if there are too
+many devices are attached.</p></li>
+<li><p>worker: If a cryptodev has been initialized with specific name, it can be
+attached to the scheduler using this parameter, simply filling the name
+here. Multiple cryptodevs can be attached initially by presenting this
+parameter multiple times.</p></li>
+<li><p>mode: Specify the scheduling mode of the PMD. The supported scheduling
+mode parameter values are specified in the “Cryptodev Scheduler Modes
+Overview” section.</p></li>
+<li><p>mode_param: Specify the mode-specific parameter. Some scheduling modes
+may be initialized with specific parameters other than the default ones,
+such as the <strong>threshold</strong> packet size of <strong>packet-size-distr</strong> mode. This
+parameter fulfills the purpose.</p></li>
+<li><p>ordering: Specify the status of the crypto operations ordering feature.
+The value of this parameter can be “enable” or “disable”. This feature
+is disabled by default.</p></li>
+</ul>
+<p>Example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">... --vdev &quot;crypto_aesni_mb0,name=aesni_mb_1&quot; --vdev &quot;crypto_aesni_mb1,name=aesni_mb_2&quot; --vdev &quot;crypto_scheduler,worker=aesni_mb_1,worker=aesni_mb_2&quot; ...</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>The scheduler cryptodev cannot be started unless the scheduling mode
+is set and at least one worker is attached. Also, to configure the
+scheduler in the run-time, like attach/detach worker(s), change
+scheduling mode, or enable/disable crypto op ordering, one should stop
+the scheduler first, otherwise an error will be returned.</p></li>
+<li><p>The crypto op reordering feature requires using the userdata field of
+every mbuf to be processed to store temporary data. By the end of
+processing, the field is set to pointing to NULL, any previously
+stored value of this field will be lost.</p></li>
+</ul>
+</div>
+</section>
+<section id="cryptodev-scheduler-modes-overview">
+<h2><span class="section-number">19.3. </span>Cryptodev Scheduler Modes Overview</h2>
+<p>Currently the Crypto Scheduler PMD library supports following modes of
+operation:</p>
+<ul class="simple">
+<li><p><strong>CDEV_SCHED_MODE_ROUNDROBIN:</strong></p></li>
+</ul>
+<blockquote>
+<div><p><em>Initialization mode parameter</em>: <strong>round-robin</strong></p>
+<p>Round-robin mode, which distributes the enqueued burst of crypto ops
+among its workers in a round-robin manner. This mode may help to fill
+the throughput gap between the physical core and the existing cryptodevs
+to increase the overall performance.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>CDEV_SCHED_MODE_PKT_SIZE_DISTR:</strong></p></li>
+</ul>
+<blockquote>
+<div><p><em>Initialization mode parameter</em>: <strong>packet-size-distr</strong></p>
+<p>Packet-size based distribution mode, which works with 2 workers, the primary
+worker and the secondary worker, and distributes the enqueued crypto
+operations to them based on their data lengths. A crypto operation will be
+distributed to the primary worker if its data length is equal to or bigger
+than the designated threshold, otherwise it will be handled by the secondary
+worker.</p>
+<p>A typical use case in this mode is with the QAT cryptodev as the primary and
+a software cryptodev as the secondary worker. This may help applications to
+process additional crypto workload than what the QAT cryptodev can handle on
+its own, by making use of the available CPU cycles to deal with smaller
+crypto workloads.</p>
+<p>The threshold is set to 128 bytes by default. It can be updated by calling
+function <strong>rte_cryptodev_scheduler_option_set</strong>. The parameter of
+<strong>option_type</strong> must be <strong>CDEV_SCHED_OPTION_THRESHOLD</strong> and <strong>option</strong> should
+point to a rte_cryptodev_scheduler_threshold_option structure filled with
+appropriate threshold value. Please NOTE this threshold has be a power-of-2
+unsigned integer. It is possible to use <strong>mode_param</strong> initialization
+parameter to achieve the same purpose. For example:</p>
+<p>… –vdev “crypto_scheduler,mode=packet-size-distr,mode_param=threshold:512” …</p>
+<p>The above parameter will overwrite the threshold value to 512.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>CDEV_SCHED_MODE_FAILOVER:</strong></p></li>
+</ul>
+<blockquote>
+<div><p><em>Initialization mode parameter</em>: <strong>fail-over</strong></p>
+<p>Fail-over mode, which works with 2 workers, the primary worker and the
+secondary worker. In this mode, the scheduler will enqueue the incoming
+crypto operation burst to the primary worker. When one or more crypto
+operations fail to be enqueued, then they will be enqueued to the secondary
+worker.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><strong>CDEV_SCHED_MODE_MULTICORE:</strong></p></li>
+</ul>
+<blockquote>
+<div><p><em>Initialization mode parameter</em>: <strong>multi-core</strong></p>
+<p>Multi-core mode, which distributes the workload with several (up to eight)
+worker cores. The enqueued bursts are distributed among the worker cores in a
+round-robin manner. If scheduler cannot enqueue entire burst to the same worker,
+it will enqueue the remaining operations to the next available worker.
+For pure small packet size (64 bytes) traffic however the multi-core mode is not
+an optimal solution, as it doesn’t give significant per-core performance improvement.
+For mixed traffic (IMIX) the optimal number of worker cores is around 2-3.
+For large packets (1.5 kbytes) scheduler shows linear scaling in performance
+up to eight cores.
+Each worker uses its own cryptodev. Only software cryptodevs
+are supported. Only the same type of cryptodevs should be used concurrently.</p>
+<p>The multi-core mode uses one extra parameter:</p>
+<ul class="simple">
+<li><p>corelist: Semicolon-separated list of logical cores to be used as workers.
+The number of worker cores should be equal to the number of worker cryptodevs.
+These cores should be present in EAL core list parameter and
+should not be used by the application or any other process.</p></li>
+</ul>
+<dl class="simple">
+<dt>Example:</dt><dd><p>… –vdev “crypto_aesni_mb1,name=aesni_mb_1” –vdev “crypto_aesni_mb_pmd2,name=aesni_mb_2” –vdev “crypto_scheduler,worker=aesni_mb_1,worker=aesni_mb_2,mode=multi-core,corelist=23;24” …</p>
+</dd>
+</dl>
+</div></blockquote>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="null.html" title="previous chapter"><span class="section-number">18. </span>Null Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="snow3g.html" title="next chapter"><span class="section-number">20. </span>SNOW 3G Crypto Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/scheduler.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

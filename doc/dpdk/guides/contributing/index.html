@@ -1,0 +1,242 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Contributor’s Guidelines &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. DPDK Coding Style" href="coding_style.html" />
+    <link rel="prev" title="6. OCTEON TX Board Support Package" href="../platform/octeontx.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="contributor-s-guidelines">
+<h1>Contributor’s Guidelines</h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="coding_style.html">1. DPDK Coding Style</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#description">1.1. Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#general-guidelines">1.2. General Guidelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-comment-style">1.3. C Comment Style</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-preprocessor-directives">1.4. C Preprocessor Directives</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-types">1.5. C Types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#naming">1.6. Naming</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-indentation">1.7. C Indentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-function-definition-declaration-and-use">1.8. C Function Definition, Declaration and Use</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#c-statement-style-and-conventions">1.9. C Statement Style and Conventions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#dynamic-logging">1.10. Dynamic Logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#python-code">1.11. Python Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#integrating-with-the-build-system">1.12. Integrating with the Build System</a></li>
+<li class="toctree-l2"><a class="reference internal" href="coding_style.html#meson-coding-style">1.13. Meson Coding Style</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="design.html">2. Design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="design.html#environment-or-architecture-specific-sources">2.1. Environment or Architecture-specific Sources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design.html#mbuf-features">2.2. Mbuf features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design.html#runtime-information-logging-tracing-and-telemetry">2.3. Runtime Information - Logging, Tracing and Telemetry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design.html#library-statistics">2.4. Library Statistics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="design.html#pf-and-vf-considerations">2.5. PF and VF Considerations</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="abi_policy.html">3. ABI Policy</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="abi_policy.html#description">3.1. Description</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_policy.html#general-guidelines">3.2. General Guidelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_policy.html#the-dpdk-abi-policy">3.3. The DPDK ABI policy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_policy.html#new-abi-versions">3.4. New ABI versions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_policy.html#experimental">3.5. Experimental</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="abi_versioning.html">4. ABI Versioning</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="abi_versioning.html#what-is-a-library-s-soname">4.1. What is a library’s soname?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_versioning.html#major-abi-versions">4.2. Major ABI versions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_versioning.html#versioning-macros">4.3. Versioning Macros</a></li>
+<li class="toctree-l2"><a class="reference internal" href="abi_versioning.html#running-the-abi-validator">4.4. Running the ABI Validator</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="documentation.html">5. DPDK Documentation Guidelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#structure-of-the-documentation">5.1. Structure of the Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#role-of-the-documentation">5.2. Role of the Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#building-the-documentation">5.3. Building the Documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#document-guidelines">5.4. Document Guidelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#rst-guidelines">5.5. RST Guidelines</a></li>
+<li class="toctree-l2"><a class="reference internal" href="documentation.html#doxygen-guidelines">5.6. Doxygen Guidelines</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="unit_test.html">6. DPDK Unit Testing Guidelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#background">6.1. Background</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#running-a-test">6.2. Running a test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#running-test-cases-via-meson">6.3. Running test cases via Meson</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#adding-tests-to-dpdk-test-application">6.4. Adding tests to dpdk-test application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#designing-a-test">6.5. Designing a test</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#checking-code-coverage">6.6. Checking code coverage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#adding-a-suite-or-test-case-to-meson">6.7. Adding a suite or test case to Meson</a></li>
+<li class="toctree-l2"><a class="reference internal" href="unit_test.html#running-cryptodev-tests">6.8. Running cryptodev tests</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="new_library.html">7. Adding a new library</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="new_library.html#process-for-approval-in-principle">7.1. Process for approval in principle</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="patches.html">8. Contributing Code to DPDK</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#the-dpdk-development-process">8.1. The DPDK Development Process</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#source-license">8.2. Source License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#maintainers-and-sub-trees">8.3. Maintainers and Sub-trees</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#getting-the-source-code">8.4. Getting the Source Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#make-your-changes">8.5. Make your Changes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#commit-messages-subject-line">8.6. Commit Messages: Subject Line</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#commit-messages-body">8.7. Commit Messages: Body</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#creating-patches">8.8. Creating Patches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#checking-the-patches">8.9. Checking the Patches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#checking-compilation">8.10. Checking Compilation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#checking-abi-compatibility">8.11. Checking ABI compatibility</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#sending-patches">8.12. Sending Patches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#the-review-process">8.13. The Review Process</a></li>
+<li class="toctree-l2"><a class="reference internal" href="patches.html#milestones-definition">8.14. Milestones definition</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="vulnerability.html">9. DPDK Vulnerability Management Process</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#scope">9.1. Scope</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#finding">9.2. Finding</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#report">9.3. Report</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#confirmation">9.4. Confirmation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#cve-request">9.5. CVE Request</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#fix-development-and-review">9.6. Fix Development and Review</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#pre-release-disclosure">9.7. Pre-Release Disclosure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#private-disclosure">9.8. Private Disclosure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#public-disclosure">9.9. Public Disclosure</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulnerability.html#references">9.10. References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="stable.html">10. DPDK Stable Releases and Long Term Support</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#introduction">10.1. Introduction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#stable-releases">10.2. Stable Releases</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#lts-release">10.3. LTS Release</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#what-changes-should-be-backported">10.4. What changes should be backported</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#the-stable-mailing-list">10.5. The Stable Mailing List</a></li>
+<li class="toctree-l2"><a class="reference internal" href="stable.html#releasing">10.6. Releasing</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cheatsheet.html">11. Patch Cheatsheet</a></li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../platform/octeontx.html" title="previous chapter"><span class="section-number">6. </span>OCTEON TX Board Support Package</a></li>
+      <li>Next: <a href="coding_style.html" title="next chapter"><span class="section-number">1. </span>DPDK Coding Style</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

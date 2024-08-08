@@ -1,0 +1,273 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>13. Enable DPDK on OpenWrt &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="14. Using AVX-512 with DPDK" href="avx512.html" />
+    <link rel="prev" title="12. Debug &amp; Troubleshoot guide" href="debug_troubleshoot.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="enable-dpdk-on-openwrt">
+<h1><span class="section-number">13. </span>Enable DPDK on OpenWrt</h1>
+<p>This document describes how to enable Data Plane Development Kit (DPDK) on
+OpenWrt in both a virtual and physical x86 environment.</p>
+<section id="introduction">
+<h2><span class="section-number">13.1. </span>Introduction</h2>
+<p>The OpenWrt project is a well-known source-based router OS which provides a
+fully writable filesystem with package management.</p>
+</section>
+<section id="build-openwrt">
+<h2><span class="section-number">13.2. </span>Build OpenWrt</h2>
+<p>You can obtain OpenWrt image through <a class="reference external" href="https://downloads.openwrt.org/releases">https://downloads.openwrt.org/releases</a>.
+To fully customize your own OpenWrt, it is highly recommended to build it from
+the source code. You can clone the OpenWrt source code as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://git.openwrt.org/openwrt/openwrt.git</span>
+</pre></div>
+</div>
+<section id="openwrt-configuration">
+<h3><span class="section-number">13.2.1. </span>OpenWrt configuration</h3>
+<ul class="simple">
+<li><p>Select <code class="docutils literal notranslate"><span class="pre">x86</span></code> in <code class="docutils literal notranslate"><span class="pre">Target</span> <span class="pre">System</span></code></p></li>
+<li><p>Select <code class="docutils literal notranslate"><span class="pre">x86_64</span></code> in <code class="docutils literal notranslate"><span class="pre">Subtarget</span></code></p></li>
+<li><p>Select <code class="docutils literal notranslate"><span class="pre">Build</span> <span class="pre">the</span> <span class="pre">OpenWrt</span> <span class="pre">SDK</span></code> for cross-compilation environment</p></li>
+<li><p>Select <code class="docutils literal notranslate"><span class="pre">Use</span> <span class="pre">glibc</span></code> in <code class="docutils literal notranslate"><span class="pre">Advanced</span> <span class="pre">configuration</span> <span class="pre">options</span> <span class="pre">(for</span> <span class="pre">developers)</span></code>
+then <code class="docutils literal notranslate"><span class="pre">ToolChain</span> <span class="pre">Options</span></code> and <code class="docutils literal notranslate"><span class="pre">C</span> <span class="pre">Library</span> <span class="pre">implementation</span></code></p></li>
+</ul>
+</section>
+<section id="kernel-configuration">
+<h3><span class="section-number">13.2.2. </span>Kernel configuration</h3>
+<p>The following configurations should be enabled:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_IOMMU_TYPE1=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_VIRQFD=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_NOIOMMU=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_PCI=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_VFIO_PCI_MMAP=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_HUGETLBFS=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_HUGETLB_PAGE=y</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">CONFIG_PROC_PAGE_MONITOR=y</span></code></p></li>
+</ul>
+</section>
+<section id="build-steps">
+<h3><span class="section-number">13.2.3. </span>Build steps</h3>
+<p>For detailed OpenWrt build steps and prerequisites, please refer to the
+<a class="reference external" href="https://openwrt.org/docs/guide-developer/build-system/use-buildsystem">OpenWrt build guide</a>.</p>
+<p>After the build is completed, you can find the images and SDK in
+<code class="docutils literal notranslate"><span class="pre">&lt;OpenWrt</span> <span class="pre">Root&gt;/bin/targets/x86/64-glibc/</span></code>.</p>
+</section>
+</section>
+<section id="dpdk-cross-compilation-for-openwrt">
+<h2><span class="section-number">13.3. </span>DPDK Cross Compilation for OpenWrt</h2>
+<section id="pre-requisites">
+<h3><span class="section-number">13.3.1. </span>Pre-requisites</h3>
+<p>NUMA is required to run DPDK in x86.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For compiling the NUMA lib, run <code class="docutils literal notranslate"><span class="pre">libtool</span> <span class="pre">--version</span></code> to ensure the libtool
+version &gt;= 2.2, otherwise the compilation will fail with errors.</p>
+</div>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/numactl/numactl.git</span>
+<span class="go">cd numactl</span>
+<span class="go">git checkout v2.0.13 -b v2.0.13</span>
+<span class="go">./autogen.sh</span>
+<span class="go">autoconf -i</span>
+<span class="go">export PATH=&lt;OpenWrt SDK&gt;/glibc/openwrt-sdk-x86-64_gcc-8.3.0_glibc.Linux-x86_64/staging_dir/toolchain-x86_64_gcc-8.3.0_glibc/bin/:$PATH</span>
+<span class="go">./configure CC=x86_64-openwrt-linux-gnu-gcc --prefix=&lt;OpenWrt SDK toolchain dir&gt;</span>
+<span class="go">make install</span>
+</pre></div>
+</div>
+<p>The numa header files and lib file is generated in the include and lib folder
+respectively under &lt;OpenWrt SDK toolchain dir&gt;.</p>
+</section>
+<section id="build-dpdk">
+<h3><span class="section-number">13.3.2. </span>Build DPDK</h3>
+<p>To cross compile with meson build, you need to write a customized cross file
+first.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[binaries]</span>
+<span class="go">c = &#39;x86_64-openwrt-linux-gcc&#39;</span>
+<span class="go">cpp = &#39;x86_64-openwrt-linux-cpp&#39;</span>
+<span class="go">ar = &#39;x86_64-openwrt-linux-ar&#39;</span>
+<span class="go">strip = &#39;x86_64-openwrt-linux-strip&#39;</span>
+
+<span class="go">meson setup builddir --cross-file openwrt-cross</span>
+<span class="go">ninja -C builddir</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-dpdk-application-on-openwrt">
+<h2><span class="section-number">13.4. </span>Running DPDK application on OpenWrt</h2>
+<section id="virtual-machine">
+<h3><span class="section-number">13.4.1. </span>Virtual machine</h3>
+<ul class="simple">
+<li><p>Extract the boot image</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">gzip -d openwrt-x86-64-combined-ext4.img.gz</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Launch Qemu</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">qemu-system-x86_64 \</span>
+<span class="go">        -cpu host \</span>
+<span class="go">        -smp 8 \</span>
+<span class="go">        -enable-kvm \</span>
+<span class="go">        -M q35 \</span>
+<span class="go">        -m 2048M \</span>
+<span class="go">        -object memory-backend-file,id=mem,size=2048M,mem-path=/tmp/hugepages,share=on \</span>
+<span class="go">        -drive file=&lt;Your OpenWrt images folder&gt;/openwrt-x86-64-combined-ext4.img,id=d0,if=none,bus=0,unit=0 \</span>
+<span class="go">        -device ide-hd,drive=d0,bus=ide.0 \</span>
+<span class="go">        -net nic,vlan=0 \</span>
+<span class="go">        -net nic,vlan=1 \</span>
+<span class="go">        -net user,vlan=1 \</span>
+<span class="go">        -display none \</span>
+</pre></div>
+</div>
+</section>
+<section id="physical-machine">
+<h3><span class="section-number">13.4.2. </span>Physical machine</h3>
+<p>You can use the <code class="docutils literal notranslate"><span class="pre">dd</span></code> tool to write the OpenWrt image to the drive you
+want to write the image on.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dd if=openwrt-18.06.1-x86-64-combined-squashfs.img of=/dev/sdX</span>
+</pre></div>
+</div>
+<p>Where sdX is name of the drive. (You can find it though <code class="docutils literal notranslate"><span class="pre">fdisk</span> <span class="pre">-l</span></code>)</p>
+</section>
+<section id="running-dpdk">
+<h3><span class="section-number">13.4.3. </span>Running DPDK</h3>
+<p>More detailed info about how to run a DPDK application please refer to
+<code class="docutils literal notranslate"><span class="pre">Running</span> <span class="pre">DPDK</span> <span class="pre">Applications</span></code> section of <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">the DPDK documentation</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You need to install pre-built NUMA libraries (including soft link)
+to /usr/lib64 in OpenWrt.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="debug_troubleshoot.html" title="previous chapter"><span class="section-number">12. </span>Debug &amp; Troubleshoot guide</a></li>
+      <li>Next: <a href="avx512.html" title="next chapter"><span class="section-number">14. </span>Using AVX-512 with DPDK</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/openwrt.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

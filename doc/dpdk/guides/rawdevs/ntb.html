@@ -1,0 +1,280 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>7. NTB Rawdev Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Mempool Device Driver" href="../mempool/index.html" />
+    <link rel="prev" title="4. IFPGA Rawdev Driver" href="ifpga.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ntb-rawdev-driver">
+<h1><span class="section-number">7. </span>NTB Rawdev Driver</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">ntb</span></code> rawdev driver provides a non-transparent bridge between two
+separate hosts so that they can communicate with each other. Thus, many
+user cases can benefit from this, such as fault tolerance and visual
+acceleration.</p>
+<p>This PMD allows two hosts to handshake for device start and stop, memory
+allocation for the peer to access and read/write allocated memory from peer.
+Also, the PMD allows to use doorbell registers to notify the peer and share
+some information by using scratchpad registers.</p>
+<section id="bios-setting-on-intel-xeon">
+<h2><span class="section-number">7.1. </span>BIOS setting on Intel Xeon</h2>
+<p>Intel Non-transparent Bridge (NTB) needs special BIOS settings on both systems.
+Note that for 4th Generation Intel® Xeon® Scalable Processors,
+option <code class="docutils literal notranslate"><span class="pre">Port</span> <span class="pre">Subsystem</span> <span class="pre">Mode</span></code> should be changed from <code class="docutils literal notranslate"><span class="pre">Gen5</span></code> to <code class="docutils literal notranslate"><span class="pre">Gen4</span> <span class="pre">Only</span></code>,
+then reboot.</p>
+<ul class="simple">
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Non-Transparent</span> <span class="pre">Bridge</span> <span class="pre">PCIe</span> <span class="pre">Port</span> <span class="pre">Definition</span></code> for needed PCIe ports
+as <code class="docutils literal notranslate"><span class="pre">NTB</span> <span class="pre">to</span> <span class="pre">NTB</span></code> mode, on both hosts.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Enable</span> <span class="pre">NTB</span> <span class="pre">BARs</span></code> as <code class="docutils literal notranslate"><span class="pre">Enabled</span></code>, on both hosts.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Enable</span> <span class="pre">SPLIT</span> <span class="pre">BARs</span></code> as <code class="docutils literal notranslate"><span class="pre">Disabled</span></code>, on both hosts.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Imbar1</span> <span class="pre">Size</span></code>, <code class="docutils literal notranslate"><span class="pre">Imbar2</span> <span class="pre">Size</span></code>, <code class="docutils literal notranslate"><span class="pre">Embar1</span> <span class="pre">Size</span></code> and <code class="docutils literal notranslate"><span class="pre">Embar2</span> <span class="pre">Size</span></code>,
+as 12-29 (i.e., 4K-512M) for 2nd Generation Intel® Xeon® Scalable Processors;
+as 12-51 (i.e., 4K-128PB) for 3rd and 4th Generation Intel® Xeon® Scalable Processors.
+Note that those bar sizes on both hosts should be the same.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">Crosslink</span> <span class="pre">Control</span> <span class="pre">override</span></code> as <code class="docutils literal notranslate"><span class="pre">DSD/USP</span></code> on one host,
+<code class="docutils literal notranslate"><span class="pre">USD/DSP</span></code> on another host.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">PCIe</span> <span class="pre">PLL</span> <span class="pre">SSC</span> <span class="pre">(Spread</span> <span class="pre">Spectrum</span> <span class="pre">Clocking)</span></code> as <code class="docutils literal notranslate"><span class="pre">Disabled</span></code>, on both hosts.
+This is a hardware requirement when using Re-timer Cards.</p></li>
+</ul>
+</section>
+<section id="device-setup">
+<h2><span class="section-number">7.2. </span>Device Setup</h2>
+<p>The Intel NTB devices need to be bound to a DPDK-supported kernel driver
+to use, i.e. igb_uio, vfio. The <code class="docutils literal notranslate"><span class="pre">dpdk-devbind.py</span></code> script can be used to
+show devices status and to bind them to a suitable kernel driver. They will
+appear under the category of “Misc (rawdev) devices”.</p>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">7.3. </span>Prerequisites</h2>
+<p>NTB PMD needs kernel PCI driver to support write combining (WC) to get
+better performance. The difference will be more than 10 times.
+To enable WC, there are 2 ways.</p>
+<ul class="simple">
+<li><p>Insert igb_uio with <code class="docutils literal notranslate"><span class="pre">wc_activate=1</span></code> flag if use igb_uio driver.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">insmod igb_uio.ko wc_activate=1</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>Enable WC for NTB device’s Bar 2 and Bar 4 (Mapped memory) manually.
+The reference is <a class="reference external" href="https://www.kernel.org/doc/html/latest/x86/mtrr.html">https://www.kernel.org/doc/html/latest/x86/mtrr.html</a>
+Get bar base address using <code class="docutils literal notranslate"><span class="pre">lspci</span> <span class="pre">-vvv</span> <span class="pre">-s</span> <span class="pre">ae:00.0</span> <span class="pre">|</span> <span class="pre">grep</span> <span class="pre">Region</span></code>.</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lspci -vvv -s ae:00.0 <span class="p">|</span> grep Region
+<span class="go">Region 0: Memory at 39bfe0000000 (64-bit, prefetchable) [size=64K]</span>
+<span class="go">Region 2: Memory at 39bfa0000000 (64-bit, prefetchable) [size=512M]</span>
+<span class="go">Region 4: Memory at 39bfc0000000 (64-bit, prefetchable) [size=512M]</span>
+</pre></div>
+</div>
+<p>Using the following command to enable WC.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo &quot;base=0x39bfa0000000 size=0x20000000 type=write-combining&quot; &gt;&gt; /proc/mtrr</span>
+<span class="go">echo &quot;base=0x39bfc0000000 size=0x20000000 type=write-combining&quot; &gt;&gt; /proc/mtrr</span>
+</pre></div>
+</div>
+<p>And the results:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat /proc/mtrr
+<span class="go">reg00: base=0x000000000 (    0MB), size= 2048MB, count=1: write-back</span>
+<span class="go">reg01: base=0x07f000000 ( 2032MB), size=   16MB, count=1: uncachable</span>
+<span class="go">reg02: base=0x39bfa0000000 (60553728MB), size=  512MB, count=1: write-combining</span>
+<span class="go">reg03: base=0x39bfc0000000 (60554240MB), size=  512MB, count=1: write-combining</span>
+</pre></div>
+</div>
+<p>To disable WC for these regions, using the following.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo &quot;disable=2&quot; &gt;&gt; /proc/mtrr</span>
+<span class="go">echo &quot;disable=3&quot; &gt;&gt; /proc/mtrr</span>
+</pre></div>
+</div>
+</section>
+<section id="ring-layout">
+<h2><span class="section-number">7.4. </span>Ring Layout</h2>
+<p>Since read/write remote system’s memory are through PCI bus, remote read
+is much more expensive than remote write. Thus, the enqueue and dequeue
+based on ntb ring should avoid remote read. The ring layout for ntb is
+like the following:</p>
+<ul>
+<li><p>Ring Format:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>desc_ring:
+
+   0               16                                              64
+   +---------------------------------------------------------------+
+   |                        buffer address                         |
+   +---------------+-----------------------------------------------+
+   | buffer length |                      resv                     |
+   +---------------+-----------------------------------------------+
+
+used_ring:
+
+   0               16              32
+   +---------------+---------------+
+   | packet length |     flags     |
+   +---------------+---------------+
+</pre></div>
+</div>
+</li>
+<li><p>Ring Layout:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>+------------------------+   +------------------------+
+| used_ring              |   | desc_ring              |
+| +---+                  |   | +---+                  |
+| |   |                  |   | |   |                  |
+| +---+      +--------+  |   | +---+                  |
+| |   | ---&gt; | buffer | &lt;+---+-|   |                  |
+| +---+      +--------+  |   | +---+                  |
+| |   |                  |   | |   |                  |
+| +---+                  |   | +---+                  |
+|  ...                   |   |  ...                   |
+|                        |   |                        |
+|            +---------+ |   |            +---------+ |
+|            | tx_tail | |   |            | rx_tail | |
+| System A   +---------+ |   | System B   +---------+ |
++------------------------+   +------------------------+
+              &lt;---------traffic---------
+</pre></div>
+</div>
+</li>
+<li><p>Enqueue and Dequeue
+Based on this ring layout, enqueue reads rx_tail to get how many free
+buffers and writes used_ring and tx_tail to tell the peer which buffers
+are filled with data.
+And dequeue reads tx_tail to get how many packets are arrived, and
+writes desc_ring and rx_tail to tell the peer about the new allocated
+buffers.
+So in this way, only remote write happens and remote read can be avoid
+to get better performance.</p></li>
+</ul>
+</section>
+<section id="limitation">
+<h2><span class="section-number">7.5. </span>Limitation</h2>
+<p>This PMD is only supported on Intel Xeon Platforms:</p>
+<ul class="simple">
+<li><p>4th Generation Intel® Xeon® Scalable Processors.</p></li>
+<li><p>3rd Generation Intel® Xeon® Scalable Processors.</p></li>
+<li><p>2nd Generation Intel® Xeon® Scalable Processors.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Rawdev Drivers</a><ul>
+      <li>Previous: <a href="ifpga.html" title="previous chapter"><span class="section-number">4. </span>IFPGA Rawdev Driver</a></li>
+      <li>Next: <a href="../mempool/index.html" title="next chapter">Mempool Device Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rawdevs/ntb.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

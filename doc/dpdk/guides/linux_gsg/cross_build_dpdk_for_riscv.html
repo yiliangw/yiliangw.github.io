@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. Cross compiling DPDK for RISC-V &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Linux Drivers" href="linux_drivers.html" />
+    <link rel="prev" title="5. Cross compiling DPDK for LoongArch" href="cross_build_dpdk_for_loongarch.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cross-compiling-dpdk-for-risc-v">
+<h1><span class="section-number">6. </span>Cross compiling DPDK for RISC-V</h1>
+<p>This chapter describes how to cross compile DPDK for RISC-V from x86 build
+hosts.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>While it’s possible to compile DPDK natively on a RISC-V host, it is
+currently recommended to cross-compile as Linux kernel does not offer any
+way for userspace to discover the vendor and architecture identifiers of the
+CPU and therefore any per-chip optimization options have to be chosen via
+a cross-file or <code class="docutils literal notranslate"><span class="pre">c_args</span></code>.</p>
+</div>
+<section id="prerequisites">
+<h2><span class="section-number">6.1. </span>Prerequisites</h2>
+<p>Ensure that you have all pre-requisites for building DPDK natively as those will
+be required also for cross-compilation.</p>
+<section id="linux-kernel">
+<h3><span class="section-number">6.1.1. </span>Linux kernel</h3>
+<p>Make sure that RISC-V host is running Linux kernel 5.13 or newer. This version
+introduces patches necessary for PCIe BAR mapping to userspace.</p>
+</section>
+</section>
+<section id="gnu-toolchain">
+<h2><span class="section-number">6.2. </span>GNU toolchain</h2>
+<section id="obtain-the-cross-toolchain">
+<h3><span class="section-number">6.2.1. </span>Obtain the cross toolchain</h3>
+<p>The build process was tested using:</p>
+<ul class="simple">
+<li><p>Ubuntu toolchain (the <code class="docutils literal notranslate"><span class="pre">crossbuild-essential-riscv64</span></code> package).</p></li>
+<li><p>Latest <a class="reference external" href="https://github.com/riscv/riscv-gnu-toolchain/releases">RISC-V GNU toolchain</a> on Ubuntu or Arch
+Linux.</p></li>
+</ul>
+<p>Alternatively the toolchain may be built straight from the source, to do that
+follow the instructions on the riscv-gnu-toolchain github page.</p>
+</section>
+<section id="unzip-and-add-into-the-path">
+<h3><span class="section-number">6.2.2. </span>Unzip and add into the PATH</h3>
+<p>This step is only required for the riscv-gnu-toolchain. The Ubuntu toolchain is
+in the PATH already.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tar -xvf riscv64-glibc-ubuntu-20.04-&lt;version&gt;.tar.gz</span>
+<span class="go">export PATH=$PATH:&lt;cross_install_dir&gt;/riscv/bin</span>
+</pre></div>
+</div>
+</section>
+<section id="cross-compiling-dpdk-with-gnu-toolchain-using-meson">
+<h3><span class="section-number">6.2.3. </span>Cross Compiling DPDK with GNU toolchain using Meson</h3>
+<p>To cross-compile DPDK for a desired target machine use the following command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup cross-build --cross-file &lt;target_machine_configuration&gt;
+ninja -C cross-build
+</pre></div>
+</div>
+<p>For example if the target machine is a generic rv64gc RISC-V, use the following
+command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup riscv64-build-gcc --cross-file config/riscv/riscv64_linux_gcc
+ninja -C riscv64-build-gcc
+</pre></div>
+</div>
+<p>If riscv-gnu-toolchain is used, binary names should be updated to match. Update
+the following lines in the cross-file:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[binaries]</span>
+<span class="go">c = &#39;riscv64-unknown-linux-gnu-gcc&#39;</span>
+<span class="go">cpp = &#39;riscv64-unknown-linux-gnu-g++&#39;</span>
+<span class="go">ar = &#39;riscv64-unknown-linux-gnu-ar&#39;</span>
+<span class="go">strip = &#39;riscv64-unknown-linux-gnu-strip&#39;</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>Some toolchains (such as freedom-u-sdk one) require also setting <code class="docutils literal notranslate"><span class="pre">--sysroot</span></code>,
+otherwise include paths might not be resolved. To do so, add the appropriate
+paths to the cross-file:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[properties]</span>
+<span class="go">...</span>
+<span class="go">sys_root = [&#39;--sysroot&#39;, &#39;&lt;path/to/toolchain/sysroot&gt;&#39;]</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="supported-cross-compilation-targets">
+<h2><span class="section-number">6.3. </span>Supported cross-compilation targets</h2>
+<p>Currently the following targets are supported:</p>
+<ul class="simple">
+<li><p>Generic rv64gc ISA: <code class="docutils literal notranslate"><span class="pre">config/riscv/riscv64_linux_gcc</span></code></p></li>
+<li><p>SiFive U740 SoC: <code class="docutils literal notranslate"><span class="pre">config/riscv/riscv64_sifive_u740_linux_gcc</span></code></p></li>
+</ul>
+<p>To add a new target support, <code class="docutils literal notranslate"><span class="pre">config/riscv/meson.build</span></code> has to be modified by
+adding a new vendor/architecture id and a corresponding cross-file has to be
+added to <code class="docutils literal notranslate"><span class="pre">config/riscv</span></code> directory.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Linux</a><ul>
+      <li>Previous: <a href="cross_build_dpdk_for_loongarch.html" title="previous chapter"><span class="section-number">5. </span>Cross compiling DPDK for LoongArch</a></li>
+      <li>Next: <a href="linux_drivers.html" title="next chapter"><span class="section-number">7. </span>Linux Drivers</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/linux_gsg/cross_build_dpdk_for_riscv.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

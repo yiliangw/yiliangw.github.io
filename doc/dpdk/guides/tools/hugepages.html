@@ -1,0 +1,219 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>1. dpdk-hugepages Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2. dpdk-devbind Application" href="devbind.html" />
+    <link rel="prev" title="DPDK Tools User Guides" href="index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-hugepages-application">
+<h1><span class="section-number">1. </span>dpdk-hugepages Application</h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">dpdk-hugepages</span></code> tool is a Data Plane Development Kit (DPDK) utility
+that helps in reserving hugepages.
+As well as checking for current settings.</p>
+<section id="running-the-application">
+<h2><span class="section-number">1.1. </span>Running the Application</h2>
+<p>The tool has a number of command line options:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-hugepages [options]</span>
+</pre></div>
+</div>
+</section>
+<section id="options">
+<h2><span class="section-number">1.2. </span>Options</h2>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">-h,</span> <span class="pre">--help</span></code></p>
+<blockquote>
+<div><p>Display usage information and quit</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-s,</span> <span class="pre">--show</span></code></p>
+<blockquote>
+<div><p>Print the current huge page configuration</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-c</span> <span class="pre">driver,</span> <span class="pre">--clear</span></code></p>
+<blockquote>
+<div><p>Clear existing huge page reservation</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-m,</span> <span class="pre">--mount</span></code></p>
+<blockquote>
+<div><p>Mount the huge page filesystem</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-u,</span> <span class="pre">--unmount</span></code></p>
+<blockquote>
+<div><p>Unmount the huge page filesystem</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-n</span> <span class="pre">NODE,</span> <span class="pre">--node=NODE</span></code></p>
+<blockquote>
+<div><p>Set NUMA node to reserve pages on</p>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-p</span> <span class="pre">SIZE,</span> <span class="pre">--pagesize=SIZE</span></code></p>
+<blockquote>
+<div><dl class="simple">
+<dt>Select hugepage size to use.</dt><dd><p>If not specified the default system huge page size is used.</p>
+</dd>
+</dl>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-r</span> <span class="pre">SIZE,</span> <span class="pre">--reserve=SIZE</span></code></p>
+<blockquote>
+<div><dl class="simple">
+<dt>Reserve huge pages.</dt><dd><p>Size is in bytes with K, M or G suffix.</p>
+</dd>
+</dl>
+</div></blockquote>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--setup</span> <span class="pre">SIZE</span></code></p>
+<blockquote>
+<div><p>Short cut to clear, unmount, reserve and mount.</p>
+</div></blockquote>
+</li>
+</ul>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>While any user can run the <code class="docutils literal notranslate"><span class="pre">dpdk-hugepages.py</span></code> script to view the
+status of huge pages, modifying the setup requires root privileges.</p>
+</div>
+</section>
+<section id="examples">
+<h2><span class="section-number">1.3. </span>Examples</h2>
+<p>To display current huge page settings:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-hugepages.py -s
+</pre></div>
+</div>
+<p>To a complete setup of with 2 Gigabyte of 1G huge pages:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-hugepages.py -p 1G --setup 2G
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DPDK Tools User Guides</a><ul>
+      <li>Previous: <a href="index.html" title="previous chapter">DPDK Tools User Guides</a></li>
+      <li>Next: <a href="devbind.html" title="next chapter"><span class="section-number">2. </span>dpdk-devbind Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/hugepages.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

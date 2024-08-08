@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Source Organization &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. Environment Abstraction Layer" href="env_abstraction_layer.html" />
+    <link rel="prev" title="2. Overview" href="overview.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="source-organization">
+<h1><span class="section-number">3. </span>Source Organization</h1>
+<p>This section describes the organization of sources in the DPDK framework.</p>
+<section id="libraries">
+<h2><span class="section-number">3.1. </span>Libraries</h2>
+<p>Libraries are located in subdirectories of <code class="docutils literal notranslate"><span class="pre">dpdk/lib</span></code>.
+By convention a library refers to any code that provides an API to an application.
+Typically, it generates an archive file (<code class="docutils literal notranslate"><span class="pre">.a</span></code>), but a kernel module would also go in the same directory.</p>
+</section>
+<section id="drivers">
+<h2><span class="section-number">3.2. </span>Drivers</h2>
+<p>Drivers are special libraries which provide poll-mode driver implementations for
+devices: either hardware devices or pseudo/virtual devices. They are contained
+in the <em>drivers</em> subdirectory, classified by type, and each compiles to a
+library with the format <code class="docutils literal notranslate"><span class="pre">librte_X_Y.a</span></code> where <code class="docutils literal notranslate"><span class="pre">X</span></code> is the device class
+name and <code class="docutils literal notranslate"><span class="pre">Y</span></code> is the driver name.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Several of the <code class="docutils literal notranslate"><span class="pre">driver/net</span></code> directories contain a <code class="docutils literal notranslate"><span class="pre">base</span></code>
+sub-directory. The <code class="docutils literal notranslate"><span class="pre">base</span></code> directory generally contains code the shouldn’t
+be modified directly by the user. Any enhancements should be done via the
+<code class="docutils literal notranslate"><span class="pre">X_osdep.c</span></code> and/or <code class="docutils literal notranslate"><span class="pre">X_osdep.h</span></code> files in that directory. Refer to the
+local README in the base directories for driver specific instructions.</p>
+</div>
+</section>
+<section id="applications">
+<h2><span class="section-number">3.3. </span>Applications</h2>
+<p>Applications are source files that contain a <code class="docutils literal notranslate"><span class="pre">main()</span></code> function.
+They are located in the <code class="docutils literal notranslate"><span class="pre">dpdk/app</span></code> and <code class="docutils literal notranslate"><span class="pre">dpdk/examples</span></code> directories.</p>
+<p>The app directory contains sample applications that are used to test DPDK (such as autotests)
+or the Poll Mode Drivers (test-pmd).</p>
+<p>The examples directory contains <a class="reference internal" href="../sample_app_ug/index.html"><span class="doc">Sample applications</span></a> that show how libraries can be used.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="overview.html" title="previous chapter"><span class="section-number">2. </span>Overview</a></li>
+      <li>Next: <a href="env_abstraction_layer.html" title="next chapter"><span class="section-number">4. </span>Environment Abstraction Layer</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/source_org.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

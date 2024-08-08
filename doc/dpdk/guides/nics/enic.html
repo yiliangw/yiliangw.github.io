@@ -1,0 +1,691 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>21. ENIC Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="22. Fail-safe poll mode driver library" href="fail_safe.html" />
+    <link rel="prev" title="20. ENETFEC Poll Mode Driver" href="enetfec.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="enic-poll-mode-driver">
+<h1><span class="section-number">21. </span>ENIC Poll Mode Driver</h1>
+<p>ENIC PMD is the DPDK poll-mode driver for the Cisco System Inc. VIC Ethernet
+NICs. These adapters are also referred to as vNICs below. If you are running
+or would like to run DPDK software applications on Cisco UCS servers using
+Cisco VIC adapters the following documentation is relevant.</p>
+<section id="supported-cisco-vic-adapters">
+<h2><span class="section-number">21.1. </span>Supported Cisco VIC adapters</h2>
+<p>ENIC PMD supports all recent generations of Cisco VIC adapters including:</p>
+<ul class="simple">
+<li><p>VIC 1200 series</p></li>
+<li><p>VIC 1300 series</p></li>
+<li><p>VIC 1400 series</p></li>
+</ul>
+</section>
+<section id="supported-features">
+<h2><span class="section-number">21.2. </span>Supported features</h2>
+<ul class="simple">
+<li><p>Unicast, multicast and broadcast transmission and reception</p></li>
+<li><p>Receive queue polling</p></li>
+<li><p>Port Hardware Statistics</p></li>
+<li><p>Hardware VLAN acceleration</p></li>
+<li><p>IP checksum offload</p></li>
+<li><p>Receive side VLAN stripping</p></li>
+<li><p>Multiple receive and transmit queues</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Setting RX VLAN (supported via UCSM/CIMC only)</p></li>
+<li><p>VLAN filtering (supported via UCSM/CIMC only)</p></li>
+<li><p>Execution of application by unprivileged system users</p></li>
+<li><p>IPV4, IPV6 and TCP RSS hashing</p></li>
+<li><p>UDP RSS hashing (1400 series and later adapters)</p></li>
+<li><p>Scattered Rx</p></li>
+<li><p>MTU update</p></li>
+<li><p>SR-IOV on UCS managed servers connected to Fabric Interconnects</p></li>
+<li><p>Flow API</p></li>
+<li><p>Overlay offload</p>
+<ul>
+<li><p>Rx/Tx checksum offloads for VXLAN, NVGRE, GENEVE</p></li>
+<li><p>TSO for VXLAN and GENEVE packets</p></li>
+<li><p>Inner RSS</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="how-to-obtain-enic-pmd-integrated-dpdk">
+<h2><span class="section-number">21.3. </span>How to obtain ENIC PMD integrated DPDK</h2>
+<p>ENIC PMD support is integrated into the DPDK suite. dpdk-&lt;version&gt;.tar.gz
+should be downloaded from <a class="reference external" href="https://core.dpdk.org/download/">https://core.dpdk.org/download/</a></p>
+</section>
+<section id="configuration-information">
+<h2><span class="section-number">21.4. </span>Configuration information</h2>
+<ul>
+<li><p><strong>vNIC Configuration Parameters</strong></p>
+<ul>
+<li><p><strong>Number of Queues</strong></p>
+<p>The maximum number of receive queues (RQs), work queues (WQs) and
+completion queues (CQs) are configurable on a per vNIC basis
+through the Cisco UCS Manager (CIMC or UCSM).</p>
+<p>These values should be configured as follows:</p>
+<ul class="simple">
+<li><p>The number of WQs should be greater or equal to the value of the
+expected nb_tx_q parameter in the call to
+rte_eth_dev_configure()</p></li>
+<li><p>The number of RQs configured in the vNIC should be greater or
+equal to <em>twice</em> the value of the expected nb_rx_q parameter in
+the call to rte_eth_dev_configure().  With the addition of Rx
+scatter, a pair of RQs on the vnic is needed for each receive
+queue used by DPDK, even if Rx scatter is not being used.
+Having a vNIC with only 1 RQ is not a valid configuration, and
+will fail with an error message.</p></li>
+<li><p>The number of CQs should set so that there is one CQ for each
+WQ, and one CQ for each pair of RQs.</p></li>
+</ul>
+<p>For example: If the application requires 3 Rx queues, and 3 Tx
+queues, the vNIC should be configured to have at least 3 WQs, 6
+RQs (3 pairs), and 6 CQs (3 for use by WQs + 3 for use by the 3
+pairs of RQs).</p>
+</li>
+<li><p><strong>Size of Queues</strong></p>
+<p>Likewise, the number of receive and transmit descriptors are configurable on
+a per-vNIC basis via the UCS Manager and should be greater than or equal to
+the nb_rx_desc and   nb_tx_desc parameters expected to be used in the calls
+to rte_eth_rx_queue_setup() and rte_eth_tx_queue_setup() respectively.
+An application requesting more than the set size will be limited to that
+size.</p>
+<p>Unless there is a lack of resources due to creating many vNICs, it
+is recommended that the WQ and RQ sizes be set to the maximum.  This
+gives the application the greatest amount of flexibility in its
+queue configuration.</p>
+<ul>
+<li><p><em>Note</em>: Since the introduction of Rx scatter, for performance
+reasons, this PMD uses two RQs on the vNIC per receive queue in
+DPDK.  One RQ holds descriptors for the start of a packet, and the
+second RQ holds the descriptors for the rest of the fragments of
+a packet.  This means that the nb_rx_desc parameter to
+rte_eth_rx_queue_setup() can be a greater than 4096.  The exact
+amount will depend on the size of the mbufs being used for
+receives, and the MTU size.</p>
+<p>For example: If the mbuf size is 2048, and the MTU is 9000, then
+receiving a full size packet will take 5 descriptors, 1 from the
+start-of-packet queue, and 4 from the second queue.  Assuming
+that the RQ size was set to the maximum of 4096, then the
+application can specify up to 1024 + 4096 as the nb_rx_desc
+parameter to rte_eth_rx_queue_setup().</p>
+</li>
+</ul>
+</li>
+<li><p><strong>Interrupts</strong></p>
+<p>At least one interrupt per vNIC interface should be configured in the UCS
+manager regardless of the number receive/transmit queues. The ENIC PMD
+uses this interrupt to get information about link status and errors
+in the fast path.</p>
+<p>In addition to the interrupt for link status and errors, when using Rx queue
+interrupts, increase the number of configured interrupts so that there is at
+least one interrupt for each Rx queue. For example, if the app uses 3 Rx
+queues and wants to use per-queue interrupts, configure 4 (3 + 1) interrupts.</p>
+</li>
+<li><p><strong>Receive Side Scaling</strong></p>
+<p>In order to fully utilize RSS in DPDK, enable all RSS related settings in
+CIMC or UCSM. These include the following items listed under
+Receive Side Scaling:
+TCP, IPv4, TCP-IPv4, IPv6, TCP-IPv6, IPv6 Extension, TCP-IPv6 Extension.</p>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="sr-iov-mode-utilization">
+<h2><span class="section-number">21.5. </span>SR-IOV mode utilization</h2>
+<p>UCS blade servers configured with dynamic vNIC connection policies in UCSM
+are capable of supporting SR-IOV. SR-IOV virtual functions (VFs) are
+specialized vNICs, distinct from regular Ethernet vNICs. These VFs can be
+directly assigned to virtual machines (VMs) as ‘passthrough’ devices.</p>
+<p>In UCS, SR-IOV VFs require the use of the Cisco Virtual Machine Fabric Extender
+(VM-FEX), which gives the VM a dedicated
+interface on the Fabric Interconnect (FI). Layer 2 switching is done at
+the FI. This may eliminate the requirement for software switching on the
+host to route intra-host VM traffic.</p>
+<p>Please refer to <a class="reference external" href="http://www.cisco.com/c/en/us/td/docs/unified_computing/ucs/sw/vm_fex/vmware/gui/config_guide/b_GUI_VMware_VM-FEX_UCSM_Configuration_Guide/b_GUI_VMware_VM-FEX_UCSM_Configuration_Guide_chapter_010.html#task_433E01651F69464783A68E66DA8A47A5">Creating a Dynamic vNIC Connection Policy</a>
+for information on configuring SR-IOV adapter policies and port profiles
+using UCSM.</p>
+<p>Once the policies are in place and the host OS is rebooted, VFs should be
+visible on the host, E.g.:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lspci <span class="p">|</span> grep Cisco <span class="p">|</span> grep Ethernet
+<span class="go">0d:00.0 Ethernet controller: Cisco Systems Inc VIC Ethernet NIC (rev a2)</span>
+<span class="go">0d:00.1 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.2 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.3 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.4 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.5 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.6 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+<span class="go">0d:00.7 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+</pre></div>
+</div>
+<p>Enable Intel IOMMU on the host and install KVM and libvirt, and reboot again as
+required. Then, using libvirt, create a VM instance with an assigned device.
+Below is an example <code class="docutils literal notranslate"><span class="pre">interface</span></code> block (part of the domain configuration XML)
+that adds the host VF 0d:00:01 to the VM. <code class="docutils literal notranslate"><span class="pre">profileid='pp-vlan-25'</span></code> indicates
+the port profile that has been configured in UCSM.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;interface type=&#39;hostdev&#39; managed=&#39;yes&#39;&gt;</span>
+<span class="go">  &lt;mac address=&#39;52:54:00:ac:ff:b6&#39;/&gt;</span>
+<span class="go">  &lt;driver name=&#39;vfio&#39;/&gt;</span>
+<span class="go">  &lt;source&gt;</span>
+<span class="go">    &lt;address type=&#39;pci&#39; domain=&#39;0x0000&#39; bus=&#39;0x0d&#39; slot=&#39;0x00&#39; function=&#39;0x1&#39;/&gt;</span>
+<span class="go">  &lt;/source&gt;</span>
+<span class="go">  &lt;virtualport type=&#39;802.1Qbh&#39;&gt;</span>
+<span class="go">    &lt;parameters profileid=&#39;pp-vlan-25&#39;/&gt;</span>
+<span class="go">  &lt;/virtualport&gt;</span>
+<span class="go">&lt;/interface&gt;</span>
+</pre></div>
+</div>
+<p>Alternatively, the configuration can be done in a separate file using the
+<code class="docutils literal notranslate"><span class="pre">network</span></code> keyword. These methods are described in the libvirt documentation for
+<a class="reference external" href="https://libvirt.org/formatnetwork.html">Network XML format</a>.</p>
+<p>When the VM instance is started, libvirt will bind the host VF to
+vfio, complete provisioning on the FI and bring up the link.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is not possible to use a VF directly from the host because it is not
+fully provisioned until libvirt brings up the VM that it is assigned
+to.</p>
+</div>
+<p>In the VM instance, the VF will now be visible. E.g., here the VF 00:04.0 is
+seen on the VM instance and should be available for binding to a DPDK.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>lspci <span class="p">|</span> grep Ether
+<span class="go">00:04.0 Ethernet controller: Cisco Systems Inc VIC SR-IOV VF (rev a2)</span>
+</pre></div>
+</div>
+<p>Follow the normal DPDK install procedure, binding the VF to either <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code>
+or <code class="docutils literal notranslate"><span class="pre">vfio</span></code> in non-IOMMU mode.</p>
+<p>In the VM, the kernel enic driver may be automatically bound to the VF during
+boot. Unbinding it currently hangs due to a known issue with the driver. To
+work around the issue, block the enic module as follows.
+Please see <a class="reference internal" href="#enic-limitations"><span class="std std-ref">Limitations</span></a> for limitations in
+the use of SR-IOV.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>cat /etc/modprobe.d/enic.conf
+<span class="go">blacklist enic</span>
+
+<span class="gp"># </span>dracut --force
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Passthrough does not require SR-IOV. If VM-FEX is not desired, the user
+may create as many regular vNICs as necessary and assign them to VMs as
+passthrough devices. Since these vNICs are not SR-IOV VFs, using them as
+passthrough devices do not require libvirt, port profiles, and VM-FEX.</p>
+</div>
+</section>
+<section id="generic-flow-api-support">
+<span id="enic-generic-flow-api"></span><h2><span class="section-number">21.6. </span>Generic Flow API support</h2>
+<p>Generic Flow API (also called “rte_flow” API) is supported. More advanced
+capabilities are available when “Advanced Filtering” is enabled on the adapter.
+Advanced filtering was added to 1300 series VIC firmware starting with version
+2.0.13 for C-series UCS servers and version 3.1.2 for UCSM managed blade
+servers. Advanced filtering is available on 1400 series adapters and beyond.
+To enable advanced filtering, the ‘Advanced filter’ radio button should be
+selected via CIMC or UCSM followed by a reboot of the server.</p>
+<ul>
+<li><p><strong>1200 series VICs</strong></p>
+<p>5-tuple exact flow support for 1200 series adapters. This allows:</p>
+<ul class="simple">
+<li><p>Attributes: ingress</p></li>
+<li><p>Items: ipv4, ipv6, udp, tcp (must exactly match src/dst IP
+addresses and ports and all must be specified)</p></li>
+<li><p>Actions: queue and void</p></li>
+<li><p>Selectors: ‘is’</p></li>
+</ul>
+</li>
+<li><p><strong>1300 and later series VICS with advanced filters disabled</strong></p>
+<p>With advanced filters disabled, an IPv4 or IPv6 item must be specified
+in the pattern.</p>
+<ul class="simple">
+<li><p>Attributes: ingress</p></li>
+<li><p>Items: eth, vlan, ipv4, ipv6, udp, tcp, vxlan, inner eth, vlan, ipv4, ipv6, udp, tcp</p></li>
+<li><p>Actions: queue and void</p></li>
+<li><p>Selectors: ‘is’, ‘spec’ and ‘mask’. ‘last’ is not supported</p></li>
+<li><p>In total, up to 64 bytes of mask is allowed across all headers</p></li>
+</ul>
+</li>
+<li><p><strong>1300 and later series VICS with advanced filters enabled</strong></p>
+<ul class="simple">
+<li><p>Attributes: ingress</p></li>
+<li><p>Items: eth, vlan, ipv4, ipv6, udp, tcp, vxlan, raw, inner eth, vlan, ipv4, ipv6, udp, tcp</p></li>
+<li><p>Actions: queue, mark, drop, flag, rss, passthru, and void</p></li>
+<li><p>Selectors: ‘is’, ‘spec’ and ‘mask’. ‘last’ is not supported</p></li>
+<li><p>In total, up to 64 bytes of mask is allowed across all headers</p></li>
+</ul>
+</li>
+<li><p><strong>1400 and later series VICs with Flow Manager API enabled</strong></p>
+<ul class="simple">
+<li><p>Attributes: ingress, egress</p></li>
+<li><p>Items: eth, vlan, ipv4, ipv6, sctp, udp, tcp, vxlan, raw, inner eth, vlan, ipv4, ipv6, sctp, udp, tcp</p></li>
+<li><p>Ingress Actions: count, drop, flag, jump, mark, port_id, passthru, queue, rss, vxlan_decap, vxlan_encap, and void</p></li>
+<li><p>Egress Actions: count, drop, jump, passthru, vxlan_encap, and void</p></li>
+<li><p>Selectors: ‘is’, ‘spec’ and ‘mask’. ‘last’ is not supported</p></li>
+<li><p>In total, up to 64 bytes of mask is allowed across all headers</p></li>
+</ul>
+</li>
+</ul>
+<p>The VIC performs packet matching after applying VLAN strip. If VLAN
+stripping is enabled, EtherType in the ETH item corresponds to the
+stripped VLAN header’s EtherType. Stripping does not affect the VLAN
+item. TCI and EtherType in the VLAN item are matched against those in
+the (stripped) VLAN header whether stripping is enabled or disabled.</p>
+<p>More features may be added in future firmware and new versions of the VIC.
+Please refer to the release notes.</p>
+</section>
+<section id="overlay-offload">
+<span id="id1"></span><h2><span class="section-number">21.7. </span>Overlay Offload</h2>
+<p>Recent hardware models support overlay offload. When enabled, the NIC performs
+the following operations for VXLAN, NVGRE, and GENEVE packets. In all cases,
+inner and outer packets can be IPv4 or IPv6.</p>
+<ul>
+<li><p>TSO for VXLAN and GENEVE packets.</p>
+<p>Hardware supports NVGRE TSO, but DPDK currently has no NVGRE offload flags.</p>
+</li>
+<li><p>Tx checksum offloads.</p>
+<p>The NIC fills in IPv4/UDP/TCP checksums for both inner and outer packets.</p>
+</li>
+<li><p>Rx checksum offloads.</p>
+<p>The NIC validates IPv4/UDP/TCP checksums of both inner and outer packets.
+Good checksum flags (e.g. <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_L4_CKSUM_GOOD</span></code>) indicate that the inner
+packet has the correct checksum, and if applicable, the outer packet also
+has the correct checksum. Bad checksum flags (e.g. <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_F_RX_L4_CKSUM_BAD</span></code>)
+indicate that the inner and/or outer packets have invalid checksum values.</p>
+</li>
+<li><p>Inner Rx packet type classification</p>
+<p>PMD sets inner L3/L4 packet types (e.g. <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_INNER_L4_TCP</span></code>), and
+<code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_TUNNEL_GRENAT</span></code> to indicate that the packet is tunneled.
+PMD does not set L3/L4 packet types for outer packets.</p>
+</li>
+<li><p>Inner RSS</p>
+<p>RSS hash calculation, therefore queue selection, is done on inner packets.</p>
+</li>
+</ul>
+<p>In order to enable overlay offload, enable VXLAN and/or Geneve on vNIC
+via CIMC or UCSM followed by a reboot of the server. When PMD successfully
+enables overlay offload, it prints one of the following messages on the console.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Overlay offload is enabled (VxLAN)</span>
+<span class="go">Overlay offload is enabled (Geneve)</span>
+<span class="go">Overlay offload is enabled (VxLAN, Geneve)</span>
+</pre></div>
+</div>
+<p>By default, PMD enables overlay offload if hardware supports it. To disable
+it, set <code class="docutils literal notranslate"><span class="pre">devargs</span></code> parameter <code class="docutils literal notranslate"><span class="pre">disable-overlay=1</span></code>. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 12:00.0,disable-overlay=1
+</pre></div>
+</div>
+<p>By default, the NIC uses 4789 and 6081 as the VXLAN and Geneve ports,
+respectively. The user may change them through
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_udp_tunnel_port_{add,delete}</span></code>. However, as the current
+NIC has a single VXLAN port number and a single Geneve port number,
+the user cannot configure multiple port numbers for each tunnel type.</p>
+<p>Geneve offload support has evolved over VIC models. On older models,
+Geneve offload and advanced filters are mutually exclusive.  This is
+enforced by UCSM and CIMC, which only allow one of the two features
+to be selected at one time. Newer VIC models do not have this restriction.</p>
+</section>
+<section id="ingress-vlan-rewrite">
+<h2><span class="section-number">21.8. </span>Ingress VLAN Rewrite</h2>
+<p>VIC adapters can tag, untag, or modify the VLAN headers of ingress
+packets. The ingress VLAN rewrite mode controls this behavior. By
+default, it is set to pass-through, where the NIC does not modify the
+VLAN header in any way so that the application can see the original
+header. This mode is sufficient for many applications, but may not be
+suitable for others. Such applications may change the mode by setting
+<code class="docutils literal notranslate"><span class="pre">devargs</span></code> parameter <code class="docutils literal notranslate"><span class="pre">ig-vlan-rewrite</span></code> to one of the following.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">pass</span></code>: Pass-through mode. The NIC does not modify the VLAN
+header. This is the default mode.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">priority</span></code>: Priority-tag default VLAN mode. If the ingress packet
+is tagged with the default VLAN, the NIC replaces its VLAN header
+with the priority tag (VLAN ID 0).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">trunk</span></code>: Default trunk mode. The NIC tags untagged ingress packets
+with the default VLAN. Tagged ingress packets are not modified. To
+the application, every packet appears as tagged.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">untag</span></code>: Untag default VLAN mode. If the ingress packet is tagged
+with the default VLAN, the NIC removes or untags its VLAN header so
+that the application sees an untagged packet. As a result, the
+default VLAN becomes <cite>untagged</cite>. This mode can be useful for
+applications such as OVS-DPDK performance benchmarks that utilize
+only the default VLAN and want to see only untagged packets.</p></li>
+</ul>
+</section>
+<section id="vectorized-rx-handler">
+<h2><span class="section-number">21.9. </span>Vectorized Rx Handler</h2>
+<p>ENIC PMD includes a version of the receive handler that is vectorized using
+AVX2 SIMD instructions. It is meant for bulk, throughput oriented workloads
+where reducing cycles/packet in PMD is a priority. In order to use the
+vectorized handler, take the following steps.</p>
+<ul>
+<li><p>Use a recent version of gcc, icc, or clang and build 64-bit DPDK. If
+the compiler is known to support AVX2, DPDK build system
+automatically compiles the vectorized handler. Otherwise, the
+handler is not available.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">devargs</span></code> parameter <code class="docutils literal notranslate"><span class="pre">enable-avx2-rx=1</span></code> to explicitly request that
+PMD consider the vectorized handler when selecting the receive handler.
+For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 12:00.0,enable-avx2-rx=1
+</pre></div>
+</div>
+<p>As the current implementation is intended for field trials, by default, the
+vectorized handler is not considered (<code class="docutils literal notranslate"><span class="pre">enable-avx2-rx=0</span></code>).</p>
+</li>
+<li><p>Run on a UCS M4 or later server with CPUs that support AVX2.</p></li>
+</ul>
+<p>PMD selects the vectorized handler when the handler is compiled into
+the driver, the user requests its use via <code class="docutils literal notranslate"><span class="pre">enable-avx2-rx=1</span></code>, CPU
+supports AVX2, and scatter Rx is not used. To verify that the
+vectorized handler is selected, enable debug logging
+(<code class="docutils literal notranslate"><span class="pre">--log-level=pmd,debug</span></code>) and check the following message.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">enic_use_vector_rx_handler use the non-scatter avx2 Rx handler</span>
+</pre></div>
+</div>
+</section>
+<section id="b-completion-queue-entry">
+<h2><span class="section-number">21.10. </span>64B Completion Queue Entry</h2>
+<p>Recent VIC adapters support 64B completion queue entries, as well as
+16B entries that are available on all adapter models. ENIC PMD enables
+and uses 64B entries by default, if available. 64B entries generally
+lower CPU cycles per Rx packet, as they avoid partial DMA writes and
+reduce cache contention between DMA and polling CPU. The effect is
+most pronounced when multiple Rx queues are used on Intel platforms
+with Data Direct I/O Technology (DDIO).</p>
+<p>If 64B entries are not available, PMD uses 16B entries. The user may
+explicitly disable 64B entries and use 16B entries by setting
+<code class="docutils literal notranslate"><span class="pre">devarg</span></code> parameter <code class="docutils literal notranslate"><span class="pre">cq64=0</span></code>. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 12:00.0,cq64=0
+</pre></div>
+</div>
+<p>To verify the selected entry size, enable debug logging
+(<code class="docutils literal notranslate"><span class="pre">--log-level=enic,debug</span></code>) and check the following messages.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">PMD: rte_enic_pmd: Supported CQ entry sizes: 16 32</span>
+<span class="go">PMD: rte_enic_pmd: Using 16B CQ entry size</span>
+</pre></div>
+</div>
+</section>
+<section id="limitations">
+<span id="enic-limitations"></span><h2><span class="section-number">21.11. </span>Limitations</h2>
+<ul>
+<li><p><strong>VLAN 0 Priority Tagging</strong></p>
+<p>If a vNIC is configured in TRUNK mode by the UCS manager, the adapter will
+priority tag egress packets according to 802.1Q if they were not already
+VLAN tagged by software. If the adapter is connected to a properly configured
+switch, there will be no unexpected behavior.</p>
+<p>In test setups where an Ethernet port of a Cisco adapter in TRUNK mode is
+connected point-to-point to another adapter port or connected though a router
+instead of a switch, all ingress packets will be VLAN tagged. Programs such
+as l3fwd may not account for VLAN tags in packets and may misbehave. One
+solution is to enable VLAN stripping on ingress so the VLAN tag is removed
+from the packet and put into the mbuf-&gt;vlan_tci field. Here is an example
+of how to accomplish this:</p>
+</li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">vlan_offload = rte_eth_dev_get_vlan_offload(port);</span>
+<span class="go">vlan_offload |= RTE_ETH_VLAN_STRIP_OFFLOAD;</span>
+<span class="go">rte_eth_dev_set_vlan_offload(port, vlan_offload);</span>
+</pre></div>
+</div>
+<p>Another alternative is modify the adapter’s ingress VLAN rewrite mode so that
+packets with the default VLAN tag are stripped by the adapter and presented to
+DPDK as untagged packets. In this case mbuf-&gt;vlan_tci and the RTE_MBUF_F_RX_VLAN and
+RTE_MBUF_F_RX_VLAN_STRIPPED mbuf flags would not be set. This mode is enabled with the
+<code class="docutils literal notranslate"><span class="pre">devargs</span></code> parameter <code class="docutils literal notranslate"><span class="pre">ig-vlan-rewrite=untag</span></code>. For example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 12:00.0,ig-vlan-rewrite=untag
+</pre></div>
+</div>
+<ul class="simple">
+<li><p><strong>SR-IOV</strong></p>
+<ul>
+<li><p>KVM hypervisor support only. VMware has not been tested.</p></li>
+<li><p>Requires VM-FEX, and so is only available on UCS managed servers connected
+to Fabric Interconnects. It is not on standalone C-Series servers.</p></li>
+<li><p>VF devices are not usable directly from the host. They can  only be used
+as assigned devices on VM instances.</p></li>
+<li><p>Currently, unbind of the ENIC kernel mode driver ‘enic.ko’ on the VM
+instance may hang. As a workaround, enic.ko should be blocked or removed
+from the boot process.</p></li>
+<li><p>pci_generic cannot be used as the uio module in the VM. igb_uio or
+vfio in non-IOMMU mode can be used.</p></li>
+<li><p>The number of RQs in UCSM dynamic vNIC configurations must be at least 2.</p></li>
+<li><p>The number of SR-IOV devices is limited to 256. Components on target system
+might limit this number to fewer than 256.</p></li>
+</ul>
+</li>
+<li><p><strong>Flow API</strong></p>
+<ul>
+<li><p>The number of filters that can be specified with the Generic Flow API is
+dependent on how many header fields are being masked. Use ‘flow create’ in
+a loop to determine how many filters your VIC will support (not more than
+1000 for 1300 series VICs). Filters are checked for matching in the order they
+were added. Since there currently is no grouping or priority support,
+‘catch-all’ filters should be added last.</p></li>
+<li><p>The supported range of IDs for the ‘MARK’ action is 0 - 0xFFFD.</p></li>
+<li><p>RSS and PASSTHRU actions only support “receive normally”. They are limited
+to supporting MARK + RSS and PASSTHRU + MARK to allow the application to mark
+packets and then receive them normally. These require 1400 series VIC adapters
+and latest firmware.</p></li>
+<li><p>RAW items are limited to matching UDP tunnel headers like VXLAN.</p></li>
+<li><p>GTP, GTP-C and GTP-U header matching is enabled, however matching items within
+the tunnel is not supported.</p></li>
+<li><p>For 1400 VICs, all flows using the RSS action on a port use same hash
+configuration. The RETA is ignored. The queues used in the RSS group must be
+sequential. There is a performance hit if the number of queues is not a power of 2.
+Only level 0 (outer header) RSS is allowed.</p></li>
+</ul>
+</li>
+<li><p><strong>Statistics</strong></p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_good_bytes</span></code> (ibytes) always includes VLAN header (4B) and CRC bytes (4B).
+This behavior applies to 1300 and older series VIC adapters.
+1400 series VICs do not count CRC bytes, and count VLAN header only when VLAN
+stripping is disabled.</p></li>
+<li><p>When the NIC drops a packet because the Rx queue has no free buffers,
+<code class="docutils literal notranslate"><span class="pre">rx_good_bytes</span></code> still increments by 4B if the packet is not VLAN tagged or
+VLAN stripping is disabled, or by 8B if the packet is VLAN tagged and stripping
+is enabled.
+This behavior applies to 1300 and older series VIC adapters. 1400 series VICs
+do not increment this byte counter when packets are dropped.</p></li>
+</ul>
+</li>
+<li><p><strong>RSS Hashing</strong></p>
+<ul>
+<li><p>Hardware enables and disables UDP and TCP RSS hashing together. The driver
+cannot control UDP and TCP hashing individually.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="how-to-build-the-suite">
+<h2><span class="section-number">21.12. </span>How to build the suite</h2>
+<p>The build instructions for the DPDK suite should be followed. By default
+the ENIC PMD library will be built into the DPDK library.</p>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a> for details.</p>
+<p>For configuring and using UIO and VFIO frameworks, please refer to the
+documentation that comes with DPDK suite.</p>
+</section>
+<section id="supported-operating-systems">
+<h2><span class="section-number">21.13. </span>Supported Operating Systems</h2>
+<p>Any Linux distribution fulfilling the conditions described in Dependencies
+section of DPDK documentation.</p>
+</section>
+<section id="known-bugs-and-unsupported-features-in-this-release">
+<h2><span class="section-number">21.14. </span>Known bugs and unsupported features in this release</h2>
+<ul class="simple">
+<li><p>Signature or flex byte based flow direction</p></li>
+<li><p>Drop feature of flow direction</p></li>
+<li><p>VLAN based flow direction</p></li>
+<li><p>Non-IPV4 flow direction</p></li>
+<li><p>Setting of extended VLAN</p></li>
+<li><p>MTU update only works if Scattered Rx mode is disabled</p></li>
+<li><p>Maximum receive packet length is ignored if Scattered Rx mode is used</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">21.15. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Prepare the system as recommended by DPDK suite.  This includes environment
+variables, hugepages configuration, tool-chains and configuration.</p></li>
+<li><p>Insert vfio-pci kernel module using the command ‘modprobe vfio-pci’ if the
+user wants to use VFIO framework.</p></li>
+<li><p>Insert uio kernel module using the command ‘modprobe uio’ if the user wants
+to use UIO framework.</p></li>
+<li><p>DPDK suite should be configured based on the user’s decision to use VFIO or
+UIO framework.</p></li>
+<li><p>If the vNIC device(s) to be used is bound to the kernel mode Ethernet driver
+use ‘ip’ to bring the interface down. The dpdk-devbind.py tool can
+then be used to unbind the device’s bus id from the ENIC kernel mode driver.</p></li>
+<li><p>Bind the intended vNIC to vfio-pci in case the user wants ENIC PMD to use
+VFIO framework using dpdk-devbind.py.</p></li>
+<li><p>Bind the intended vNIC to igb_uio in case the user wants ENIC PMD to use
+UIO framework using dpdk-devbind.py.</p></li>
+</ul>
+<p>At this point the system should be ready to run DPDK applications. Once the
+application runs to completion, the vNIC can be detached from vfio-pci or
+igb_uio if necessary.</p>
+<p>Root privilege is required to bind and unbind vNICs to/from VFIO/UIO.
+VFIO framework helps an unprivileged user to run the applications.
+For an unprivileged user to run the applications on DPDK and ENIC PMD,
+it may be necessary to increase the maximum locked memory of the user.
+The following command could be used to do this.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo sh -c &quot;ulimit -l &lt;value in Kilo Bytes&gt;&quot;</span>
+</pre></div>
+</div>
+<p>The value depends on the memory configuration of the application, DPDK and
+PMD.  Typically, the limit has to be raised to higher than 2GB.
+e.g., 2621440</p>
+</section>
+<section id="additional-reference">
+<h2><span class="section-number">21.16. </span>Additional Reference</h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.cisco.com/c/en/us/products/servers-unified-computing/index.html">https://www.cisco.com/c/en/us/products/servers-unified-computing/index.html</a></p></li>
+<li><p><a class="reference external" href="https://www.cisco.com/c/en/us/products/interfaces-modules/unified-computing-system-adapters/index.html">https://www.cisco.com/c/en/us/products/interfaces-modules/unified-computing-system-adapters/index.html</a></p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="enetfec.html" title="previous chapter"><span class="section-number">20. </span>ENETFEC Poll Mode Driver</a></li>
+      <li>Next: <a href="fail_safe.html" title="next chapter"><span class="section-number">22. </span>Fail-safe poll mode driver library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/enic.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

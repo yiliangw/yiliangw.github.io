@@ -1,0 +1,347 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>2. System Requirements &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="3. Compiling the DPDK Target from Source" href="build_dpdk.html" />
+    <link rel="prev" title="1. Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="system-requirements">
+<h1><span class="section-number">2. </span>System Requirements</h1>
+<p>This chapter describes the packages required to compile the DPDK.</p>
+<section id="bios-setting-prerequisite-on-x86">
+<h2><span class="section-number">2.1. </span>BIOS Setting Prerequisite on x86</h2>
+<p>For the majority of platforms, no special BIOS settings are needed to use basic DPDK functionality.
+However, for additional HPET timer and power management functionality,
+and high performance of small packets, BIOS setting changes may be needed.
+Consult the section on <a class="reference internal" href="enable_func.html#enabling-additional-functionality"><span class="std std-ref">Enabling Additional Functionality</span></a>
+for more information on the required changes.</p>
+</section>
+<section id="compilation-of-the-dpdk">
+<h2><span class="section-number">2.2. </span>Compilation of the DPDK</h2>
+<p><strong>Required Tools and Libraries:</strong></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The setup commands and installed packages needed on various systems may be different.
+For details on Linux distributions and the versions tested, please consult the DPDK Release Notes.</p>
+</div>
+<ul class="simple">
+<li><p>General development tools including a C compiler supporting the C11 standard,
+including standard atomics, for example: GCC (version 5.0+) or Clang (version 3.6+),
+and <code class="docutils literal notranslate"><span class="pre">pkg-config</span></code> or <code class="docutils literal notranslate"><span class="pre">pkgconf</span></code> to be used when building end-user binaries against DPDK.</p>
+<ul>
+<li><p>For RHEL/Fedora systems these can be installed using <code class="docutils literal notranslate"><span class="pre">dnf</span> <span class="pre">groupinstall</span> <span class="pre">&quot;Development</span> <span class="pre">Tools&quot;</span></code></p></li>
+<li><p>For Ubuntu/Debian systems these can be installed using <code class="docutils literal notranslate"><span class="pre">apt</span> <span class="pre">install</span> <span class="pre">build-essential</span></code></p></li>
+<li><p>For Alpine Linux, <code class="docutils literal notranslate"><span class="pre">apk</span> <span class="pre">add</span> <span class="pre">alpine-sdk</span> <span class="pre">bsd-compat-headers</span></code></p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>pkg-config 0.27, supplied with RHEL-7,
+does not process the Libs.private section correctly,
+resulting in statically linked applications not being linked properly.
+Use an updated version of <code class="docutils literal notranslate"><span class="pre">pkg-config</span></code> or <code class="docutils literal notranslate"><span class="pre">pkgconf</span></code> instead when building applications</p>
+</div>
+<ul class="simple">
+<li><p>Python 3.6 or later.</p></li>
+<li><p>Meson (version 0.53.2+) and ninja</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">meson</span></code> &amp; <code class="docutils literal notranslate"><span class="pre">ninja-build</span></code> packages in most Linux distributions</p></li>
+<li><p>If the packaged version is below the minimum version, the latest versions
+can be installed from Python’s “pip” repository: <code class="docutils literal notranslate"><span class="pre">pip3</span> <span class="pre">install</span> <span class="pre">meson</span> <span class="pre">ninja</span></code></p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pyelftools</span></code> (version 0.22+)</p>
+<ul>
+<li><p>For Fedora systems it can be installed using <code class="docutils literal notranslate"><span class="pre">dnf</span> <span class="pre">install</span> <span class="pre">python-pyelftools</span></code></p></li>
+<li><p>For RHEL/CentOS systems it can be installed using <code class="docutils literal notranslate"><span class="pre">pip3</span> <span class="pre">install</span> <span class="pre">pyelftools</span></code></p></li>
+<li><p>For Ubuntu/Debian it can be installed using <code class="docutils literal notranslate"><span class="pre">apt</span> <span class="pre">install</span> <span class="pre">python3-pyelftools</span></code></p></li>
+<li><p>For Alpine Linux, <code class="docutils literal notranslate"><span class="pre">apk</span> <span class="pre">add</span> <span class="pre">py3-elftools</span></code></p></li>
+</ul>
+</li>
+<li><p>Library for handling NUMA (Non Uniform Memory Access).</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">numactl-devel</span></code> in RHEL/Fedora;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">libnuma-dev</span></code> in Debian/Ubuntu;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">numactl-dev</span></code> in Alpine Linux</p></li>
+</ul>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Please ensure that the latest patches are applied to third party libraries
+and software to avoid any known vulnerabilities.</p>
+</div>
+<p><strong>Optional Tools:</strong></p>
+<ul class="simple">
+<li><p>Intel® C++ Compiler (icc). For installation, additional libraries may be required.
+See the icc Installation Guide found in the Documentation directory under the compiler installation.</p></li>
+<li><p>IBM® Advance ToolChain for Powerlinux. This is a set of open source development tools and runtime libraries
+which allows users to take leading edge advantage of IBM’s latest POWER hardware features on Linux. To install
+it, see the IBM official installation document.</p></li>
+</ul>
+<p><strong>Additional Libraries</strong></p>
+<p>A number of DPDK components, such as libraries and poll-mode drivers (PMDs) have additional dependencies.
+For DPDK builds, the presence or absence of these dependencies will be automatically detected
+enabling or disabling the relevant components appropriately.</p>
+<p>In each case, the relevant library development package (<code class="docutils literal notranslate"><span class="pre">-devel</span></code> or <code class="docutils literal notranslate"><span class="pre">-dev</span></code>) is needed to build the DPDK components.</p>
+<p>For libraries the additional dependencies include:</p>
+<ul class="simple">
+<li><p>libarchive: for some unit tests using tar to get their resources.</p></li>
+<li><p>libelf: to compile and use the bpf library.</p></li>
+</ul>
+<p>For poll-mode drivers, the additional dependencies for each driver can be
+found in that driver’s documentation in the relevant DPDK guide document,
+e.g. <a class="reference internal" href="../nics/index.html"><span class="doc">Network Interface Controller Drivers</span></a></p>
+</section>
+<section id="running-dpdk-applications">
+<h2><span class="section-number">2.3. </span>Running DPDK Applications</h2>
+<p>To run a DPDK application, some customization may be required on the target machine.</p>
+<section id="system-software">
+<h3><span class="section-number">2.3.1. </span>System Software</h3>
+<p><strong>Required:</strong></p>
+<ul>
+<li><p>Kernel version &gt;= 4.14</p>
+<p>The kernel version required is based on the oldest long term stable kernel available
+at kernel.org when the DPDK version is in development.
+Compatibility for recent distribution kernels will be kept, notably RHEL/CentOS 7.</p>
+<p>The kernel version in use can be checked using the command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>uname -r
+</pre></div>
+</div>
+</li>
+<li><p>glibc &gt;= 2.7 (for features related to cpuset)</p>
+<p>The version can be checked using the <code class="docutils literal notranslate"><span class="pre">ldd</span> <span class="pre">--version</span></code> command.</p>
+</li>
+<li><p>Kernel configuration</p>
+<p>In the Fedora OS and other common distributions, such as Ubuntu, or Red Hat Enterprise Linux,
+the vendor supplied kernel configurations can be used to run most DPDK applications.</p>
+<p>For other kernel builds, options which should be enabled for DPDK include:</p>
+<ul class="simple">
+<li><p>HUGETLBFS</p></li>
+<li><p>PROC_PAGE_MONITOR  support</p></li>
+<li><p>HPET and HPET_MMAP configuration options should also be enabled if HPET  support is required.
+See the section on <a class="reference internal" href="enable_func.html#high-precision-event-timer"><span class="std std-ref">High Precision Event Timer (HPET) Functionality</span></a> for more details.</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="use-of-hugepages-in-the-linux-environment">
+<span id="linux-gsg-hugepages"></span><h3><span class="section-number">2.3.2. </span>Use of Hugepages in the Linux Environment</h3>
+<p>Hugepage support is required for the large memory pool allocation used for packet buffers
+(the HUGETLBFS option must be enabled in the running kernel as indicated the previous section).
+By using hugepage allocations, performance is increased since fewer pages are needed,
+and therefore less Translation Lookaside Buffers (TLBs, high speed translation caches),
+which reduce the time it takes to translate a virtual page address to a physical page address.
+Without hugepages, high TLB miss rates would occur with the standard 4k page size, slowing performance.</p>
+<section id="reserving-hugepages-for-dpdk-use">
+<h4><span class="section-number">2.3.2.1. </span>Reserving Hugepages for DPDK Use</h4>
+<p>The reservation of hugepages can be performed at run time.
+This is done by echoing the number of hugepages required
+to a <code class="docutils literal notranslate"><span class="pre">nr_hugepages</span></code> file in the <code class="docutils literal notranslate"><span class="pre">/sys/kernel/</span></code> directory
+corresponding to a specific page size (in Kilobytes).
+For a single-node system, the command to use is as follows
+(assuming that 1024 of 2MB pages are required):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo 1024 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages
+</pre></div>
+</div>
+<p>On a NUMA machine, the above command will usually divide the number of hugepages
+equally across all NUMA nodes (assuming there is enough memory on all NUMA nodes).
+However, pages can also be reserved explicitly on individual NUMA nodes
+using a <code class="docutils literal notranslate"><span class="pre">nr_hugepages</span></code> file in the <code class="docutils literal notranslate"><span class="pre">/sys/devices/</span></code> directory:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo 1024 &gt; /sys/devices/system/node/node0/hugepages/hugepages-2048kB/nr_hugepages
+echo 1024 &gt; /sys/devices/system/node/node1/hugepages/hugepages-2048kB/nr_hugepages
+</pre></div>
+</div>
+<p>The tool <code class="docutils literal notranslate"><span class="pre">dpdk-hugepages.py</span></code> can be used to manage hugepages.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Some kernel versions may not allow reserving 1 GB hugepages at run time,
+so reserving them at boot time may be the only option.
+Please see below for instructions.</p>
+</div>
+<p><strong>Alternative:</strong></p>
+<p>In the general case, reserving hugepages at run time is perfectly fine,
+but in use cases where having lots of physically contiguous memory is required,
+it is preferable to reserve hugepages at boot time,
+as that will help in preventing physical memory from becoming heavily fragmented.</p>
+<p>To reserve hugepages at boot time, a parameter is passed to the Linux kernel on the kernel command line.</p>
+<p>For 2 MB pages, just pass the hugepages option to the kernel. For example, to reserve 1024 pages of 2 MB, use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>hugepages=1024
+</pre></div>
+</div>
+<p>For other hugepage sizes, for example 1G pages, the size must be specified explicitly and
+can also be optionally set as the default hugepage size for the system.
+For example, to reserve 4G of hugepage memory in the form of four 1G pages, the following options should be passed to the kernel:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>default_hugepagesz=1G hugepagesz=1G hugepages=4
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The hugepage sizes that a CPU supports can be determined from the CPU flags on Intel architecture.
+If pse exists, 2M hugepages are supported; if pdpe1gb exists, 1G hugepages are supported.
+On IBM Power architecture, the supported hugepage sizes are 16MB and 16GB.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For 64-bit applications, it is recommended to use 1 GB hugepages if the platform supports them.</p>
+</div>
+<p>In the case of a dual-socket NUMA system,
+the number of hugepages reserved at boot time is generally divided equally between the two sockets
+(on the assumption that sufficient memory is present on both sockets).</p>
+<p>See the Documentation/admin-guide/kernel-parameters.txt file in your Linux source tree for further details of these and other kernel options.</p>
+</section>
+<section id="using-hugepages-with-the-dpdk">
+<h4><span class="section-number">2.3.2.2. </span>Using Hugepages with the DPDK</h4>
+<p>If secondary process support is not required, DPDK is able to use hugepages
+without any configuration by using “in-memory” mode.
+Please see <a class="reference internal" href="linux_eal_parameters.html"><span class="doc">EAL parameters</span></a> for more details.</p>
+<p>If secondary process support is required,
+mount points for hugepages need to be created.
+On modern Linux distributions, a default mount point for hugepages
+is provided by the system and is located at <code class="docutils literal notranslate"><span class="pre">/dev/hugepages</span></code>.
+This mount point will use the default hugepage size
+set by the kernel parameters as described above.</p>
+<p>However, in order to use hugepage sizes other than the default, it is necessary
+to manually create mount points for those hugepage sizes (e.g. 1GB pages).</p>
+<p>To make the hugepages of size 1GB available for DPDK use,
+following steps must be performed:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mkdir /mnt/huge
+mount -t hugetlbfs pagesize=1GB /mnt/huge
+</pre></div>
+</div>
+<p>The mount point can be made permanent across reboots, by adding the following line to the <code class="docutils literal notranslate"><span class="pre">/etc/fstab</span></code> file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>nodev /mnt/huge hugetlbfs pagesize=1GB 0 0
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Linux</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter"><span class="section-number">1. </span>Introduction</a></li>
+      <li>Next: <a href="build_dpdk.html" title="next chapter"><span class="section-number">3. </span>Compiling the DPDK Target from Source</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/linux_gsg/sys_reqs.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

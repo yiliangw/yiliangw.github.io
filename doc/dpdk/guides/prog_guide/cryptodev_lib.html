@@ -1,0 +1,1587 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>20. Cryptography Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="21. Compression Device Library" href="compressdev.html" />
+    <link rel="prev" title="19. Wireless Baseband Device Library" href="bbdev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cryptography-device-library">
+<h1><span class="section-number">20. </span>Cryptography Device Library</h1>
+<p>The cryptodev library provides a Crypto device framework for management and
+provisioning of hardware and software Crypto poll mode drivers, defining generic
+APIs which support a number of different Crypto operations. The framework
+currently only supports cipher, authentication, chained cipher/authentication
+and AEAD symmetric and asymmetric Crypto operations.</p>
+<section id="design-principles">
+<h2><span class="section-number">20.1. </span>Design Principles</h2>
+<p>The cryptodev library follows the same basic principles as those used in DPDK’s
+Ethernet Device framework. The Crypto framework provides a generic Crypto device
+framework which supports both physical (hardware) and virtual (software) Crypto
+devices as well as a generic Crypto API which allows Crypto devices to be
+managed and configured and supports Crypto operations to be provisioned on
+Crypto poll mode driver.</p>
+</section>
+<section id="device-management">
+<h2><span class="section-number">20.2. </span>Device Management</h2>
+<section id="device-creation">
+<h3><span class="section-number">20.2.1. </span>Device Creation</h3>
+<p>Physical Crypto devices are discovered during the PCI probe/enumeration of the
+EAL function which is executed at DPDK initialization, based on
+their PCI device identifier, each unique PCI BDF (bus/bridge, device,
+function). Specific physical Crypto devices, like other physical devices in DPDK
+can be listed using the EAL command line options.</p>
+<p>Virtual devices can be created by two mechanisms, either using the EAL command
+line options or from within the application using an EAL API directly.</p>
+<p>From the command line using the –vdev EAL option</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--vdev  &#39;crypto_aesni_mb0,max_nb_queue_pairs=2,socket_id=0&#39;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>If DPDK application requires multiple software crypto PMD devices then required
+number of <code class="docutils literal notranslate"><span class="pre">--vdev</span></code> with appropriate libraries are to be added.</p></li>
+<li><p>An Application with crypto PMD instances sharing the same library requires unique ID.</p></li>
+</ul>
+<p>Example: <code class="docutils literal notranslate"><span class="pre">--vdev</span>&#160; <span class="pre">'crypto_aesni_mb0'</span> <span class="pre">--vdev</span>&#160; <span class="pre">'crypto_aesni_mb1'</span></code></p>
+</div>
+<p>Or using the rte_vdev_init API within the application code.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_vdev_init</span><span class="p">(</span><span class="s">&quot;crypto_aesni_mb&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                  </span><span class="s">&quot;max_nb_queue_pairs=2,socket_id=0&quot;</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>All virtual Crypto devices support the following initialization parameters:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">max_nb_queue_pairs</span></code> - maximum number of queue pairs supported by the device.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id</span></code> - socket on which to allocate the device resources on.</p></li>
+</ul>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">20.2.2. </span>Device Identification</h3>
+<p>Each device, whether virtual or physical is uniquely designated by two
+identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the Crypto device in all functions
+exported by the cryptodev API.</p></li>
+<li><p>A device name used to designate the Crypto device in console messages, for
+administration or debugging purposes. For ease of use, the port name includes
+the port index.</p></li>
+</ul>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">20.2.3. </span>Device Configuration</h3>
+<p>The configuration of each Crypto device includes the following operations:</p>
+<ul class="simple">
+<li><p>Allocation of resources, including hardware resources if a physical device.</p></li>
+<li><p>Resetting the device into a well-known default state.</p></li>
+<li><p>Initialization of statistics counters.</p></li>
+</ul>
+<p>The rte_cryptodev_configure API is used to configure a Crypto device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_cryptodev_configure</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                            </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_config</span><span class="w"> </span><span class="o">*</span><span class="n">config</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_config</span></code> structure is used to pass the configuration
+parameters for socket selection and number of queue pairs.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">;</span><span class="w">			</span><span class="cm">/**&lt; Socket to allocate resources on */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_queue_pairs</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Number of queue pairs to configure on device */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">ff_disable</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Feature flags to be disabled. Only the following features are</span>
+<span class="cm">	 * allowed to be disabled,</span>
+<span class="cm">	 *  - RTE_CRYPTODEV_FF_SYMMETRIC_CRYPTO</span>
+<span class="cm">	 *  - RTE_CRYPTODEV_FF_ASYMMETRIC_CRYPTO</span>
+<span class="cm">	 *  - RTE_CRYTPODEV_FF_SECURITY</span>
+<span class="cm">	 */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="configuration-of-queue-pairs">
+<h3><span class="section-number">20.2.4. </span>Configuration of Queue Pairs</h3>
+<p>Each Crypto devices queue pair is individually configured through the
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_queue_pair_setup</span></code> API.
+Each queue pairs resources may be allocated on a specified socket.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">rte_cryptodev_queue_pair_setup</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">queue_pair_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_qp_conf</span><span class="w"> </span><span class="o">*</span><span class="n">qp_conf</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_qp_conf</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">nb_descriptors</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Number of descriptors per queue pair */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mp_session</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; The mempool for creating session in sessionless mode */</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The field <code class="docutils literal notranslate"><span class="pre">mp_session</span></code> is used for creating temporary session to process
+the crypto operations in the session-less mode.
+They can be the same other different mempools. Please note not all Cryptodev
+PMDs supports session-less mode.</p>
+</section>
+<section id="logical-cores-memory-and-queues-pair-relationships">
+<h3><span class="section-number">20.2.5. </span>Logical Cores, Memory and Queues Pair Relationships</h3>
+<p>The Crypto device Library as the Poll Mode Driver library support NUMA for when
+a processor’s logical cores and interfaces utilize its local memory. Therefore
+Crypto operations, and in the case of symmetric Crypto operations, the session
+and the mbuf being operated on, should be allocated from memory pools created
+in the local memory. The buffers should, if possible, remain on the local
+processor to obtain the best performance results and buffer descriptors should
+be populated with mbufs allocated from a mempool allocated from local memory.</p>
+<p>The run-to-completion model also performs better, especially in the case of
+virtual Crypto devices, if the Crypto operation and session and data buffer is
+in local memory instead of a remote processor’s memory. This is also true for
+the pipe-line model provided all logical cores used are located on the same
+processor.</p>
+<p>Multiple logical cores should never share the same queue pair for enqueuing
+operations or dequeuing operations on the same Crypto device since this would
+require global locks and hinder performance. It is however possible to use a
+different logical core to dequeue an operation on a queue pair from the logical
+core which it was enqueued on. This means that a crypto burst enqueue/dequeue
+APIs are a logical place to transition from one logical core to another in a
+packet processing pipeline.</p>
+</section>
+</section>
+<section id="device-features-and-capabilities">
+<h2><span class="section-number">20.3. </span>Device Features and Capabilities</h2>
+<p>Crypto devices define their functionality through two mechanisms, global device
+features and algorithm capabilities. Global devices features identify device
+wide level features which are applicable to the whole device such as
+the device having hardware acceleration or supporting symmetric and/or asymmetric
+Crypto operations.</p>
+<p>The capabilities mechanism defines the individual algorithms/functions which
+the device supports, such as a specific symmetric Crypto cipher,
+authentication operation or Authenticated Encryption with Associated Data
+(AEAD) operation.</p>
+<section id="device-features">
+<h3><span class="section-number">20.3.1. </span>Device Features</h3>
+<p>Currently the following Crypto device features are defined:</p>
+<ul class="simple">
+<li><p>Symmetric Crypto operations</p></li>
+<li><p>Asymmetric Crypto operations</p></li>
+<li><p>Chaining of symmetric Crypto operations</p></li>
+<li><p>SSE accelerated SIMD vector operations</p></li>
+<li><p>AVX accelerated SIMD vector operations</p></li>
+<li><p>AVX2 accelerated SIMD vector operations</p></li>
+<li><p>AESNI accelerated instructions</p></li>
+<li><p>Hardware off-load processing</p></li>
+</ul>
+</section>
+<section id="device-operation-capabilities">
+<h3><span class="section-number">20.3.2. </span>Device Operation Capabilities</h3>
+<p>Crypto capabilities which identify particular algorithm which the Crypto PMD
+supports are  defined by the operation type, the operation transform, the
+transform identifier and then the particulars of the transform. For the full
+scope of the Crypto capability see the definition of the structure in the
+<em>DPDK API Reference</em>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_capabilities</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Each Crypto poll mode driver defines its own private array of capabilities
+for the operations it supports. Below is an example of the capabilities for a
+PMD which supports the authentication algorithm SHA1_HMAC and the cipher
+algorithm AES_CBC.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_capabilities</span><span class="w"> </span><span class="n">pmd_capabilities</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w">    </span><span class="cm">/* SHA1 HMAC */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_TYPE_SYMMETRIC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">sym</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">xform_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_SYM_XFORM_AUTH</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">auth</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_AUTH_SHA1_HMAC</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">block_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">key_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">64</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">increment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">                </span><span class="p">},</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">digest_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">12</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">increment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">                </span><span class="p">},</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">aad_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">},</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">iv_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">},</span><span class="w"></span>
+<span class="w">    </span><span class="p">{</span><span class="w">    </span><span class="cm">/* AES CBC */</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_TYPE_SYMMETRIC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">sym</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">xform_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_SYM_XFORM_CIPHER</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">cipher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_CIPHER_AES_CBC</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">block_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">key_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">32</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">increment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">8</span><span class="w"></span>
+<span class="w">                </span><span class="p">},</span><span class="w"></span>
+<span class="w">                </span><span class="p">.</span><span class="n">iv_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">min</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">max</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">16</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="p">.</span><span class="n">increment</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="w"></span>
+<span class="w">                </span><span class="p">}</span><span class="w"></span>
+<span class="w">            </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="capabilities-discovery">
+<h3><span class="section-number">20.3.3. </span>Capabilities Discovery</h3>
+<p>Discovering the features and capabilities of a Crypto device poll mode driver
+is achieved through the <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_info_get</span></code> function.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="nf">rte_cryptodev_info_get</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                            </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_info</span><span class="w"> </span><span class="o">*</span><span class="n">dev_info</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This allows the user to query a specific Crypto PMD and get all the device
+features and capabilities. The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_info</span></code> structure contains all the
+relevant information for the device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_info</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">driver_name</span><span class="p">;</span><span class="w">	</span><span class="cm">/**&lt; Driver name. */</span><span class="w"></span>
+<span class="w">	</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">driver_id</span><span class="p">;</span><span class="w">		</span><span class="cm">/**&lt; Driver identifier */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_device</span><span class="w"> </span><span class="o">*</span><span class="n">device</span><span class="p">;</span><span class="w">	</span><span class="cm">/**&lt; Generic device information. */</span><span class="w"></span>
+
+<span class="w">	</span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">feature_flags</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Feature flags exposes HW/SW features for the given device */</span><span class="w"></span>
+
+<span class="w">	</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_capabilities</span><span class="w"> </span><span class="o">*</span><span class="n">capabilities</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Array of devices supported capabilities */</span><span class="w"></span>
+
+<span class="w">	</span><span class="kt">unsigned</span><span class="w"> </span><span class="n">max_nb_queue_pairs</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Maximum number of queues pairs supported by device. */</span><span class="w"></span>
+
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">min_mbuf_headroom_req</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Minimum mbuf headroom required by device */</span><span class="w"></span>
+
+<span class="w">	</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">min_mbuf_tailroom_req</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; Minimum mbuf tailroom required by device */</span><span class="w"></span>
+
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="kt">unsigned</span><span class="w"> </span><span class="n">max_nb_sessions</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; Maximum number of sessions supported by device.</span>
+<span class="cm">		 * If 0, the device does not have any limitation in</span>
+<span class="cm">		 * number of sessions that can be used.</span>
+<span class="cm">		 */</span><span class="w"></span>
+<span class="w">	</span><span class="p">}</span><span class="w"> </span><span class="n">sym</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="operation-processing">
+<h2><span class="section-number">20.4. </span>Operation Processing</h2>
+<p>Scheduling of Crypto operations on DPDK’s application data path is
+performed using a burst oriented asynchronous API set. A queue pair on a Crypto
+device accepts a burst of Crypto operations using enqueue burst API. On physical
+Crypto devices the enqueue burst API will place the operations to be processed
+on the devices hardware input queue, for virtual devices the processing of the
+Crypto operations is usually completed during the enqueue call to the Crypto
+device. The dequeue burst API will retrieve any processed operations available
+from the queue pair on the Crypto device, from physical devices this is usually
+directly from the devices processed queue, and for virtual device’s from a
+<code class="docutils literal notranslate"><span class="pre">rte_ring</span></code> where processed operations are placed after being processed on the
+enqueue call.</p>
+<section id="private-data">
+<h3><span class="section-number">20.4.1. </span>Private data</h3>
+<p>For session-based operations, the set and get API provides a mechanism for an
+application to store and retrieve the private user data information stored along
+with the crypto session.</p>
+<p>For example, suppose an application is submitting a crypto operation with a session
+associated and wants to indicate private user data information which is required to be
+used after completion of the crypto operation. In this case, the application can use
+the set API to set the user data and retrieve it using get API.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_cryptodev_sym_session_set_user_data</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_sym_session</span><span class="w"> </span><span class="o">*</span><span class="n">sess</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nf">rte_cryptodev_sym_session_get_user_data</span><span class="p">(</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_sym_session</span><span class="w"> </span><span class="o">*</span><span class="n">sess</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Please note the <code class="docutils literal notranslate"><span class="pre">size</span></code> passed to set API cannot be bigger than the predefined
+<code class="docutils literal notranslate"><span class="pre">user_data_sz</span></code> when creating the session header mempool, otherwise the
+function will return error. Also when <code class="docutils literal notranslate"><span class="pre">user_data_sz</span></code> was defined as <code class="docutils literal notranslate"><span class="pre">0</span></code> when
+creating the session header mempool, the get API will always return <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p>
+<p>For session-less mode, the private user data information can be placed along with the
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_op</span></code>. The <code class="docutils literal notranslate"><span class="pre">rte_crypto_op::private_data_offset</span></code> indicates the
+start of private data information. The offset is counted from the start of the
+rte_crypto_op including other crypto information such as the IVs (since there can
+be an IV also for authentication).</p>
+</section>
+<section id="user-callback-apis">
+<h3><span class="section-number">20.4.2. </span>User callback APIs</h3>
+<p>The add APIs configures a user callback function to be called for each burst of crypto
+ops received/sent on a given crypto device queue pair. The return value is a pointer
+that can be used later to remove the callback using remove API. Application is expected
+to register a callback function of type <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_callback_fn</span></code>. Multiple callback
+functions can be added for a given queue pair. API does not restrict on maximum number of
+callbacks.</p>
+<p>Callbacks registered by application would not survive <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure</span></code> as it
+reinitializes the callback list. It is user responsibility to remove all installed
+callbacks before calling <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure</span></code> to avoid possible memory leakage.</p>
+<p>So, the application is expected to add user callback after <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure</span></code>.
+The callbacks can also be added at the runtime. These callbacks get executed when
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_enqueue_burst</span></code>/<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_dequeue_burst</span></code> is called.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_cb</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_cryptodev_add_enq_callback</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="n">rte_cryptodev_callback_fn</span><span class="w"> </span><span class="n">cb_fn</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">cb_arg</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_cb</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_cryptodev_add_deq_callback</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="n">rte_cryptodev_callback_fn</span><span class="w"> </span><span class="n">cb_fn</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">cb_arg</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">uint16_t</span><span class="w"> </span><span class="p">(</span><span class="o">*</span><span class="w"> </span><span class="n">rte_cryptodev_callback_fn</span><span class="p">)(</span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                       </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_ops</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">user_param</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The remove API removes a callback function added by
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_add_enq_callback</span></code>/<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_add_deq_callback</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_cryptodev_remove_enq_callback</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                      </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_cb</span><span class="w"> </span><span class="o">*</span><span class="n">cb</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">int</span><span class="w"> </span><span class="nf">rte_cryptodev_remove_deq_callback</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                      </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_cb</span><span class="w"> </span><span class="o">*</span><span class="n">cb</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="enqueue-dequeue-burst-apis">
+<h3><span class="section-number">20.4.3. </span>Enqueue / Dequeue Burst APIs</h3>
+<p>The burst enqueue API uses a Crypto device identifier and a queue pair
+identifier to specify the Crypto device queue pair to schedule the processing on.
+The <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> parameter is the number of operations to process which are
+supplied in the <code class="docutils literal notranslate"><span class="pre">ops</span></code> array of <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code> structures.
+The enqueue function returns the number of operations it actually enqueued for
+processing, a return value equal to <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> means that all packets have been
+enqueued.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_cryptodev_enqueue_burst</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                     </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The dequeue API uses the same format as the enqueue API of processed but
+the <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> and <code class="docutils literal notranslate"><span class="pre">ops</span></code> parameters are now used to specify the max processed
+operations the user wishes to retrieve and the location in which to store them.
+The API call returns the actual number of processed operations returned, this
+can never be larger than <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code>.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">rte_cryptodev_dequeue_burst</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                     </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="operation-representation">
+<h3><span class="section-number">20.4.4. </span>Operation Representation</h3>
+<p>An Crypto operation is represented by an rte_crypto_op structure, which is a
+generic metadata container for all necessary information required for the
+Crypto operation to be processed on a particular Crypto device poll mode driver.</p>
+<figure class="align-default">
+<img alt="../_images/crypto_op.svg" src="../_images/crypto_op.svg" /></figure>
+<p>The operation structure includes the operation type, the operation status
+and the session type (session-based/less), a reference to the operation
+specific data, which can vary in size and content depending on the operation
+being provisioned. It also contains the source mempool for the operation,
+if it allocated from a mempool.</p>
+<p>If Crypto operations are allocated from a Crypto operation mempool, see next
+section, there is also the ability to allocate private memory with the
+operation for applications purposes.</p>
+<p>Application software is responsible for specifying all the operation specific
+fields in the <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code> structure which are then used by the Crypto PMD
+to process the requested operation.</p>
+</section>
+<section id="operation-management-and-allocation">
+<h3><span class="section-number">20.4.5. </span>Operation Management and Allocation</h3>
+<p>The cryptodev library provides an API set for managing Crypto operations which
+utilize the Mempool Library to allocate operation buffers. Therefore, it ensures
+that the crypto operation is interleaved optimally across the channels and
+ranks for optimal processing.
+A <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code> contains a field indicating the pool that it originated from.
+When calling <code class="docutils literal notranslate"><span class="pre">rte_crypto_op_free(op)</span></code>, the operation returns to its original pool.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">extern</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="w"></span>
+<span class="n">rte_crypto_op_pool_create</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">name</span><span class="p">,</span><span class="w"> </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_crypto_op_type</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"></span>
+<span class="w">                          </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">nb_elts</span><span class="p">,</span><span class="w"> </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">cache_size</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">priv_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                          </span><span class="kt">int</span><span class="w"> </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>During pool creation <code class="docutils literal notranslate"><span class="pre">rte_crypto_op_init()</span></code> is called as a constructor to
+initialize each Crypto operation which subsequently calls
+<code class="docutils literal notranslate"><span class="pre">__rte_crypto_op_reset()</span></code> to configure any operation type specific fields based
+on the type parameter.</p>
+<p><code class="docutils literal notranslate"><span class="pre">rte_crypto_op_alloc()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_crypto_op_bulk_alloc()</span></code> are used to allocate
+Crypto operations of a specific type from a given Crypto operation mempool.
+<code class="docutils literal notranslate"><span class="pre">__rte_crypto_op_reset()</span></code> is called on each operation before being returned to
+allocate to a user so the operation is always in a good known state before use
+by the application.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">rte_crypto_op_alloc</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                          </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_crypto_op_type</span><span class="w"> </span><span class="n">type</span><span class="p">)</span><span class="w"></span>
+
+<span class="kt">unsigned</span><span class="w"> </span><span class="n">rte_crypto_op_bulk_alloc</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mempool</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="k">enum</span><span class="w"> </span><span class="n">rte_crypto_op_type</span><span class="w"> </span><span class="n">type</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                  </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">**</span><span class="n">ops</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_ops</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">rte_crypto_op_free()</span></code> is called by the application to return an operation to
+its allocating pool.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">void</span><span class="w"> </span><span class="n">rte_crypto_op_free</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">op</span><span class="p">)</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="symmetric-cryptography-support">
+<h2><span class="section-number">20.5. </span>Symmetric Cryptography Support</h2>
+<p>The cryptodev library currently provides support for the following symmetric
+Crypto operations; cipher, authentication, including chaining of these
+operations, as well as also supporting AEAD operations.</p>
+<section id="session-and-session-management">
+<h3><span class="section-number">20.5.1. </span>Session and Session Management</h3>
+<p>Sessions are used in symmetric cryptographic processing to store the immutable
+data defined in a cryptographic transform which is used in the operation
+processing of a packet flow. Sessions are used to manage information such as
+expand cipher keys and HMAC IPADs and OPADs, which need to be calculated for a
+particular Crypto operation, but are immutable on a packet to packet basis for
+a flow. Crypto sessions cache this immutable data in a optimal way for the
+underlying PMD and this allows further acceleration of the offload of
+Crypto workloads.</p>
+<p>The Crypto device framework provides APIs to create session mempool and allocate
+and initialize sessions for crypto devices, where sessions are mempool objects.
+The application has to use <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_session_pool_create()</span></code> to
+create the session mempool header and the private data with the size specified
+by the user through the <code class="docutils literal notranslate"><span class="pre">elt_size</span></code> parameter in the function.
+The session private data is for the driver to initialize and access
+during crypto operations, hence the <code class="docutils literal notranslate"><span class="pre">elt_size</span></code> should be big enough
+for all drivers that will share this mempool.
+To obtain the proper session private data size of a crypto device,
+the user can call <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_get_private_session_size()</span></code> function.
+In case of heterogeneous crypto devices which will share the same session mempool,
+the maximum session private data size of them should be passed.</p>
+<p>Once the session mempools have been created, <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_session_create()</span></code>
+is used to allocate and initialize the session from the given mempool.
+The created session can ONLY be used by the crypto devices sharing the same driver ID
+as the device ID passed into the function as the parameter.
+In addition, a symmetric transform chain is used to specify the operation and its parameters.
+See the section below for details on transforms.</p>
+<p>When a session is no longer used, user must call <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_session_free()</span></code>
+to uninitialize the session data and return the session
+back to the mempool it belongs.</p>
+</section>
+<section id="transforms-and-transform-chaining">
+<h3><span class="section-number">20.5.2. </span>Transforms and Transform Chaining</h3>
+<p>Symmetric Crypto transforms (<code class="docutils literal notranslate"><span class="pre">rte_crypto_sym_xform</span></code>) are the mechanism used
+to specify the details of the Crypto operation. For chaining of symmetric
+operations such as cipher encrypt and authentication generate, the next pointer
+allows transform to be chained together. Crypto devices which support chaining
+must publish the chaining of symmetric Crypto operations feature flag. Allocation of the
+xform structure is in the application domain. To allow future API extensions in a
+backwardly compatible manner, e.g. addition of a new parameter, the application should
+zero the full xform struct before populating it.</p>
+<p>Currently there are three transforms types cipher, authentication and AEAD.
+Also it is important to note that the order in which the
+transforms are passed indicates the order of the chaining.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_xform</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_xform</span><span class="w"> </span><span class="o">*</span><span class="n">next</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="cm">/**&lt; next xform in chain */</span><span class="w"></span>
+<span class="w">	</span><span class="k">enum</span><span class="w"> </span><span class="n">rte_crypto_sym_xform_type</span><span class="w"> </span><span class="n">type</span><span class="w"></span>
+<span class="w">	</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; xform type */</span><span class="w"></span>
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_auth_xform</span><span class="w"> </span><span class="n">auth</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; Authentication / hash xform */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_cipher_xform</span><span class="w"> </span><span class="n">cipher</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; Cipher xform */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_aead_xform</span><span class="w"> </span><span class="n">aead</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; AEAD xform */</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The API does not place a limit on the number of transforms that can be chained
+together but this will be limited by the underlying Crypto device poll mode
+driver which is processing the operation.</p>
+<figure class="align-default">
+<img alt="../_images/crypto_xform_chain.svg" src="../_images/crypto_xform_chain.svg" /></figure>
+</section>
+<section id="symmetric-operations">
+<h3><span class="section-number">20.5.3. </span>Symmetric Operations</h3>
+<p>The symmetric Crypto operation structure contains all the mutable data relating
+to performing symmetric cryptographic processing on a referenced mbuf data
+buffer. It is used for either cipher, authentication, AEAD and chained
+operations.</p>
+<p>As a minimum the symmetric operation must have a source data buffer (<code class="docutils literal notranslate"><span class="pre">m_src</span></code>),
+a valid session (or transform chain if in session-less mode) and the minimum
+authentication/ cipher/ AEAD parameters required depending on the type of operation
+specified in the session or the transform
+chain.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_op</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">m_src</span><span class="p">;</span><span class="w">	</span><span class="cm">/**&lt; source mbuf */</span><span class="w"></span>
+<span class="w">	</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">m_dst</span><span class="p">;</span><span class="w">	</span><span class="cm">/**&lt; destination mbuf */</span><span class="w"></span>
+
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">session</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; Handle for the initialised crypto/security session context */</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_xform</span><span class="w"> </span><span class="o">*</span><span class="n">xform</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="cm">/**&lt; Session-less API crypto operation parameters */</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+
+<span class="w">	</span><span class="k">union</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">			</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">				</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w"></span>
+<span class="w">				 </span><span class="cm">/**&lt; Starting point for AEAD processing, specified as</span>
+<span class="cm">				  * number of bytes from start of packet in source</span>
+<span class="cm">				  * buffer.</span>
+<span class="cm">				  */</span><span class="w"></span>
+<span class="w">				</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">;</span><span class="w"></span>
+<span class="w">				 </span><span class="cm">/**&lt; The message length, in bytes, of the source buffer</span>
+<span class="cm">				  * on which the cryptographic operation will be</span>
+<span class="cm">				  * computed.</span>
+<span class="cm">				  */</span><span class="w"></span>
+<span class="w">			</span><span class="p">}</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Data offsets and length for AEAD */</span><span class="w"></span>
+<span class="w">			</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">				</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="w">				</span><span class="cm">/**&lt; This points to the location where the digest result</span>
+<span class="cm">				 * should be inserted (in the case of digest generation)</span>
+<span class="cm">				 * or where the purported digest exists (in the case of</span>
+<span class="cm">				 * digest verification).</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * At session creation time, the client specified the</span>
+<span class="cm">				 * digest result length with the digest_length member</span>
+<span class="cm">				 * of the @ref rte_crypto_auth_xform structure. For</span>
+<span class="cm">				 * physical crypto devices the caller must allocate at</span>
+<span class="cm">				 * least digest_length of physically contiguous memory</span>
+<span class="cm">				 * at this location.</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * For digest generation, the digest result will</span>
+<span class="cm">				 * overwrite any data at this location.</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * @note</span>
+<span class="cm">				 * For GCM (@ref RTE_CRYPTO_AEAD_AES_GCM), for</span>
+<span class="cm">				 * &quot;digest result&quot; read &quot;authentication tag T&quot;.</span>
+<span class="cm">				 */</span><span class="w"></span>
+<span class="w">				</span><span class="n">rte_iova_t</span><span class="w"> </span><span class="n">phys_addr</span><span class="p">;</span><span class="w"></span>
+<span class="w">				</span><span class="cm">/**&lt; Physical address of digest */</span><span class="w"></span>
+<span class="w">			</span><span class="p">}</span><span class="w"> </span><span class="n">digest</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Digest parameters */</span><span class="w"></span>
+<span class="w">			</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">				</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="w">				</span><span class="cm">/**&lt; Pointer to Additional Authenticated Data (AAD)</span>
+<span class="cm">				 * needed for authenticated cipher mechanisms (CCM and</span>
+<span class="cm">				 * GCM)</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * Specifically for CCM (@ref RTE_CRYPTO_AEAD_AES_CCM),</span>
+<span class="cm">				 * the caller should setup this field as follows:</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * - the additional authentication data itself should</span>
+<span class="cm">				 * be written starting at an offset of 18 bytes into</span>
+<span class="cm">				 * the array, leaving room for the first block (16 bytes)</span>
+<span class="cm">				 * and the length encoding in the first two bytes of the</span>
+<span class="cm">				 * second block.</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * - Note that PMDs may modify the memory reserved</span>
+<span class="cm">				 * (first 18 bytes and the final padding).</span>
+<span class="cm">				 *</span>
+<span class="cm">				 * Finally, for GCM (@ref RTE_CRYPTO_AEAD_AES_GCM), the</span>
+<span class="cm">				 * caller should setup this field as follows:</span>
+<span class="cm">				 *</span>
+<span class="cm">				 */</span><span class="w"></span>
+<span class="w">				</span><span class="n">rte_iova_t</span><span class="w"> </span><span class="n">phys_addr</span><span class="p">;</span><span class="w">	</span><span class="cm">/**&lt; physical address */</span><span class="w"></span>
+<span class="w">			</span><span class="p">}</span><span class="w"> </span><span class="n">aad</span><span class="p">;</span><span class="w"></span>
+<span class="w">			</span><span class="cm">/**&lt; Additional authentication parameters */</span><span class="w"></span>
+<span class="w">		</span><span class="p">}</span><span class="w"> </span><span class="n">aead</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">		</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">			</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">				</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">					</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w"></span>
+<span class="w">					 </span><span class="cm">/**&lt; Starting point for cipher processing,</span>
+<span class="cm">					  * specified as number of bytes from start</span>
+<span class="cm">					  * of data in the source buffer.</span>
+<span class="cm">					  * The result of the cipher operation will be</span>
+<span class="cm">					  * written back into the output buffer</span>
+<span class="cm">					  * starting at this location.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For SNOW 3G @ RTE_CRYPTO_CIPHER_SNOW3G_UEA2,</span>
+<span class="cm">					  * KASUMI @ RTE_CRYPTO_CIPHER_KASUMI_F8</span>
+<span class="cm">					  * and ZUC @ RTE_CRYPTO_CIPHER_ZUC_EEA3,</span>
+<span class="cm">					  * this field should be in bits. For</span>
+<span class="cm">					  * digest-encrypted cases this must be</span>
+<span class="cm">					  * an 8-bit multiple.</span>
+<span class="cm">					  */</span><span class="w"></span>
+<span class="w">					</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">;</span><span class="w"></span>
+<span class="w">					 </span><span class="cm">/**&lt; The message length, in bytes, of the</span>
+<span class="cm">					  * source buffer on which the cryptographic</span>
+<span class="cm">					  * operation will be computed.</span>
+<span class="cm">					  * This is also the same as the result length.</span>
+<span class="cm">					  * For block ciphers, this must be a</span>
+<span class="cm">					  * multiple of the block size,</span>
+<span class="cm">					  * or for the AES-XTS a multiple of the data-unit length</span>
+<span class="cm">					  * as described in xform.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UEA2,</span>
+<span class="cm">					  * KASUMI @ RTE_CRYPTO_CIPHER_KASUMI_F8</span>
+<span class="cm">					  * and ZUC @ RTE_CRYPTO_CIPHER_ZUC_EEA3,</span>
+<span class="cm">					  * this field should be in bits. For</span>
+<span class="cm">					  * digest-encrypted cases this must be</span>
+<span class="cm">					  * an 8-bit multiple.</span>
+<span class="cm">					  */</span><span class="w"></span>
+<span class="w">				</span><span class="p">}</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Data offsets and length for ciphering */</span><span class="w"></span>
+<span class="w">			</span><span class="p">}</span><span class="w"> </span><span class="n">cipher</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">			</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">				</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">					</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">offset</span><span class="p">;</span><span class="w"></span>
+<span class="w">					 </span><span class="cm">/**&lt; Starting point for hash processing,</span>
+<span class="cm">					  * specified as number of bytes from start of</span>
+<span class="cm">					  * packet in source buffer.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,</span>
+<span class="cm">					  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9</span>
+<span class="cm">					  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,</span>
+<span class="cm">					  * this field should be in bits. For</span>
+<span class="cm">					  * digest-encrypted cases this must be</span>
+<span class="cm">					  * an 8-bit multiple.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9,</span>
+<span class="cm">					  * this offset should be such that</span>
+<span class="cm">					  * data to authenticate starts at COUNT.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For DOCSIS security protocol, this</span>
+<span class="cm">					  * offset is the DOCSIS header length</span>
+<span class="cm">					  * and, therefore, also the CRC offset</span>
+<span class="cm">					  * i.e. the number of bytes into the</span>
+<span class="cm">					  * packet at which CRC calculation</span>
+<span class="cm">					  * should begin.</span>
+<span class="cm">					  */</span><span class="w"></span>
+<span class="w">					</span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">length</span><span class="p">;</span><span class="w"></span>
+<span class="w">					 </span><span class="cm">/**&lt; The message length, in bytes, of the source</span>
+<span class="cm">					  * buffer that the hash will be computed on.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For SNOW 3G @ RTE_CRYPTO_AUTH_SNOW3G_UIA2,</span>
+<span class="cm">					  * KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9</span>
+<span class="cm">					  * and ZUC @ RTE_CRYPTO_AUTH_ZUC_EIA3,</span>
+<span class="cm">					  * this field should be in bits. For</span>
+<span class="cm">					  * digest-encrypted cases this must be</span>
+<span class="cm">					  * an 8-bit multiple.</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For KASUMI @ RTE_CRYPTO_AUTH_KASUMI_F9,</span>
+<span class="cm">					  * the length should include the COUNT,</span>
+<span class="cm">					  * FRESH, message, direction bit and padding</span>
+<span class="cm">					  * (to be multiple of 8 bits).</span>
+<span class="cm">					  *</span>
+<span class="cm">					  * @note</span>
+<span class="cm">					  * For DOCSIS security protocol, this</span>
+<span class="cm">					  * is the CRC length i.e. the number of</span>
+<span class="cm">					  * bytes in the packet over which the</span>
+<span class="cm">					  * CRC should be calculated</span>
+<span class="cm">					  */</span><span class="w"></span>
+<span class="w">				</span><span class="p">}</span><span class="w"> </span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="w">				</span><span class="cm">/**&lt; Data offsets and length for authentication */</span><span class="w"></span>
+
+<span class="w">				</span><span class="k">struct</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">					</span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">;</span><span class="w"></span>
+<span class="w">					</span><span class="cm">/**&lt; This points to the location where</span>
+<span class="cm">					 * the digest result should be inserted</span>
+<span class="cm">					 * (in the case of digest generation)</span>
+<span class="cm">					 * or where the purported digest exists</span>
+<span class="cm">					 * (in the case of digest verification).</span>
+<span class="cm">					 *</span>
+<span class="cm">					 * At session creation time, the client</span>
+<span class="cm">					 * specified the digest result length with</span>
+<span class="cm">					 * the digest_length member of the</span>
+<span class="cm">					 * @ref rte_crypto_auth_xform structure.</span>
+<span class="cm">					 * For physical crypto devices the caller</span>
+<span class="cm">					 * must allocate at least digest_length of</span>
+<span class="cm">					 * physically contiguous memory at this</span>
+<span class="cm">					 * location.</span>
+<span class="cm">					 *</span>
+<span class="cm">					 * For digest generation, the digest result</span>
+<span class="cm">					 * will overwrite any data at this location.</span>
+<span class="cm">					 *</span>
+<span class="cm">					 * @note</span>
+<span class="cm">					 * Digest-encrypted case.</span>
+<span class="cm">					 * Digest can be generated, appended to</span>
+<span class="cm">					 * the end of raw data and encrypted</span>
+<span class="cm">					 * together using chained digest</span>
+<span class="cm">					 * generation</span>
+<span class="cm">					 * (@ref RTE_CRYPTO_AUTH_OP_GENERATE)</span>
+<span class="cm">					 * and encryption</span>
+<span class="cm">					 * (@ref RTE_CRYPTO_CIPHER_OP_ENCRYPT)</span>
+<span class="cm">					 * xforms. Similarly, authentication</span>
+<span class="cm">					 * of the raw data against appended,</span>
+<span class="cm">					 * decrypted digest, can be performed</span>
+<span class="cm">					 * using decryption</span>
+<span class="cm">					 * (@ref RTE_CRYPTO_CIPHER_OP_DECRYPT)</span>
+<span class="cm">					 * and digest verification</span>
+<span class="cm">					 * (@ref RTE_CRYPTO_AUTH_OP_VERIFY)</span>
+<span class="cm">					 * chained xforms.</span>
+<span class="cm">					 * To perform those operations, a few</span>
+<span class="cm">					 * additional conditions must be met:</span>
+<span class="cm">					 * - caller must allocate at least</span>
+<span class="cm">					 * digest_length of memory at the end of</span>
+<span class="cm">					 * source and (in case of out-of-place</span>
+<span class="cm">					 * operations) destination buffer; those</span>
+<span class="cm">					 * buffers can be linear or split using</span>
+<span class="cm">					 * scatter-gather lists,</span>
+<span class="cm">					 * - digest data pointer must point to</span>
+<span class="cm">					 * the end of source or (in case of</span>
+<span class="cm">					 * out-of-place operations) destination</span>
+<span class="cm">					 * data, which is pointer to the</span>
+<span class="cm">					 * data buffer + auth.data.offset +</span>
+<span class="cm">					 * auth.data.length,</span>
+<span class="cm">					 * - cipher.data.offset +</span>
+<span class="cm">					 * cipher.data.length must be greater</span>
+<span class="cm">					 * than auth.data.offset +</span>
+<span class="cm">					 * auth.data.length and is typically</span>
+<span class="cm">					 * equal to auth.data.offset +</span>
+<span class="cm">					 * auth.data.length + digest_length.</span>
+<span class="cm">					 * - for wireless algorithms, i.e.</span>
+<span class="cm">					 * SNOW 3G, KASUMI and ZUC, as the</span>
+<span class="cm">					 * cipher.data.length,</span>
+<span class="cm">					 * cipher.data.offset,</span>
+<span class="cm">					 * auth.data.length and</span>
+<span class="cm">					 * auth.data.offset are in bits, they</span>
+<span class="cm">					 * must be 8-bit multiples.</span>
+<span class="cm">					 *</span>
+<span class="cm">					 * Note, that for security reasons, it</span>
+<span class="cm">					 * is PMDs&#39; responsibility to not</span>
+<span class="cm">					 * leave an unencrypted digest in any</span>
+<span class="cm">					 * buffer after performing auth-cipher</span>
+<span class="cm">					 * operations.</span>
+<span class="cm">					 *</span>
+<span class="cm">					 */</span><span class="w"></span>
+<span class="w">					</span><span class="n">rte_iova_t</span><span class="w"> </span><span class="n">phys_addr</span><span class="p">;</span><span class="w"></span>
+<span class="w">					</span><span class="cm">/**&lt; Physical address of digest */</span><span class="w"></span>
+<span class="w">				</span><span class="p">}</span><span class="w"> </span><span class="n">digest</span><span class="p">;</span><span class="w"> </span><span class="cm">/**&lt; Digest parameters */</span><span class="w"></span>
+<span class="w">			</span><span class="p">}</span><span class="w"> </span><span class="n">auth</span><span class="p">;</span><span class="w"></span>
+<span class="w">		</span><span class="p">};</span><span class="w"></span>
+<span class="w">	</span><span class="p">};</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="synchronous-mode">
+<h2><span class="section-number">20.6. </span>Synchronous mode</h2>
+<p>Some cryptodevs support synchronous mode alongside with a standard asynchronous
+mode. In that case operations are performed directly when calling
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_cpu_crypto_process</span></code> method instead of enqueuing and
+dequeuing an operation before. This mode of operation allows cryptodevs which
+utilize CPU cryptographic acceleration to have significant performance boost
+comparing to standard asynchronous approach. Cryptodevs supporting synchronous
+mode have <code class="docutils literal notranslate"><span class="pre">RTE_CRYPTODEV_FF_SYM_CPU_CRYPTO</span></code> feature flag set.</p>
+<p>To perform a synchronous operation a call to
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_sym_cpu_crypto_process</span></code> has to be made with vectorized
+operation descriptor (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sym_vec</span></code>) containing:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">num</span></code> - number of operations to perform,</p></li>
+<li><p>pointer to an array of size <code class="docutils literal notranslate"><span class="pre">num</span></code> containing a scatter-gather list
+descriptors of performed operations (<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sgl</span></code>). Each instance
+of <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sgl</span></code> consists of a number of segments and a pointer to
+an array of segment descriptors <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_vec</span></code>;</p></li>
+<li><p>pointers to arrays of size <code class="docutils literal notranslate"><span class="pre">num</span></code> containing IV, AAD and digest information
+in the <code class="docutils literal notranslate"><span class="pre">cpu_crypto</span></code> sub-structure,</p></li>
+<li><p>pointer to an array of size <code class="docutils literal notranslate"><span class="pre">num</span></code> where status information will be stored
+for each operation.</p></li>
+</ul>
+<p>Function returns a number of successfully completed operations and sets
+appropriate status number for each operation in the status array provided as
+a call argument. Status different than zero must be treated as error.</p>
+<p>For more details, e.g. how to convert an mbuf to an SGL, please refer to an
+example usage in the IPsec library implementation.</p>
+<section id="cryptodev-raw-data-path-apis">
+<h3><span class="section-number">20.6.1. </span>Cryptodev Raw Data-path APIs</h3>
+<p>The Crypto Raw data-path APIs are a set of APIs designed to enable external
+libraries/applications to leverage the cryptographic processing provided by
+DPDK crypto PMDs through the cryptodev API but in a manner that is not
+dependent on native DPDK data structures (eg. rte_mbuf, rte_crypto_op, … etc)
+in their data-path implementation.</p>
+<p>The raw data-path APIs have the following advantages:</p>
+<ul class="simple">
+<li><p>External data structure friendly design. The new APIs uses the operation
+descriptor <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sym_vec</span></code> that supports raw data pointer and
+IOVA addresses as input. Moreover, the APIs does not require the user to
+allocate the descriptor from mempool, nor requiring mbufs to describe input
+data’s virtual and IOVA addresses. All these features made the translation
+from user’s own data structure into the descriptor easier and more efficient.</p></li>
+<li><p>Flexible enqueue and dequeue operation. The raw data-path APIs gives the
+user more control to the enqueue and dequeue operations, including the
+capability of precious enqueue/dequeue count, abandoning enqueue or dequeue
+at any time, and operation status translation and set on the fly.</p></li>
+</ul>
+<p>Cryptodev PMDs which support the raw data-path APIs will have
+<code class="docutils literal notranslate"><span class="pre">RTE_CRYPTODEV_FF_SYM_RAW_DP</span></code> feature flag presented. To use this feature,
+the user shall create a local <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_raw_dp_ctx</span></code> buffer and
+extend to at least the length returned by <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_get_raw_dp_ctx_size</span></code>
+function call. The created buffer is then initialized using
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure_raw_dp_ctx</span></code> function with the <code class="docutils literal notranslate"><span class="pre">is_update</span></code>
+parameter as 0. The library and the crypto device driver will then set the
+buffer and attach either the cryptodev sym session, the rte_security session,
+or the cryptodev xform for session-less operation into the ctx buffer, and
+set the corresponding enqueue and dequeue function handlers based on the
+algorithm information stored in the session or xform. When the <code class="docutils literal notranslate"><span class="pre">is_update</span></code>
+parameter passed into <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure_raw_dp_ctx</span></code> is 1, the driver
+will not initialize the buffer but only update the session or xform and
+the function handlers accordingly.</p>
+<p>After the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_raw_dp_ctx</span></code> buffer is initialized, it is now
+ready for enqueue and dequeue operation. There are two different enqueue
+functions: <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue</span></code> to enqueue single raw data
+operation, and <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_burst</span></code> to enqueue a descriptor
+with multiple operations. In case of the application uses similar approach to
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sym_vec</span></code> to manage its data burst but with different
+data structure, using the <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_burst</span></code> function may be
+less efficient as this is a situation where the application has to loop over
+all crypto operations to assemble the <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sym_vec</span></code> descriptor
+from its own data structure, and then the driver will loop over them again to
+translate every operation in the descriptor to the driver’s specific queue data.
+The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue</span></code> should be used to save one loop for each data
+burst instead.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_burst</span></code>
+functions will return or set the enqueue status. <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue</span></code>
+will return the status directly, <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_burst</span></code> will
+return the number of operations enqueued or stored (explained as follows) and
+set the <code class="docutils literal notranslate"><span class="pre">enqueue_status</span></code> buffer provided by the user. The possible
+enqueue status values are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code>: the operation(s) is/are enqueued successfully.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">0</span></code>: the operation(s) is/are cached successfully in the crypto device queue
+but is not actually enqueued. The user shall call
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_done</span></code> function after the expected operations
+are stored. The crypto device will then start enqueuing all of them at
+once.</p></li>
+<li><p>The negative integer: error occurred during enqueue.</p></li>
+</ul>
+<p>Calling <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure_raw_dp_ctx</span></code> with the parameter <code class="docutils literal notranslate"><span class="pre">is_update</span></code>
+set as 0 twice without the enqueue function returning or setting enqueue status
+to 1 or <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_enqueue_done</span></code> function being called in between will
+invalidate any operation stored in the device queue but not enqueued. This
+feature is useful when the user wants to abandon partially enqueued operations
+for a failed enqueue burst operation and try enqueuing in a whole later.</p>
+<p>Similar as enqueue, there are two dequeue functions:
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_dequeue</span></code> for dequeuing single operation, and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_dequeue_burst</span></code> for dequeuing a burst of operations (e.g.
+all operations in a <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_sym_vec</span></code> descriptor). The
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_dequeue_burst</span></code> function allows the user to provide callback
+functions to retrieve dequeue count from the enqueued user data and write the
+expected status value to the user data on the fly. The dequeue functions also
+set the dequeue status:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1</span></code>: the operation(s) is/are dequeued successfully.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">0</span></code>: the operation(s) is/are completed but is not actually dequeued (hence
+still kept in the device queue). The user shall call the
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_dequeue_done</span></code> function after the expected number of
+operations (e.g. all operations in a descriptor) are dequeued. The crypto
+device driver will then free them from the queue at once.</p></li>
+<li><p>The negative integer: error occurred during dequeue.</p></li>
+</ul>
+<p>Calling <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_configure_raw_dp_ctx</span></code> with the parameter <code class="docutils literal notranslate"><span class="pre">is_update</span></code>
+set as 0 twice without the dequeue functions execution changed dequeue_status
+to 1 or <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_raw_dequeue_done</span></code> function being called in between will
+revert the crypto device queue’s dequeue effort to the moment when the
+<code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_crypto_raw_dp_ctx</span></code> buffer is initialized. This feature is useful
+when the user wants to abandon partially dequeued data and try dequeuing again
+later in a whole.</p>
+<p>There are a few limitations to the raw data path APIs:</p>
+<ul class="simple">
+<li><p>Only support in-place operations.</p></li>
+<li><p>APIs are NOT thread-safe.</p></li>
+<li><p>CANNOT mix the raw data-path API’s enqueue with rte_cryptodev_enqueue_burst,
+or vice versa.</p></li>
+</ul>
+<p>See <em>DPDK API Reference</em> for details on each API definitions.</p>
+</section>
+</section>
+<section id="sample-code">
+<h2><span class="section-number">20.7. </span>Sample code</h2>
+<p>There are various sample applications that show how to use the cryptodev library,
+such as the L2fwd with Crypto sample application (L2fwd-crypto) and
+the IPsec Security Gateway application (ipsec-secgw).</p>
+<p>While these applications demonstrate how an application can be created to perform
+generic crypto operation, the required complexity hides the basic steps of
+how to use the cryptodev APIs.</p>
+<p>The following sample code shows the basic steps to encrypt several buffers
+with AES-CBC (although performing other crypto operations is similar),
+using one of the crypto PMDs available in DPDK.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/*</span>
+<span class="cm"> * Simple example to encrypt several buffers with AES-CBC using</span>
+<span class="cm"> * the Cryptodev APIs.</span>
+<span class="cm"> */</span><span class="w"></span>
+
+<span class="cp">#define MAX_SESSIONS         1024</span>
+<span class="cp">#define NUM_MBUFS            1024</span>
+<span class="cp">#define POOL_CACHE_SIZE      128</span>
+<span class="cp">#define BURST_SIZE           32</span>
+<span class="cp">#define BUFFER_SIZE          1024</span>
+<span class="cp">#define AES_CBC_IV_LENGTH    16</span>
+<span class="cp">#define AES_CBC_KEY_LENGTH   16</span>
+<span class="cp">#define IV_OFFSET            (sizeof(struct rte_crypto_op) + \</span>
+<span class="cp">                             sizeof(struct rte_crypto_sym_op))</span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">mbuf_pool</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">crypto_op_pool</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_mempool</span><span class="w"> </span><span class="o">*</span><span class="n">session_pool</span><span class="p">,</span><span class="w"> </span><span class="o">*</span><span class="n">session_priv_pool</span><span class="p">;</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">session_size</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* Initialize EAL. */</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eal_init</span><span class="p">(</span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="n">argv</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Invalid EAL arguments</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">socket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_socket_id</span><span class="p">();</span><span class="w"></span>
+
+<span class="cm">/* Create the mbuf pool. */</span><span class="w"></span>
+<span class="n">mbuf_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_pktmbuf_pool_create</span><span class="p">(</span><span class="s">&quot;mbuf_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">NUM_MBUFS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">POOL_CACHE_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">RTE_MBUF_DEFAULT_BUF_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">mbuf_pool</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Cannot create mbuf pool</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * The IV is always placed after the crypto operation,</span>
+<span class="cm"> * so some private data is required to be reserved.</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">crypto_op_private_data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AES_CBC_IV_LENGTH</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* Create crypto operation pool. */</span><span class="w"></span>
+<span class="n">crypto_op_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_crypto_op_pool_create</span><span class="p">(</span><span class="s">&quot;crypto_op_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">RTE_CRYPTO_OP_TYPE_SYMMETRIC</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">NUM_MBUFS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">POOL_CACHE_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">crypto_op_private_data</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">crypto_op_pool</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Cannot create crypto op pool</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Create the virtual crypto device. */</span><span class="w"></span>
+<span class="kt">char</span><span class="w"> </span><span class="n">args</span><span class="p">[</span><span class="mi">128</span><span class="p">];</span><span class="w"></span>
+<span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">crypto_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;crypto_aesni_mb0&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="n">snprintf</span><span class="p">(</span><span class="n">args</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">args</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;socket_id=%d&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_vdev_init</span><span class="p">(</span><span class="n">crypto_name</span><span class="p">,</span><span class="w"> </span><span class="n">args</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Cannot create virtual device&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">cdev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_get_dev_id</span><span class="p">(</span><span class="n">crypto_name</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Get private session data size. */</span><span class="w"></span>
+<span class="n">session_size</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_sym_get_private_session_size</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="cp">#ifdef USE_TWO_MEMPOOLS</span>
+<span class="cm">/* Create session mempool for the session header. */</span><span class="w"></span>
+<span class="n">session_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_sym_session_pool_create</span><span class="p">(</span><span class="s">&quot;session_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">MAX_SESSIONS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">POOL_CACHE_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Create session private data mempool for the</span>
+<span class="cm"> * private session data for the crypto device.</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="n">session_priv_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_mempool_create</span><span class="p">(</span><span class="s">&quot;session_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">MAX_SESSIONS</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">session_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">POOL_CACHE_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="n">socket_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="cp">#else</span>
+<span class="cm">/* Use of the same mempool for session header and private data */</span><span class="w"></span>
+<span class="w">    </span><span class="n">session_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_sym_session_pool_create</span><span class="p">(</span><span class="s">&quot;session_pool&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">MAX_SESSIONS</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">session_size</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">POOL_CACHE_SIZE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                </span><span class="n">socket_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">session_priv_pool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session_pool</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#endif</span>
+
+<span class="cm">/* Configure the crypto device. */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_config</span><span class="w"> </span><span class="n">conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">nb_queue_pairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">socket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">socket_id</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_qp_conf</span><span class="w"> </span><span class="n">qp_conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">nb_descriptors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2048</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">mp_session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session_pool</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">mp_session_private</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">session_priv_pool</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_cryptodev_configure</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">conf</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to configure cryptodev %u&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">cdev_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_cryptodev_queue_pair_setup</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">qp_conf</span><span class="p">,</span><span class="w"> </span><span class="n">socket_id</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to setup queue pair</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_cryptodev_start</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to start device</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Create the crypto transform. */</span><span class="w"></span>
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">cipher_key</span><span class="p">[</span><span class="mi">16</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_sym_xform</span><span class="w"> </span><span class="n">cipher_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">next</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_SYM_XFORM_CIPHER</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="p">.</span><span class="n">cipher</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_CIPHER_OP_ENCRYPT</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">algo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_CIPHER_AES_CBC</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">key</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cipher_key</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AES_CBC_KEY_LENGTH</span><span class="w"></span>
+<span class="w">        </span><span class="p">},</span><span class="w"></span>
+<span class="w">        </span><span class="p">.</span><span class="n">iv</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">IV_OFFSET</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AES_CBC_IV_LENGTH</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="cm">/* Create crypto session and initialize it for the crypto device. */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_cryptodev_sym_session</span><span class="w"> </span><span class="o">*</span><span class="n">session</span><span class="p">;</span><span class="w"></span>
+<span class="n">session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_sym_session_create</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">cipher_xform</span><span class="p">,</span><span class="w"></span>
+<span class="w">                </span><span class="n">session_pool</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">session</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Session could not be created</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Get a burst of crypto operations. */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">crypto_ops</span><span class="p">[</span><span class="n">BURST_SIZE</span><span class="p">];</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_crypto_op_bulk_alloc</span><span class="p">(</span><span class="n">crypto_op_pool</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="n">RTE_CRYPTO_OP_TYPE_SYMMETRIC</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="n">crypto_ops</span><span class="p">,</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Not enough crypto operations available</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Get a burst of mbufs. */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">mbufs</span><span class="p">[</span><span class="n">BURST_SIZE</span><span class="p">];</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_pktmbuf_alloc_bulk</span><span class="p">(</span><span class="n">mbuf_pool</span><span class="p">,</span><span class="w"> </span><span class="n">mbufs</span><span class="p">,</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Not enough mbufs available&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* Initialize the mbufs and append them to the crypto operations. */</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_pktmbuf_append</span><span class="p">(</span><span class="n">mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="n">BUFFER_SIZE</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Not enough room in the mbuf</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">crypto_ops</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">sym</span><span class="o">-&gt;</span><span class="n">m_src</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mbufs</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Set up the crypto operations. */</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">crypto_ops</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="cm">/* Modify bytes of the IV at the end of the crypto operation */</span><span class="w"></span>
+<span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="n">iv_ptr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_crypto_op_ctod_offset</span><span class="p">(</span><span class="n">op</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="o">*</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                            </span><span class="n">IV_OFFSET</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">generate_random_bytes</span><span class="p">(</span><span class="n">iv_ptr</span><span class="p">,</span><span class="w"> </span><span class="n">AES_CBC_IV_LENGTH</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">sym</span><span class="o">-&gt;</span><span class="n">cipher</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">offset</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="w">    </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">sym</span><span class="o">-&gt;</span><span class="n">cipher</span><span class="p">.</span><span class="n">data</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">BUFFER_SIZE</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Attach the crypto session to the operation */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_crypto_op_attach_sym_session</span><span class="p">(</span><span class="n">op</span><span class="p">,</span><span class="w"> </span><span class="n">session</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Enqueue the crypto operations in the crypto device. */</span><span class="w"></span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_enqueued_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_enqueue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">crypto_ops</span><span class="p">,</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Dequeue the crypto operations until all the operations</span>
+<span class="cm"> * are processed in the crypto device.</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="kt">uint16_t</span><span class="w"> </span><span class="n">num_dequeued_ops</span><span class="p">,</span><span class="w"> </span><span class="n">total_num_dequeued_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="k">do</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_op</span><span class="w"> </span><span class="o">*</span><span class="n">dequeued_ops</span><span class="p">[</span><span class="n">BURST_SIZE</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="n">num_dequeued_ops</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_dequeue_burst</span><span class="p">(</span><span class="n">cdev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                    </span><span class="n">dequeued_ops</span><span class="p">,</span><span class="w"> </span><span class="n">BURST_SIZE</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">total_num_dequeued_ops</span><span class="w"> </span><span class="o">+=</span><span class="w"> </span><span class="n">num_dequeued_ops</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* Check if operation was processed successfully */</span><span class="w"></span>
+<span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">num_dequeued_ops</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dequeued_ops</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">-&gt;</span><span class="n">status</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_STATUS_SUCCESS</span><span class="p">)</span><span class="w"></span>
+<span class="w">            </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"></span>
+<span class="w">                    </span><span class="s">&quot;Some operations were not processed correctly&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="p">}</span><span class="w"></span>
+
+<span class="w">    </span><span class="n">rte_mempool_put_bulk</span><span class="p">(</span><span class="n">crypto_op_pool</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="p">)</span><span class="n">dequeued_ops</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                        </span><span class="n">num_dequeued_ops</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">total_num_dequeued_ops</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">num_enqueued_ops</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="asymmetric-cryptography">
+<h2><span class="section-number">20.8. </span>Asymmetric Cryptography</h2>
+<p>The cryptodev library currently provides support for the following asymmetric
+Crypto operations; RSA, Modular exponentiation and inversion, Diffie-Hellman and
+Elliptic Curve Diffie-Hellman public and/or private key generation and shared
+secret compute, DSA Signature generation and verification.</p>
+<section id="id1">
+<h3><span class="section-number">20.8.1. </span>Session and Session Management</h3>
+<p>Sessions are used in asymmetric cryptographic processing to store the immutable
+data defined in asymmetric cryptographic transform which is further used in the
+operation processing. Sessions typically stores information, such as, public
+and private key information or domain params or prime modulus data i.e. immutable
+across data sets. Crypto sessions cache this immutable data in a optimal way for the
+underlying PMD and this allows further acceleration of the offload of Crypto workloads.</p>
+<p>Like symmetric, the Crypto device framework provides APIs to allocate and initialize
+asymmetric sessions for crypto devices, where sessions are mempool objects.
+It is the application’s responsibility to create and manage the session mempools.
+Application using both symmetric and asymmetric sessions should allocate and maintain
+different sessions pools for each type.</p>
+<p>An application can use <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_asym_session_pool_create()</span></code> to create a mempool
+with a specified number of elements. The element size will allow for the session header,
+and the max private session size.
+The max private session size is chosen based on available crypto devices,
+the biggest private session size is used. This means any of those devices can be used,
+and the mempool element will have available space for its private session data.</p>
+<p>Once the session mempools have been created, <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_asym_session_create()</span></code>
+is used to allocate and initialize an asymmetric session from the given mempool.
+An asymmetric transform chain is used to specify the operation and its parameters.
+See the section below for details on transforms.</p>
+<p>When a session is no longer used, user must call <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_asym_session_clear()</span></code>
+for each of the crypto devices that are using the session, to free all driver
+private asymmetric session data. Once this is done, session should be freed using
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_asym_session_free()</span></code> which returns them to their mempool.</p>
+</section>
+<section id="asymmetric-sessionless-support">
+<h3><span class="section-number">20.8.2. </span>Asymmetric Sessionless Support</h3>
+<p>Asymmetric crypto framework supports session-less operations as well.</p>
+<p>Fields that should be set by user are:</p>
+<p>Member xform of struct rte_crypto_asym_op should point to the user created rte_crypto_asym_xform.
+Note that rte_crypto_asym_xform should be immutable for the lifetime of associated crypto_op.</p>
+<p>Member sess_type of rte_crypto_op should also be set to RTE_CRYPTO_OP_SESSIONLESS.</p>
+</section>
+<section id="id2">
+<h3><span class="section-number">20.8.3. </span>Transforms and Transform Chaining</h3>
+<p>Asymmetric Crypto transforms (<code class="docutils literal notranslate"><span class="pre">rte_crypto_asym_xform</span></code>) are the mechanism used
+to specify the details of the asymmetric Crypto operation. Next pointer within
+xform allows transform to be chained together. Also it is important to note that
+the order in which the transforms are passed indicates the order of the chaining. Allocation
+of the xform structure is in the application domain. To allow future API extensions in a
+backwardly compatible manner, e.g. addition of a new parameter, the application should
+zero the full xform struct before populating it.</p>
+<p>Not all asymmetric crypto xforms are supported for chaining. Currently supported
+asymmetric crypto chaining is Diffie-Hellman private key generation followed by
+public generation. Also, currently API does not support chaining of symmetric and
+asymmetric crypto xforms.</p>
+<p>Each xform defines specific asymmetric crypto algo. Currently supported are:
+* RSA
+* Modular operations (Exponentiation and Inverse)
+* Diffie-Hellman
+* DSA
+* Elliptic Curve Diffie-Hellman
+* None - special case where PMD may support a passthrough mode. More for diagnostic purpose</p>
+<p>See <em>DPDK API Reference</em> for details on each rte_crypto_xxx_xform struct</p>
+</section>
+<section id="asymmetric-operations">
+<h3><span class="section-number">20.8.4. </span>Asymmetric Operations</h3>
+<p>The asymmetric Crypto operation structure contains all the mutable data relating
+to asymmetric cryptographic processing on an input data buffer. It uses either
+RSA, Modular, Diffie-Hellman or DSA operations depending upon session it is attached
+to.</p>
+<p>Every operation must carry a valid session handle which further carries information
+on xform or xform-chain to be performed on op. Every xform type defines its own set
+of operational params in their respective rte_crypto_xxx_op_param struct. Depending
+on xform information within session, PMD picks up and process respective op_param
+struct.
+Unlike symmetric, asymmetric operations do not use mbufs for input/output.
+They operate on data buffer of type <code class="docutils literal notranslate"><span class="pre">rte_crypto_param</span></code>.</p>
+<p>See <em>DPDK API Reference</em> for details on each rte_crypto_xxx_op_param struct</p>
+</section>
+<section id="private-user-data">
+<h3><span class="section-number">20.8.5. </span>Private user data</h3>
+<p>Similar to symmetric above, asymmetric also has a set and get API that provides a
+mechanism for an application to store and retrieve the private user data information
+stored along with the crypto session.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_cryptodev_asym_session_set_user_data</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">sess</span><span class="p">,</span><span class="w"></span>
+<span class="w">        </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">size</span><span class="p">);</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="nf">rte_cryptodev_asym_session_get_user_data</span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">sess</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Please note the <code class="docutils literal notranslate"><span class="pre">size</span></code> passed to set API cannot be bigger than the predefined
+<code class="docutils literal notranslate"><span class="pre">user_data_sz</span></code> when creating the session mempool, otherwise the function will
+return an error. Also when <code class="docutils literal notranslate"><span class="pre">user_data_sz</span></code> was defined as <code class="docutils literal notranslate"><span class="pre">0</span></code> when
+creating the session mempool, the get API will always return <code class="docutils literal notranslate"><span class="pre">NULL</span></code>.</p>
+</section>
+</section>
+<section id="asymmetric-crypto-sample-code">
+<h2><span class="section-number">20.9. </span>Asymmetric crypto Sample code</h2>
+<p>There’s a unit test application test_cryptodev_asym.c inside unit test framework that
+show how to setup and process asymmetric operations using cryptodev library.</p>
+<p>The following code samples are taken from the test application mentioned above,
+and show basic steps to compute modular exponentiation using an openssl PMD
+available in DPDK (performing other crypto operations is similar except change
+to respective op and xform setup).</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The following code snippets are taken from multiple functions, so variable
+names may differ slightly between sections.</p>
+</div>
+<p>Configure the virtual device, queue pairs, crypto op pool and session mempool.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">op_mpool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_crypto_op_pool_create</span><span class="p">(</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;CRYPTO_ASYM_OP_POOL&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">RTE_CRYPTO_OP_TYPE_ASYMMETRIC</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">TEST_NUM_BUFS</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_socket_id</span><span class="p">());</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">op_mpool</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Can&#39;t create ASYM_CRYPTO_OP_POOL</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">return</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Create an OPENSSL device if required */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">gbl_driver_id</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">rte_cryptodev_driver_id_get</span><span class="p">(</span><span class="w"></span>
+<span class="w">		</span><span class="n">RTE_STR</span><span class="p">(</span><span class="n">CRYPTODEV_NAME_OPENSSL_PMD</span><span class="p">)))</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">nb_devs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_device_count_by_driver</span><span class="p">(</span><span class="w"></span>
+<span class="w">			</span><span class="n">rte_cryptodev_driver_id_get</span><span class="p">(</span><span class="w"></span>
+<span class="w">			</span><span class="n">RTE_STR</span><span class="p">(</span><span class="n">CRYPTODEV_NAME_OPENSSL_PMD</span><span class="p">)));</span><span class="w"></span>
+<span class="w">	</span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nb_devs</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_vdev_init</span><span class="p">(</span><span class="w"></span>
+<span class="w">			</span><span class="n">RTE_STR</span><span class="p">(</span><span class="n">CRYPTODEV_NAME_OPENSSL_PMD</span><span class="p">),</span><span class="w"></span>
+<span class="w">			</span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">		</span><span class="n">TEST_ASSERT</span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to create &quot;</span><span class="w"></span>
+<span class="w">			</span><span class="s">&quot;instance of pmd : %s&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="n">RTE_STR</span><span class="p">(</span><span class="n">CRYPTODEV_NAME_OPENSSL_PMD</span><span class="p">));</span><span class="w"></span>
+<span class="w">	</span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Get list of valid crypto devs */</span><span class="w"></span>
+<span class="n">nb_devs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_devices_get</span><span class="p">(</span><span class="w"></span>
+<span class="w">			</span><span class="n">rte_cryptodev_driver_name_get</span><span class="p">(</span><span class="n">gbl_driver_id</span><span class="p">),</span><span class="w"></span>
+<span class="w">			</span><span class="n">valid_devs</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_CRYPTO_MAX_DEVS</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">nb_devs</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;No crypto devices found?</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SKIPPED</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/*</span>
+<span class="cm"> * Get first valid asymmetric device found in test suite param and</span>
+<span class="cm"> * break</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">nb_devs</span><span class="w"> </span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">rte_cryptodev_info_get</span><span class="p">(</span><span class="n">valid_devs</span><span class="p">[</span><span class="n">i</span><span class="p">],</span><span class="w"> </span><span class="o">&amp;</span><span class="n">info</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">info</span><span class="p">.</span><span class="n">feature_flags</span><span class="w"> </span><span class="o">&amp;</span><span class="w"> </span><span class="n">RTE_CRYPTODEV_FF_ASYMMETRIC_CRYPTO</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="n">dev_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">valid_devs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">valid_devs</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="w">		</span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">dev_id</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">-1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Device doesn&#39;t support asymmetric. &quot;</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;Test skipped.</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="k">return</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Set valid device count */</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">valid_dev_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">nb_devs</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* configure device with num qp */</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">.</span><span class="n">nb_queue_pairs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">max_nb_queue_pairs</span><span class="p">;</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">.</span><span class="n">socket_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">SOCKET_ID_ANY</span><span class="p">;</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">.</span><span class="n">ff_disable</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTODEV_FF_SECURITY</span><span class="w"> </span><span class="o">|</span><span class="w"></span>
+<span class="w">		</span><span class="n">RTE_CRYPTODEV_FF_SYMMETRIC_CRYPTO</span><span class="p">;</span><span class="w"></span>
+<span class="n">TEST_ASSERT_SUCCESS</span><span class="p">(</span><span class="n">rte_cryptodev_configure</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="o">&amp;</span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">),</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;Failed to configure cryptodev %u with %u qps&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">conf</span><span class="p">.</span><span class="n">nb_queue_pairs</span><span class="p">);</span><span class="w"></span>
+
+<span class="cm">/* configure qp */</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">qp_conf</span><span class="p">.</span><span class="n">nb_descriptors</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">DEFAULT_NUM_OPS_INFLIGHT</span><span class="p">;</span><span class="w"></span>
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">qp_conf</span><span class="p">.</span><span class="n">mp_session</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">session_mpool</span><span class="p">;</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">qp_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">qp_id</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">info</span><span class="p">.</span><span class="n">max_nb_queue_pairs</span><span class="p">;</span><span class="w"> </span><span class="n">qp_id</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">TEST_ASSERT_SUCCESS</span><span class="p">(</span><span class="n">rte_cryptodev_queue_pair_setup</span><span class="p">(</span><span class="w"></span>
+<span class="w">		</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">qp_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">qp_conf</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">rte_cryptodev_socket_id</span><span class="p">(</span><span class="n">dev_id</span><span class="p">)),</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;Failed to setup queue pair %u on cryptodev %u ASYM&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">qp_id</span><span class="p">,</span><span class="w"> </span><span class="n">dev_id</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">session_mpool</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_asym_session_pool_create</span><span class="p">(</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;test_asym_sess_mp&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">TEST_NUM_SESSIONS</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">SOCKET_ID_ANY</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">TEST_ASSERT_NOT_NULL</span><span class="p">(</span><span class="n">ts_params</span><span class="o">-&gt;</span><span class="n">session_mpool</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;session mempool allocation failed&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Create MODEX data vectors.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">mod_p</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x00</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb3</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa1</span><span class="p">,</span><span class="w"> </span><span class="mh">0xaf</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb7</span><span class="p">,</span><span class="w"> </span><span class="mh">0x13</span><span class="p">,</span><span class="w"> </span><span class="mh">0x08</span><span class="p">,</span><span class="w"> </span><span class="mh">0x00</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x0a</span><span class="p">,</span><span class="w"> </span><span class="mh">0x35</span><span class="p">,</span><span class="w"> </span><span class="mh">0xdc</span><span class="p">,</span><span class="w"> </span><span class="mh">0x2b</span><span class="p">,</span><span class="w"> </span><span class="mh">0x20</span><span class="p">,</span><span class="w"> </span><span class="mh">0x8d</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa1</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb5</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0xce</span><span class="p">,</span><span class="w"> </span><span class="mh">0x47</span><span class="p">,</span><span class="w"> </span><span class="mh">0x8a</span><span class="p">,</span><span class="w"> </span><span class="mh">0xc3</span><span class="p">,</span><span class="w"> </span><span class="mh">0x80</span><span class="p">,</span><span class="w"> </span><span class="mh">0xf4</span><span class="p">,</span><span class="w"> </span><span class="mh">0x7d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x4a</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0xa2</span><span class="p">,</span><span class="w"> </span><span class="mh">0x62</span><span class="p">,</span><span class="w"> </span><span class="mh">0xfd</span><span class="p">,</span><span class="w"> </span><span class="mh">0x61</span><span class="p">,</span><span class="w"> </span><span class="mh">0x7f</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb5</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa8</span><span class="p">,</span><span class="w"> </span><span class="mh">0xde</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x0a</span><span class="p">,</span><span class="w"> </span><span class="mh">0x17</span><span class="p">,</span><span class="w"> </span><span class="mh">0x97</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa0</span><span class="p">,</span><span class="w"> </span><span class="mh">0xbf</span><span class="p">,</span><span class="w"> </span><span class="mh">0xdf</span><span class="p">,</span><span class="w"> </span><span class="mh">0x56</span><span class="p">,</span><span class="w"> </span><span class="mh">0x5a</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x3d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x51</span><span class="p">,</span><span class="w"> </span><span class="mh">0x56</span><span class="p">,</span><span class="w"> </span><span class="mh">0x4f</span><span class="p">,</span><span class="w"> </span><span class="mh">0x70</span><span class="p">,</span><span class="w"> </span><span class="mh">0x70</span><span class="p">,</span><span class="w"> </span><span class="mh">0x3f</span><span class="p">,</span><span class="w"> </span><span class="mh">0x63</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x6a</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">,</span><span class="w"> </span><span class="mh">0x5b</span><span class="p">,</span><span class="w"> </span><span class="mh">0xad</span><span class="p">,</span><span class="w"> </span><span class="mh">0x84</span><span class="p">,</span><span class="w"> </span><span class="mh">0x0d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x3f</span><span class="p">,</span><span class="w"> </span><span class="mh">0x27</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x6e</span><span class="p">,</span><span class="w"> </span><span class="mh">0x3b</span><span class="p">,</span><span class="w"> </span><span class="mh">0x34</span><span class="p">,</span><span class="w"> </span><span class="mh">0x91</span><span class="p">,</span><span class="w"> </span><span class="mh">0x60</span><span class="p">,</span><span class="w"> </span><span class="mh">0x14</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb9</span><span class="p">,</span><span class="w"> </span><span class="mh">0xaa</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x72</span><span class="p">,</span><span class="w"> </span><span class="mh">0xfd</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa3</span><span class="p">,</span><span class="w"> </span><span class="mh">0x64</span><span class="p">,</span><span class="w"> </span><span class="mh">0xd2</span><span class="p">,</span><span class="w"> </span><span class="mh">0x03</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa7</span><span class="p">,</span><span class="w"> </span><span class="mh">0x53</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x87</span><span class="p">,</span><span class="w"> </span><span class="mh">0x9e</span><span class="p">,</span><span class="w"> </span><span class="mh">0x88</span><span class="p">,</span><span class="w"> </span><span class="mh">0x0b</span><span class="p">,</span><span class="w"> </span><span class="mh">0xc1</span><span class="p">,</span><span class="w"> </span><span class="mh">0x14</span><span class="p">,</span><span class="w"> </span><span class="mh">0x93</span><span class="p">,</span><span class="w"> </span><span class="mh">0x1a</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x62</span><span class="p">,</span><span class="w"> </span><span class="mh">0xff</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb1</span><span class="p">,</span><span class="w"> </span><span class="mh">0x5d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x74</span><span class="p">,</span><span class="w"> </span><span class="mh">0xcd</span><span class="p">,</span><span class="w"> </span><span class="mh">0x59</span><span class="p">,</span><span class="w"> </span><span class="mh">0x63</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x18</span><span class="p">,</span><span class="w"> </span><span class="mh">0x11</span><span class="p">,</span><span class="w"> </span><span class="mh">0x3d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x4f</span><span class="p">,</span><span class="w"> </span><span class="mh">0xba</span><span class="p">,</span><span class="w"> </span><span class="mh">0x75</span><span class="p">,</span><span class="w"> </span><span class="mh">0xd4</span><span class="p">,</span><span class="w"> </span><span class="mh">0x33</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x4e</span><span class="p">,</span><span class="w"> </span><span class="mh">0x23</span><span class="p">,</span><span class="w"> </span><span class="mh">0x6b</span><span class="p">,</span><span class="w"> </span><span class="mh">0x7b</span><span class="p">,</span><span class="w"> </span><span class="mh">0x57</span><span class="p">,</span><span class="w"> </span><span class="mh">0x44</span><span class="p">,</span><span class="w"> </span><span class="mh">0xe1</span><span class="p">,</span><span class="w"> </span><span class="mh">0xd3</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x03</span><span class="p">,</span><span class="w"> </span><span class="mh">0x13</span><span class="p">,</span><span class="w"> </span><span class="mh">0xa6</span><span class="p">,</span><span class="w"> </span><span class="mh">0xf0</span><span class="p">,</span><span class="w"> </span><span class="mh">0x8b</span><span class="p">,</span><span class="w"> </span><span class="mh">0x60</span><span class="p">,</span><span class="w"> </span><span class="mh">0xb0</span><span class="p">,</span><span class="w"> </span><span class="mh">0x9e</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0xee</span><span class="p">,</span><span class="w"> </span><span class="mh">0x75</span><span class="p">,</span><span class="w"> </span><span class="mh">0x08</span><span class="p">,</span><span class="w"> </span><span class="mh">0x9d</span><span class="p">,</span><span class="w"> </span><span class="mh">0x71</span><span class="p">,</span><span class="w"> </span><span class="mh">0x63</span><span class="p">,</span><span class="w"> </span><span class="mh">0x13</span><span class="p">,</span><span class="w"> </span><span class="mh">0xcb</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0xa6</span><span class="p">,</span><span class="w"> </span><span class="mh">0x81</span><span class="p">,</span><span class="w"> </span><span class="mh">0x92</span><span class="p">,</span><span class="w"> </span><span class="mh">0x14</span><span class="p">,</span><span class="w"> </span><span class="mh">0x03</span><span class="p">,</span><span class="w"> </span><span class="mh">0x22</span><span class="p">,</span><span class="w"> </span><span class="mh">0x2d</span><span class="p">,</span><span class="w"> </span><span class="mh">0xde</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="mh">0x55</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="kt">uint8_t</span><span class="w"> </span><span class="n">mod_e</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mh">0x01</span><span class="p">,</span><span class="w"> </span><span class="mh">0x00</span><span class="p">,</span><span class="w"> </span><span class="mh">0x01</span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Setup crypto xform to do modular exponentiation using data vectors.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_crypto_asym_xform</span><span class="w"> </span><span class="n">modex_xform</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">next</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">xform_type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_CRYPTO_ASYM_XFORM_MODEX</span><span class="p">,</span><span class="w"></span>
+<span class="w">	</span><span class="p">.</span><span class="n">modex</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">		</span><span class="p">.</span><span class="n">modulus</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">			</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod_p</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">mod_p</span><span class="p">)</span><span class="w"></span>
+<span class="w">		</span><span class="p">},</span><span class="w"></span>
+<span class="w">		</span><span class="p">.</span><span class="n">exponent</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">			</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mod_e</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">mod_e</span><span class="p">)</span><span class="w"></span>
+<span class="w">		</span><span class="p">}</span><span class="w"></span>
+<span class="w">	</span><span class="p">}</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Generate crypto op, create and attach a session, then process packets.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_crypto_op_alloc</span><span class="p">(</span><span class="n">op_mpool</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_CRYPTO_OP_TYPE_ASYMMETRIC</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">op</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;line %u FAILED: %s&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">		</span><span class="n">__LINE__</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to allocate asymmetric crypto &quot;</span><span class="w"></span>
+<span class="w">		</span><span class="s">&quot;operation struct&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">goto</span><span class="w"> </span><span class="n">error_exit</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_cryptodev_asym_session_create</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">modex_xform</span><span class="p">,</span><span class="w"> </span><span class="n">sess_mpool</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">sess</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"></span>
+<span class="w">			 </span><span class="s">&quot;line %u &quot;</span><span class="w"></span>
+<span class="w">			</span><span class="s">&quot;FAILED: %s&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">__LINE__</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="s">&quot;Session creation failed&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="n">ret</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="o">-</span><span class="n">ENOTSUP</span><span class="p">)</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="n">TEST_SKIPPED</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">goto</span><span class="w"> </span><span class="n">error_exit</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="n">asym_op</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">op</span><span class="o">-&gt;</span><span class="n">asym</span><span class="p">;</span><span class="w"></span>
+<span class="n">memcpy</span><span class="p">(</span><span class="n">input</span><span class="p">,</span><span class="w"> </span><span class="n">base</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">base</span><span class="p">));</span><span class="w"></span>
+<span class="n">asym_op</span><span class="o">-&gt;</span><span class="n">modex</span><span class="p">.</span><span class="n">base</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">input</span><span class="p">;</span><span class="w"></span>
+<span class="n">asym_op</span><span class="o">-&gt;</span><span class="n">modex</span><span class="p">.</span><span class="n">base</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">base</span><span class="p">);</span><span class="w"></span>
+<span class="n">asym_op</span><span class="o">-&gt;</span><span class="n">modex</span><span class="p">.</span><span class="n">result</span><span class="p">.</span><span class="n">data</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">result</span><span class="p">;</span><span class="w"></span>
+<span class="n">asym_op</span><span class="o">-&gt;</span><span class="n">modex</span><span class="p">.</span><span class="n">result</span><span class="p">.</span><span class="n">length</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">result</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* attach asymmetric crypto session to crypto operations */</span><span class="w"></span>
+<span class="n">rte_crypto_op_attach_asym_session</span><span class="p">(</span><span class="n">op</span><span class="p">,</span><span class="w"> </span><span class="n">sess</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">RTE_LOG</span><span class="p">(</span><span class="n">DEBUG</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Process ASYM operation&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="cm">/* Process crypto operation */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_cryptodev_enqueue_burst</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">op</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="s">&quot;line %u FAILED: %s&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="n">__LINE__</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Error sending packet for operation&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">goto</span><span class="w"> </span><span class="n">error_exit</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="k">while</span><span class="w"> </span><span class="p">(</span><span class="n">rte_cryptodev_dequeue_burst</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">result_op</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">	</span><span class="n">rte_pause</span><span class="p">();</span><span class="w"></span>
+
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">result_op</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="nb">NULL</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">	</span><span class="n">RTE_LOG</span><span class="p">(</span><span class="n">ERR</span><span class="p">,</span><span class="w"> </span><span class="n">USER1</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="s">&quot;line %u FAILED: %s&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">			</span><span class="n">__LINE__</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Failed to process asym crypto op&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="w">	</span><span class="n">status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">TEST_FAILED</span><span class="p">;</span><span class="w"></span>
+<span class="w">	</span><span class="k">goto</span><span class="w"> </span><span class="n">error_exit</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_asym_session</span></code> struct is hidden from the application.
+The <code class="docutils literal notranslate"><span class="pre">sess</span></code> pointer used above is a void pointer.</p>
+</div>
+<section id="asymmetric-crypto-device-api">
+<h3><span class="section-number">20.9.1. </span>Asymmetric Crypto Device API</h3>
+<p>The cryptodev Library API is described in the
+<a class="reference external" href="https://doc.dpdk.org/api/">DPDK API Reference</a></p>
+</section>
+</section>
+<section id="device-statistics">
+<h2><span class="section-number">20.10. </span>Device Statistics</h2>
+<p>The Cryptodev library has support for displaying Crypto device information
+through the Telemetry interface. Telemetry commands that can be used
+are shown below.</p>
+<ol class="arabic">
+<li><p>Get the list of available Crypto devices by ID:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /cryptodev/list
+{&quot;/cryptodev/list&quot;: [0, 1, 2, 3]}
+</pre></div>
+</div>
+</li>
+<li><p>Get general information from a Crypto device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /cryptodev/info,0
+{&quot;/cryptodev/info&quot;: {&quot;device_name&quot;: &quot;0000:1c:01.0_qat_sym&quot;,
+&quot;max_nb_queue_pairs&quot;: 2}}
+</pre></div>
+</div>
+</li>
+<li><p>Get the statistics for a particular Crypto device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /cryptodev/stats,0
+{&quot;/cryptodev/stats&quot;: {&quot;enqueued_count&quot;: 0, &quot;dequeued_count&quot;: 0,
+&quot;enqueue_err_count&quot;: 0, &quot;dequeue_err_count&quot;: 0}}
+</pre></div>
+</div>
+</li>
+<li><p>Get the capabilities of a particular Crypto device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>--&gt; /cryptodev/caps,0
+{&quot;/cryptodev/caps&quot;: {&quot;crypto_caps&quot;: [&lt;array of serialized bytes of
+capabilities&gt;], &quot;crypto_caps_n&quot;: &lt;number of capabilities&gt;}}
+</pre></div>
+</div>
+</li>
+</ol>
+<p>For more information on how to use the Telemetry interface, see
+the <a class="reference internal" href="../howto/telemetry.html"><span class="doc">DPDK Telemetry User Guide</span></a>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="bbdev.html" title="previous chapter"><span class="section-number">19. </span>Wireless Baseband Device Library</a></li>
+      <li>Next: <a href="compressdev.html" title="next chapter"><span class="section-number">21. </span>Compression Device Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/cryptodev_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

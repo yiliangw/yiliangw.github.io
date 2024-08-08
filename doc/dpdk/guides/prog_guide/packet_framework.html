@@ -1,0 +1,1490 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>59. Packet Framework &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="60. Vhost Library" href="vhost_lib.html" />
+    <link rel="prev" title="58. Packet Classification and Access Control" href="packet_classif_access_ctrl.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packet-framework">
+<h1><span class="section-number">59. </span>Packet Framework</h1>
+<section id="design-objectives">
+<h2><span class="section-number">59.1. </span>Design Objectives</h2>
+<p>The main design objectives for the DPDK Packet Framework are:</p>
+<ul class="simple">
+<li><p>Provide standard methodology to build complex packet processing pipelines.
+Provide reusable and extensible templates for the commonly used pipeline functional blocks;</p></li>
+<li><p>Provide capability to switch between pure software and hardware-accelerated implementations for the same pipeline functional block;</p></li>
+<li><p>Provide the best trade-off between flexibility and performance.
+Hardcoded pipelines usually provide the best performance, but are not flexible,
+while developing flexible frameworks is never a problem, but performance is usually low;</p></li>
+<li><p>Provide a framework that is logically similar to Open Flow.</p></li>
+</ul>
+</section>
+<section id="overview">
+<h2><span class="section-number">59.2. </span>Overview</h2>
+<p>Packet processing applications are frequently structured as pipelines of multiple stages,
+with the logic of each stage glued around a lookup table.
+For each incoming packet, the table defines the set of actions to be applied to the packet,
+as well as the next stage to send the packet to.</p>
+<p>The DPDK Packet Framework minimizes the development effort required to build packet processing pipelines
+by defining a standard methodology for pipeline development,
+as well as providing libraries of reusable templates for the commonly used pipeline blocks.</p>
+<p>The pipeline is constructed by connecting the set of input ports with the set of output ports
+through the set of tables in a tree-like topology.
+As result of lookup operation for the current packet in the current table,
+one of the table entries (on lookup hit) or the default table entry (on lookup miss)
+provides the set of actions to be applied on the current packet,
+as well as the next hop for the packet, which can be either another table, an output port or packet drop.</p>
+<p>An example of packet processing pipeline is presented in <a class="reference internal" href="#figure-figure32"><span class="std std-numref">Fig. 59.1</span></a>:</p>
+<figure class="align-default" id="id1">
+<span id="figure-figure32"></span><img alt="../_images/figure32.png" src="../_images/figure32.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.1 </span><span class="caption-text">Example of Packet Processing Pipeline where Input Ports 0 and 1
+are Connected with Output Ports 0, 1 and 2 through Tables 0 and 1</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="port-library-design">
+<h2><span class="section-number">59.3. </span>Port Library Design</h2>
+<section id="port-types">
+<h3><span class="section-number">59.3.1. </span>Port Types</h3>
+<p><a class="reference internal" href="#table-qos-19"><span class="std std-numref">Table 59.1</span></a> is a non-exhaustive list of ports that can be implemented with the Packet Framework.</p>
+<span id="table-qos-19"></span><table class="docutils align-default" id="id2">
+<caption><span class="caption-number">Table 59.1 </span><span class="caption-text">Port Types</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 17%" />
+<col style="width: 81%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Port type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>SW ring</p></td>
+<td><p>SW circular buffer used for message passing between the application threads. Uses
+the DPDK rte_ring primitive. Expected to be the most commonly used type of
+port.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>HW ring</p></td>
+<td><p>Queue of buffer descriptors used to interact with NIC, switch or accelerator ports.
+For NIC ports, it uses the DPDK rte_eth_rx_queue or rte_eth_tx_queue
+primitives.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>IP reassembly</p></td>
+<td><p>Input packets are either IP fragments or complete IP datagrams. Output packets are
+complete IP datagrams.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>IP fragmentation</p></td>
+<td><p>Input packets are jumbo (IP datagrams with length bigger than MTU) or non-jumbo
+packets. Output packets are non-jumbo packets.</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Traffic manager</p></td>
+<td><p>Traffic manager attached to a specific NIC output port, performing congestion
+management and hierarchical scheduling according to pre-defined SLAs.</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>Source</p></td>
+<td><p>Input port used as packet generator. Similar to Linux kernel /dev/zero character
+device.</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>Sink</p></td>
+<td><p>Output port used to drop all input packets. Similar to Linux kernel /dev/null
+character device.</p></td>
+</tr>
+<tr class="row-odd"><td><p>8</p></td>
+<td><p>Sym_crypto</p></td>
+<td><p>Output port used to extract DPDK Cryptodev operations from a fixed offset of the
+packet and then enqueue to the Cryptodev PMD. Input port used to dequeue the
+Cryptodev operations from the Cryptodev PMD and then retrieve the packets from them.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="port-interface">
+<h3><span class="section-number">59.3.2. </span>Port Interface</h3>
+<p>Each port is unidirectional, i.e. either input port or output port.
+Each input/output port is required to implement an abstract interface that
+defines the initialization and run-time operation of the port.
+The port abstract interface is described in.</p>
+<span id="table-qos-20"></span><table class="docutils align-default" id="id3">
+<caption><span class="caption-number">Table 59.2 </span><span class="caption-text">20 Port Abstract Interface</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 15%" />
+<col style="width: 82%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Port Operation</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Create</p></td>
+<td><p>Create the low-level port object (e.g. queue). Can internally allocate memory.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Free</p></td>
+<td><p>Free the resources (e.g. memory) used by the low-level port object.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>RX</p></td>
+<td><p>Read a burst of input packets. Non-blocking operation. Only defined for input ports.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>TX</p></td>
+<td><p>Write a burst of input packets. Non-blocking operation. Only defined for output ports.</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Flush</p></td>
+<td><p>Flush the output buffer. Only defined for output ports.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="table-library-design">
+<h2><span class="section-number">59.4. </span>Table Library Design</h2>
+<section id="table-types">
+<h3><span class="section-number">59.4.1. </span>Table Types</h3>
+<p><a class="reference internal" href="#table-qos-21"><span class="std std-numref">Table 59.3</span></a> is a non-exhaustive list of types of tables that can be implemented with the Packet Framework.</p>
+<span id="table-qos-21"></span><table class="docutils align-default" id="id4">
+<caption><span class="caption-number">Table 59.3 </span><span class="caption-text">Table Types</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 26%" />
+<col style="width: 71%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Table Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Hash table</p></td>
+<td><p>Lookup key is n-tuple based.</p>
+<p>Typically, the lookup key is hashed to produce a signature that is used to
+identify a bucket of entries where the lookup key is searched next.</p>
+<p>The signature associated with the lookup key of each input packet is either
+read from the packet descriptor (pre-computed signature) or computed at
+table lookup time.</p>
+<p>The table lookup, add entry and delete entry operations, as well as any
+other pipeline block that pre-computes the signature all have to use the
+same hashing algorithm to generate the signature.</p>
+<p>Typically used to implement flow classification tables, ARP caches, routing
+table for tunnelling protocols, etc.</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Longest Prefix Match (LPM)</p></td>
+<td><p>Lookup key is the IP address.</p>
+<p>Each table entries has an associated IP prefix (IP and depth).</p>
+<p>The table lookup operation selects the IP prefix that is matched by the
+lookup key; in case of multiple matches, the entry with the longest prefix
+depth wins.</p>
+<p>Typically used to implement IP routing tables.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Access Control List (ACLs)</p></td>
+<td><p>Lookup key is 7-tuple of two VLAN/MPLS labels, IP destination address,
+IP source addresses, L4 protocol, L4 destination port, L4 source port.</p>
+<p>Each table entry has an associated ACL and priority. The ACL contains bit
+masks for the VLAN/MPLS labels, IP prefix for IP destination address, IP
+prefix for IP source addresses, L4 protocol and bitmask, L4 destination
+port and bit mask, L4 source port and bit mask.</p>
+<p>The table lookup operation selects the ACL that is matched by the lookup
+key; in case of multiple matches, the entry with the highest priority wins.</p>
+<p>Typically used to implement rule databases for firewalls, etc.</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Pattern matching search</p></td>
+<td><p>Lookup key is the packet payload.</p>
+<p>Table is a database of patterns, with each pattern having a priority
+assigned.</p>
+<p>The table lookup operation selects the patterns that is matched by the
+input packet; in case of multiple matches, the matching pattern with the
+highest priority wins.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Array</p></td>
+<td><p>Lookup key is the table entry index itself.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="table-interface">
+<h3><span class="section-number">59.4.2. </span>Table Interface</h3>
+<p>Each table is required to implement an abstract interface that defines the initialization
+and run-time operation of the table.
+The table abstract interface is described in <a class="reference internal" href="#table-qos-29-1"><span class="std std-numref">Table 59.4</span></a>.</p>
+<span id="table-qos-29-1"></span><table class="docutils align-default" id="id5">
+<caption><span class="caption-number">Table 59.4 </span><span class="caption-text">Table Abstract Interface</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 16%" />
+<col style="width: 81%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Table operation</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Create</p></td>
+<td><p>Create the low-level data structures of the lookup table. Can internally allocate
+memory.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Free</p></td>
+<td><p>Free up all the resources used by the lookup table.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Add entry</p></td>
+<td><p>Add new entry to the lookup table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Delete entry</p></td>
+<td><p>Delete specific entry from the lookup table.</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Lookup</p></td>
+<td><p>Look up a burst of input packets and return a bit mask specifying the result of the
+lookup operation for each packet: a set bit signifies lookup hit for the corresponding
+packet, while a cleared bit a lookup miss.</p>
+<p>For each lookup hit packet, the lookup operation also returns a pointer to the table
+entry that was hit, which contains the actions to be applied on the packet and any
+associated metadata.</p>
+<p>For each lookup miss packet, the actions to be applied on the packet and any
+associated metadata are specified by the default table entry preconfigured for lookup
+miss.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="hash-table-design">
+<h3><span class="section-number">59.4.3. </span>Hash Table Design</h3>
+<section id="hash-table-overview">
+<h4><span class="section-number">59.4.3.1. </span>Hash Table Overview</h4>
+<p>Hash tables are important because the key lookup operation is optimized for speed:
+instead of having to linearly search the lookup key through all the keys in the table,
+the search is limited to only the keys stored in a single table bucket.</p>
+<p><strong>Associative Arrays</strong></p>
+<p>An associative array is a function that can be specified as a set of (key, value) pairs,
+with each key from the possible set of input keys present at most once.
+For a given associative array, the possible operations are:</p>
+<ol class="arabic simple">
+<li><p><em>add (key, value)</em>: When no value is currently associated with <em>key</em>, then the (key, <em>value</em> ) association is created.
+When <em>key</em> is already associated value <em>value0</em>, then the association (<em>key</em>, <em>value0</em>) is removed
+and association <em>(key, value)</em> is created;</p></li>
+<li><p><em>delete key</em>: When no value is currently associated with <em>key</em>, this operation has no effect.
+When <em>key</em> is already associated  <em>value</em>, then association  <em>(key, value)</em> is removed;</p></li>
+<li><p><em>lookup key</em>: When no value is currently associated with  <em>key</em>, then this operation returns void value (lookup miss).
+When <em>key</em> is associated with <em>value</em>, then this operation returns <em>value</em>.
+The <em>(key, value)</em> association is not changed.</p></li>
+</ol>
+<p>The matching criterion used to compare the input key against the keys in the associative array is <em>exact match</em>,
+as the key size (number of bytes) and the key value (array of bytes) have to match exactly for the two keys under comparison.</p>
+<p><strong>Hash Function</strong></p>
+<p>A hash function deterministically maps data of variable length (key) to data of fixed size (hash value or key signature).
+Typically, the size of the key is bigger than the size of the key signature.
+The hash function basically compresses a long key into a short signature.
+Several keys can share the same signature (collisions).</p>
+<p>High quality hash functions have uniform distribution.
+For large number of keys, when dividing the space of signature values into a fixed number of equal intervals (buckets),
+it is desirable to have the key signatures evenly distributed across these intervals (uniform distribution),
+as opposed to most of the signatures going into only a few of the intervals
+and the rest of the intervals being largely unused (non-uniform distribution).</p>
+<p><strong>Hash Table</strong></p>
+<p>A hash table is an associative array that uses a hash function for its operation.
+The reason for using a hash function is to optimize the performance of the lookup operation
+by minimizing the number of table keys that have to be compared against the input key.</p>
+<p>Instead of storing the (key, value) pairs in a single list, the hash table maintains multiple lists (buckets).
+For any given key, there is a single bucket where that key might exist, and this bucket is uniquely identified based on the key signature.
+Once the key signature is computed and the hash table bucket identified,
+the key is either located in this bucket or it is not present in the hash table at all,
+so the key search can be narrowed down from the full set of keys currently in the table
+to just the set of keys currently in the identified table bucket.</p>
+<p>The performance of the hash table lookup operation is greatly improved,
+provided that the table keys are evenly distributed among the hash table buckets,
+which can be achieved by using a hash function with uniform distribution.
+The rule to map a key to its bucket can simply be to use the key signature (modulo the number of table buckets) as the table bucket ID:</p>
+<blockquote>
+<div><p><em>bucket_id = f_hash(key) % n_buckets;</em></p>
+</div></blockquote>
+<p>By selecting the number of buckets to be a power of two, the modulo operator can be replaced by a bitwise AND logical operation:</p>
+<blockquote>
+<div><p><em>bucket_id = f_hash(key) &amp; (n_buckets - 1);</em></p>
+</div></blockquote>
+<p>considering <em>n_bits</em> as the number of bits set in <em>bucket_mask = n_buckets - 1</em>,
+this means that all the keys that end up in the same hash table bucket have the lower <em>n_bits</em> of their signature identical.
+In order to reduce the number of keys in the same bucket (collisions), the number of hash table buckets needs to be increased.</p>
+<p>In packet processing context, the sequence of operations involved in hash table operations is described in <a class="reference internal" href="#figure-figure33"><span class="std std-numref">Fig. 59.2</span></a>:</p>
+<figure class="align-default" id="id6">
+<span id="figure-figure33"></span><img alt="../_images/figure33.png" src="../_images/figure33.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.2 </span><span class="caption-text">Sequence of Steps for Hash Table Operations in a Packet Processing Context</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="hash-table-use-cases">
+<h4><span class="section-number">59.4.3.2. </span>Hash Table Use Cases</h4>
+<p><strong>Flow Classification</strong></p>
+<p><em>Description:</em> The flow classification is executed at least once for each input packet.
+This operation maps each incoming packet against one of the known traffic flows in the flow database that typically contains millions of flows.</p>
+<p><em>Hash table name:</em> Flow classification table</p>
+<p><em>Number of keys:</em> Millions</p>
+<p><em>Key format:</em> n-tuple of packet fields that uniquely identify a traffic flow/connection.
+Example: DiffServ 5-tuple of (Source IP address, Destination IP address, L4 protocol, L4 protocol source port, L4 protocol destination port).
+For IPv4 protocol and L4 protocols like TCP, UDP or SCTP, the size of the DiffServ 5-tuple is 13 bytes, while for IPv6 it is 37 bytes.</p>
+<p><em>Key value (key data):</em> actions and action meta-data describing what processing to be applied for the packets of the current flow.
+The size of the data associated with each traffic flow can vary from 8 bytes to kilobytes.</p>
+<p><strong>Address Resolution Protocol (ARP)</strong></p>
+<p><em>Description:</em> Once a route has been identified for an IP packet (so the output interface and the IP address of the next hop station are known),
+the MAC address of the next hop station is needed in order to send this packet onto the next leg of the journey
+towards its destination (as identified by its destination IP address).
+The MAC address of the next hop station becomes the destination MAC address of the outgoing Ethernet frame.</p>
+<p><em>Hash table name:</em> ARP table</p>
+<p><em>Number of keys:</em> Thousands</p>
+<p><em>Key format:</em> The pair of (Output interface, Next Hop IP address), which is typically 5 bytes for IPv4 and 17 bytes for IPv6.</p>
+<p><em>Key value (key data):</em> MAC address of the next hop station (6 bytes).</p>
+</section>
+<section id="hash-table-types">
+<h4><span class="section-number">59.4.3.3. </span>Hash Table Types</h4>
+<p><a class="reference internal" href="#table-qos-22"><span class="std std-numref">Table 59.5</span></a> lists the hash table configuration parameters shared by all different hash table types.</p>
+<span id="table-qos-22"></span><table class="docutils align-default" id="id7">
+<caption><span class="caption-number">Table 59.5 </span><span class="caption-text">Configuration Parameters Common for All Hash Table Types</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 25%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Parameter</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Key size</p></td>
+<td><p>Measured as number of bytes. All keys have the same size.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Key value (key data) size</p></td>
+<td><p>Measured as number of bytes.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Number of buckets</p></td>
+<td><p>Needs to be a power of two.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Maximum number of keys</p></td>
+<td><p>Needs to be a power of two.</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Hash function</p></td>
+<td><p>Examples: jhash, CRC hash, etc.</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>Hash function seed</p></td>
+<td><p>Parameter to be passed to the hash function.</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>Key offset</p></td>
+<td><p>Offset of the lookup key byte array within the packet meta-data stored in
+the packet buffer.</p></td>
+</tr>
+</tbody>
+</table>
+<section id="bucket-full-problem">
+<h5><span class="section-number">59.4.3.3.1. </span>Bucket Full Problem</h5>
+<p>On initialization, each hash table bucket is allocated space for exactly 4 keys.
+As keys are added to the table, it can happen that a given bucket already has 4 keys when a new key has to be added to this bucket.
+The possible options are:</p>
+<ol class="arabic simple">
+<li><p><strong>Least Recently Used (LRU) Hash Table.</strong>
+One of the existing keys in the bucket is deleted and the new key is added in its place.
+The number of keys in each bucket never grows bigger than 4. The logic to pick the key to be dropped from the bucket is LRU.
+The hash table lookup operation maintains the order in which the keys in the same bucket are hit, so every time a key is hit,
+it becomes the new Most Recently Used (MRU) key, i.e. the last candidate for drop.
+When a key is added to the bucket, it also becomes the new MRU key.
+When a key needs to be picked and dropped, the first candidate for drop, i.e. the current LRU key, is always picked.
+The LRU logic requires maintaining specific data structures per each bucket.</p></li>
+<li><p><strong>Extendable Bucket Hash Table.</strong>
+The bucket is extended with space for 4 more keys.
+This is done by allocating additional memory at table initialization time,
+which is used to create a pool of free keys (the size of this pool is configurable and always a multiple of 4).
+On key add operation, the allocation of a group of 4 keys only happens successfully within the limit of free keys,
+otherwise the key add operation fails.
+On key delete operation, a group of 4 keys is freed back to the pool of free keys
+when the key to be deleted is the only key that was used within its group of 4 keys at that time.
+On key lookup operation, if the current bucket is in extended state and a match is not found in the first group of 4 keys,
+the search continues beyond the first group of 4 keys, potentially until all keys in this bucket are examined.
+The extendable bucket logic requires maintaining specific data structures per table and per each bucket.</p></li>
+</ol>
+<span id="table-qos-23"></span><table class="docutils align-default" id="id8">
+<caption><span class="caption-number">Table 59.6 </span><span class="caption-text">Configuration Parameters Specific to Extendable Bucket Hash Table</span></caption>
+<colgroup>
+<col style="width: 4%" />
+<col style="width: 34%" />
+<col style="width: 63%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Parameter</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Number of additional keys</p></td>
+<td><p>Needs to be a power of two, at least equal to 4.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="signature-computation">
+<h5><span class="section-number">59.4.3.3.2. </span>Signature Computation</h5>
+<p>The possible options for key signature computation are:</p>
+<ol class="arabic simple">
+<li><p><strong>Pre-computed key signature.</strong>
+The key lookup operation is split between two CPU cores.
+The first CPU core (typically the CPU core that performs packet RX) extracts the key from the input packet,
+computes the key signature and saves both the key and the key signature in the packet buffer as packet meta-data.
+The second CPU core reads both the key and the key signature from the packet meta-data
+and performs the bucket search step of the key lookup operation.</p></li>
+<li><p><strong>Key signature computed on lookup (“do-sig” version).</strong>
+The same CPU core reads the key from the packet meta-data, uses it to compute the key signature
+and also performs the bucket search step of the key lookup operation.</p></li>
+</ol>
+<span id="table-qos-24"></span><table class="docutils align-default" id="id9">
+<caption><span class="caption-number">Table 59.7 </span><span class="caption-text">Configuration Parameters Specific to Pre-computed Key Signature Hash Table</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 20%" />
+<col style="width: 77%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Parameter</p></th>
+<th class="head"><p>Details</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Signature offset</p></td>
+<td><p>Offset of the pre-computed key signature within the packet meta-data.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="key-size-optimized-hash-tables">
+<h5><span class="section-number">59.4.3.3.3. </span>Key Size Optimized Hash Tables</h5>
+<p>For specific key sizes, the data structures and algorithm of key lookup operation can be specially handcrafted for further performance improvements,
+so following options are possible:</p>
+<ol class="arabic simple">
+<li><p><strong>Implementation supporting configurable key size.</strong></p></li>
+<li><p><strong>Implementation supporting a single key size.</strong>
+Typical key sizes are 8 bytes and 16 bytes.</p></li>
+</ol>
+</section>
+</section>
+<section id="bucket-search-logic-for-configurable-key-size-hash-tables">
+<h4><span class="section-number">59.4.3.4. </span>Bucket Search Logic for Configurable Key Size Hash Tables</h4>
+<p>The performance of the bucket search logic is one of the main factors influencing the performance of the key lookup operation.
+The data structures and algorithm are designed to make the best use of Intel CPU architecture resources like:
+cache memory space, cache memory bandwidth, external memory bandwidth, multiple execution units working in parallel,
+out of order instruction execution, special CPU instructions, etc.</p>
+<p>The bucket search logic handles multiple input packets in parallel.
+It is built as a pipeline of several stages (3 or 4), with each pipeline stage handling two different packets from the burst of input packets.
+On each pipeline iteration, the packets are pushed to the next pipeline stage: for the 4-stage pipeline,
+two packets (that just completed stage 3) exit the pipeline,
+two packets (that just completed stage 2) are now executing stage 3, two packets (that just completed stage 1) are now executing stage 2,
+two packets (that just completed stage 0) are now executing stage 1 and two packets (next two packets to read from the burst of input packets)
+are entering the pipeline to execute stage 0.
+The pipeline iterations continue until all packets from the burst of input packets execute the last stage of the pipeline.</p>
+<p>The bucket search logic is broken into pipeline stages at the boundary of the next memory access.
+Each pipeline stage uses data structures that are stored (with high probability) into the L1 or L2 cache memory of the current CPU core and
+breaks just before the next memory access required by the algorithm.
+The current pipeline stage finalizes by prefetching the data structures required by the next pipeline stage,
+so given enough time for the prefetch to complete,
+when the next pipeline stage eventually gets executed for the same packets,
+it will read the data structures it needs from L1 or L2 cache memory and thus avoid the significant penalty incurred by L2 or L3 cache memory miss.</p>
+<p>By prefetching the data structures required by the next pipeline stage in advance (before they are used)
+and switching to executing another pipeline stage for different packets,
+the number of L2 or L3 cache memory misses is greatly reduced, hence one of the main reasons for improved performance.
+This is because the cost of L2/L3 cache memory miss on memory read accesses is high, as usually due to data dependency between instructions,
+the CPU execution units have to stall until the read operation is completed from L3 cache memory or external DRAM memory.
+By using prefetch instructions, the latency of memory read accesses is hidden,
+provided that it is preformed early enough before the respective data structure is actually used.</p>
+<p>By splitting the processing into several stages that are executed on different packets (the packets from the input burst are interlaced),
+enough work is created to allow the prefetch instructions to complete successfully (before the prefetched data structures are actually accessed) and
+also the data dependency between instructions is loosened.
+For example, for the 4-stage pipeline, stage 0 is executed on packets 0 and 1 and then,
+before same packets 0 and 1 are used (i.e. before stage 1 is executed on packets 0 and 1),
+different packets are used: packets 2 and 3 (executing stage 1), packets 4 and 5 (executing stage 2) and packets 6 and 7 (executing stage 3).
+By executing useful work while the data structures are brought into the L1 or L2 cache memory, the latency of the read memory accesses is hidden.
+By increasing the gap between two consecutive accesses to the same data structure, the data dependency between instructions is loosened;
+this allows making the best use of the super-scalar and out-of-order execution CPU architecture,
+as the number of CPU core execution units that are active (rather than idle or stalled due to data dependency constraints between instructions) is maximized.</p>
+<p>The bucket search logic is also implemented without using any branch instructions.
+This avoids the important cost associated with flushing the CPU core execution pipeline on every instance of branch misprediction.</p>
+<section id="configurable-key-size-hash-table">
+<h5><span class="section-number">59.4.3.4.1. </span>Configurable Key Size Hash Table</h5>
+<p><a class="reference internal" href="#figure-figure34"><span class="std std-numref">Fig. 59.3</span></a>, <a class="reference internal" href="#table-qos-25"><span class="std std-numref">Table 59.8</span></a> and <a class="reference internal" href="#table-qos-26"><span class="std std-numref">Table 59.9</span></a> detail the main data structures used to implement configurable key size hash tables (either LRU or extendable bucket,
+either with pre-computed signature or “do-sig”).</p>
+<figure class="align-default" id="id10">
+<span id="figure-figure34"></span><img alt="../_images/figure34.png" src="../_images/figure34.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.3 </span><span class="caption-text">Data Structures for Configurable Key Size Hash Tables</span></p>
+</figcaption>
+</figure>
+<span id="table-qos-25"></span><table class="docutils align-default" id="id11">
+<caption><span class="caption-number">Table 59.8 </span><span class="caption-text">Main Large Data Structures (Arrays) used for Configurable Key Size Hash Tables</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 22%" />
+<col style="width: 26%" />
+<col style="width: 23%" />
+<col style="width: 27%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Array name</p></th>
+<th class="head"><p>Number of entries</p></th>
+<th class="head"><p>Entry size (bytes)</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Bucket array</p></td>
+<td><p>n_buckets (configurable)</p></td>
+<td><p>32</p></td>
+<td><p>Buckets of the hash table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Bucket extensions array</p></td>
+<td><p>n_buckets_ext (configurable)</p></td>
+<td><p>32</p></td>
+<td><p>This array is only created
+for extendable bucket tables.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Key array</p></td>
+<td><p>n_keys</p></td>
+<td><p>key_size (configurable)</p></td>
+<td><p>Keys added to the hash table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Data array</p></td>
+<td><p>n_keys</p></td>
+<td><p>entry_size (configurable)</p></td>
+<td><p>Key values (key data)
+associated with the hash
+table keys.</p></td>
+</tr>
+</tbody>
+</table>
+<span id="table-qos-26"></span><table class="docutils align-default" id="id12">
+<caption><span class="caption-number">Table 59.9 </span><span class="caption-text">Field Description for Bucket Array Entry (Configurable Key Size Hash Tables)</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 17%" />
+<col style="width: 19%" />
+<col style="width: 62%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Field name</p></th>
+<th class="head"><p>Field size (bytes)</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Next Ptr/LRU</p></td>
+<td><p>8</p></td>
+<td><p>For LRU tables, this fields represents the LRU list for the
+current bucket stored as array of 4 entries of 2 bytes each.
+Entry 0 stores the index (0 .. 3) of the MRU key, while entry 3
+stores the index of the LRU key.</p>
+<p>For extendable bucket tables, this field represents the next
+pointer (i.e. the pointer to the next group of 4 keys linked to
+the current bucket). The next pointer is not NULL if the bucket
+is currently extended or NULL otherwise.
+To help the branchless implementation, bit 0 (least significant
+bit) of this field is set to 1 if the next pointer is not NULL
+and to 0 otherwise.</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Sig[0 .. 3]</p></td>
+<td><p>4 x 2</p></td>
+<td><p>If key X (X = 0 .. 3) is valid, then sig X bits 15 .. 1 store
+the most significant 15 bits of key X signature and sig X bit 0
+is set to 1.</p>
+<p>If key X is not valid, then sig X is set to zero.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Key Pos [0 .. 3]</p></td>
+<td><p>4 x 4</p></td>
+<td><p>If key X is valid (X = 0 .. 3), then Key Pos X represents the
+index into the key array where key X is stored, as well as the
+index into the data array where the value associated with key X
+is stored.</p>
+<p>If key X is not valid, then the value of Key Pos X is undefined.</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p><a class="reference internal" href="#figure-figure35"><span class="std std-numref">Fig. 59.4</span></a> and <a class="reference internal" href="#table-qos-27"><span class="std std-numref">Table 59.10</span></a> detail the bucket search pipeline stages (either LRU or extendable bucket,
+either with pre-computed signature or “do-sig”).
+For each pipeline stage, the described operations are applied to each of the two packets handled by that stage.</p>
+<figure class="align-default" id="id13">
+<span id="figure-figure35"></span><img alt="../_images/figure35.png" src="../_images/figure35.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.4 </span><span class="caption-text">Bucket Search Pipeline for Key Lookup Operation (Configurable Key Size Hash
+Tables)</span></p>
+</figcaption>
+</figure>
+<span id="table-qos-27"></span><table class="docutils align-default" id="id14">
+<caption><span class="caption-number">Table 59.10 </span><span class="caption-text">Description of the Bucket Search Pipeline Stages (Configurable Key Size Hash Tables)</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 25%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Stage name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>Prefetch packet meta-data</p></td>
+<td><p>Select next two packets from the burst of input packets.</p>
+<p>Prefetch packet meta-data containing the key and key signature.</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>Prefetch table bucket</p></td>
+<td><p>Read the key signature from the packet meta-data (for extendable bucket hash
+tables) or read the key from the packet meta-data and compute key signature
+(for LRU tables).</p>
+<p>Identify the bucket ID using the key signature.</p>
+<p>Set bit 0 of the signature to 1 (to match only signatures of valid keys from
+the table).</p>
+<p>Prefetch the bucket.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>Prefetch table key</p></td>
+<td><p>Read the key signatures from the bucket.</p>
+<p>Compare the signature of the input key against the 4 key signatures from the
+packet. As result, the following is obtained:</p>
+<p><em>match</em>
+= equal to TRUE if there was at least one signature match and to FALSE in
+the case of no signature match;</p>
+<p><em>match_many</em>
+= equal to TRUE is there were more than one signature matches (can be up to
+4 signature matches in the worst case scenario) and to FALSE otherwise;</p>
+<p><em>match_pos</em>
+= the index of the first key that produced signature match (only valid if
+match is true).</p>
+<p>For extendable bucket hash tables only, set
+<em>match_many</em>
+to TRUE if next pointer is valid.</p>
+<p>Prefetch the bucket key indicated by
+<em>match_pos</em>
+(even if
+<em>match_pos</em>
+does not point to valid key valid).</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>Prefetch table data</p></td>
+<td><p>Read the bucket key indicated by
+<em>match_pos</em>.</p>
+<p>Compare the bucket key against the input key. As result, the following is
+obtained:
+<em>match_key</em>
+= equal to TRUE if the two keys match and to FALSE otherwise.</p>
+<p>Report input key as lookup hit only when both
+<em>match</em>
+and
+<em>match_key</em>
+are equal to TRUE and as lookup miss otherwise.</p>
+<p>For LRU tables only, use branchless logic to update the bucket LRU list
+(the current key becomes the new MRU) only on lookup hit.</p>
+<p>Prefetch the key value (key data) associated with the current key (to avoid
+branches, this is done on both lookup hit and miss).</p>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Additional notes:</p>
+<ol class="arabic simple">
+<li><p>The pipelined version of the bucket search algorithm is executed only if there are at least 7 packets in the burst of input packets.
+If there are less than 7 packets in the burst of input packets,
+a non-optimized implementation of the bucket search algorithm is executed.</p></li>
+<li><p>Once the pipelined version of the bucket search algorithm has been executed for all the packets in the burst of input packets,
+the non-optimized implementation of the bucket search algorithm is also executed for any packets that did not produce a lookup hit,
+but have the <em>match_many</em> flag set.
+As result of executing the non-optimized version, some of these packets may produce a lookup hit or lookup miss.
+This does not impact the performance of the key lookup operation,
+as the probability of matching more than one signature in the same group of 4 keys or of having the bucket in extended state
+(for extendable bucket hash tables only) is relatively small.</p></li>
+</ol>
+<p><strong>Key Signature Comparison Logic</strong></p>
+<p>The key signature comparison logic is described in <a class="reference internal" href="#table-qos-28"><span class="std std-numref">Table 59.11</span></a>.</p>
+<span id="table-qos-28"></span><table class="docutils align-default" id="id15">
+<caption><span class="caption-number">Table 59.11 </span><span class="caption-text">Lookup Tables for Match, Match_Many and Match_Pos</span></caption>
+<colgroup>
+<col style="width: 6%" />
+<col style="width: 9%" />
+<col style="width: 23%" />
+<col style="width: 31%" />
+<col style="width: 31%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p>#</p></td>
+<td><p>mask</p></td>
+<td><p>match (1 bit)</p></td>
+<td><p>match_many (1 bit)</p></td>
+<td><p>match_pos (2 bits)</p></td>
+</tr>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>0000</p></td>
+<td><p>0</p></td>
+<td><p>0</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>0001</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>0010</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>01</p></td>
+</tr>
+<tr class="row-odd"><td><p>3</p></td>
+<td><p>0011</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>4</p></td>
+<td><p>0100</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>10</p></td>
+</tr>
+<tr class="row-odd"><td><p>5</p></td>
+<td><p>0101</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>6</p></td>
+<td><p>0110</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>01</p></td>
+</tr>
+<tr class="row-odd"><td><p>7</p></td>
+<td><p>0111</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>8</p></td>
+<td><p>1000</p></td>
+<td><p>1</p></td>
+<td><p>0</p></td>
+<td><p>11</p></td>
+</tr>
+<tr class="row-odd"><td><p>9</p></td>
+<td><p>1001</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>10</p></td>
+<td><p>1010</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>01</p></td>
+</tr>
+<tr class="row-odd"><td><p>11</p></td>
+<td><p>1011</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>12</p></td>
+<td><p>1100</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>10</p></td>
+</tr>
+<tr class="row-odd"><td><p>13</p></td>
+<td><p>1101</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+<tr class="row-even"><td><p>14</p></td>
+<td><p>1110</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>01</p></td>
+</tr>
+<tr class="row-odd"><td><p>15</p></td>
+<td><p>1111</p></td>
+<td><p>1</p></td>
+<td><p>1</p></td>
+<td><p>00</p></td>
+</tr>
+</tbody>
+</table>
+<p>The input <em>mask</em> hash bit X (X = 0 .. 3) set to 1 if input signature is equal to bucket signature X and set to 0 otherwise.
+The outputs <em>match</em>, <em>match_many</em> and <em>match_pos</em> are 1 bit, 1 bit and 2 bits in size respectively and their meaning has been explained above.</p>
+<p>As displayed in <a class="reference internal" href="#table-qos-29"><span class="std std-numref">Table 59.12</span></a>, the lookup tables for <em>match</em> and <em>match_many</em> can be collapsed into a single 32-bit value and the lookup table for
+<em>match_pos</em> can be collapsed into a 64-bit value.
+Given the input <em>mask</em>, the values for <em>match</em>, <em>match_many</em> and <em>match_pos</em> can be obtained by indexing their respective bit array to extract 1 bit,
+1 bit and 2 bits respectively with branchless logic.</p>
+<span id="table-qos-29"></span><table class="docutils align-default" id="id16">
+<caption><span class="caption-number">Table 59.12 </span><span class="caption-text">Collapsed Lookup Tables for Match, Match_Many and Match_Pos</span></caption>
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 58%" />
+<col style="width: 26%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td></td>
+<td><p>Bit array</p></td>
+<td><p>Hexadecimal value</p></td>
+</tr>
+<tr class="row-even"><td><p>match</p></td>
+<td><p>1111_1111_1111_1110</p></td>
+<td><p>0xFFFELLU</p></td>
+</tr>
+<tr class="row-odd"><td><p>match_many</p></td>
+<td><p>1111_1110_1110_1000</p></td>
+<td><p>0xFEE8LLU</p></td>
+</tr>
+<tr class="row-even"><td><p>match_pos</p></td>
+<td><p>0001_0010_0001_0011__0001_0010_0001_0000</p></td>
+<td><p>0x12131210LLU</p></td>
+</tr>
+</tbody>
+</table>
+<p>The pseudo-code for match, match_many and match_pos is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>match = (0xFFFELLU &gt;&gt; mask) &amp; 1;
+
+match_many = (0xFEE8LLU &gt;&gt; mask) &amp; 1;
+
+match_pos = (0x12131210LLU &gt;&gt; (mask &lt;&lt; 1)) &amp; 3;
+</pre></div>
+</div>
+</section>
+<section id="single-key-size-hash-tables">
+<h5><span class="section-number">59.4.3.4.2. </span>Single Key Size Hash Tables</h5>
+<p><a class="reference internal" href="#figure-figure37"><span class="std std-numref">Fig. 59.5</span></a>, <a class="reference internal" href="#figure-figure38"><span class="std std-numref">Fig. 59.6</span></a>, <a class="reference internal" href="#table-qos-30"><span class="std std-numref">Table 59.13</span></a> and <a class="reference internal" href="#table-qos-31"><span class="std std-numref">Table 59.14</span></a> detail the main data structures used to implement 8-byte and 16-byte key hash tables
+(either LRU or extendable bucket, either with pre-computed signature or “do-sig”).</p>
+<figure class="align-default" id="id17">
+<span id="figure-figure37"></span><img alt="../_images/figure37.png" src="../_images/figure37.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.5 </span><span class="caption-text">Data Structures for 8-byte Key Hash Tables</span></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id18">
+<span id="figure-figure38"></span><img alt="../_images/figure38.png" src="../_images/figure38.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.6 </span><span class="caption-text">Data Structures for 16-byte Key Hash Tables</span></p>
+</figcaption>
+</figure>
+<span id="table-qos-30"></span><table class="docutils align-default" id="id19">
+<caption><span class="caption-number">Table 59.13 </span><span class="caption-text">Main Large Data Structures (Arrays) used for 8-byte and 16-byte Key Size Hash Tables</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 22%" />
+<col style="width: 26%" />
+<col style="width: 19%" />
+<col style="width: 31%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Array name</p></th>
+<th class="head"><p>Number of entries</p></th>
+<th class="head"><p>Entry size (bytes)</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Bucket array</p></td>
+<td><p>n_buckets (configurable)</p></td>
+<td><p><em>8-byte key size:</em></p>
+<p>64 + 4 x entry_size</p>
+<p><em>16-byte key size:</em></p>
+<p>128 + 4 x entry_size</p>
+</td>
+<td><p>Buckets of the hash table.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Bucket extensions array</p></td>
+<td><p>n_buckets_ext (configurable)</p></td>
+<td><p><em>8-byte key size:</em></p>
+<p>64 + 4 x entry_size</p>
+<p><em>16-byte key size:</em></p>
+<p>128 + 4 x entry_size</p>
+</td>
+<td><p>This array is only created for
+extendable bucket tables.</p></td>
+</tr>
+</tbody>
+</table>
+<span id="table-qos-31"></span><table class="docutils align-default" id="id20">
+<caption><span class="caption-number">Table 59.14 </span><span class="caption-text">Field Description for Bucket Array Entry (8-byte and 16-byte Key Hash Tables)</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 13%" />
+<col style="width: 17%" />
+<col style="width: 68%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Field name</p></th>
+<th class="head"><p>Field size (bytes)</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Valid</p></td>
+<td><p>8</p></td>
+<td><p>Bit X (X = 0 .. 3) is set to 1 if key X is valid or to 0 otherwise.</p>
+<p>Bit 4 is only used for extendable bucket tables to help with the
+implementation of the branchless logic. In this case, bit 4 is set to 1 if
+next pointer is valid (not NULL) or to 0 otherwise.</p>
+</td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Next Ptr/LRU</p></td>
+<td><p>8</p></td>
+<td><p>For LRU tables, this fields represents the LRU list for the current bucket
+stored as array of 4 entries of 2 bytes each. Entry 0 stores the index
+(0 .. 3) of the MRU key, while entry 3 stores the index of the LRU key.</p>
+<p>For extendable bucket tables, this field represents the next pointer (i.e.
+the pointer to the next group of 4 keys linked to the current bucket). The
+next pointer is not NULL if the bucket is currently extended or NULL
+otherwise.</p>
+</td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Key [0 .. 3]</p></td>
+<td><p>4 x key_size</p></td>
+<td><p>Full keys.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Data [0 .. 3]</p></td>
+<td><p>4 x entry_size</p></td>
+<td><p>Full key values (key data) associated with keys 0 .. 3.</p></td>
+</tr>
+</tbody>
+</table>
+<p>and detail the bucket search pipeline used to implement 8-byte and 16-byte key hash tables (either LRU or extendable bucket,
+either with pre-computed signature or “do-sig”).
+For each pipeline stage, the described operations are applied to each of the two packets handled by that stage.</p>
+<figure class="align-default" id="id21">
+<span id="figure-figure39"></span><img alt="../_images/figure39.png" src="../_images/figure39.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 59.7 </span><span class="caption-text">Bucket Search Pipeline for Key Lookup Operation (Single Key Size Hash
+Tables)</span></p>
+</figcaption>
+</figure>
+<span id="table-qos-32"></span><table class="docutils align-default" id="id22">
+<caption><span class="caption-number">Table 59.15 </span><span class="caption-text">Description of the Bucket Search Pipeline Stages (8-byte and 16-byte Key Hash Tables)</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 25%" />
+<col style="width: 72%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Stage name</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>Prefetch packet meta-data</p></td>
+<td><ol class="arabic simple">
+<li><p>Select next two packets from the burst of input packets.</p></li>
+<li><p>Prefetch packet meta-data containing the key and key signature.</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>Prefetch table bucket</p></td>
+<td><ol class="arabic simple">
+<li><p>Read the key signature from the packet meta-data (for extendable bucket
+hash tables) or read the key from the packet meta-data and compute key
+signature (for LRU tables).</p></li>
+<li><p>Identify the bucket ID using the key signature.</p></li>
+<li><p>Prefetch the bucket.</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>Prefetch table data</p></td>
+<td><ol class="arabic simple">
+<li><p>Read the bucket.</p></li>
+<li><p>Compare all 4 bucket keys against the input key.</p></li>
+<li><p>Report input key as lookup hit only when a match is identified (more
+than one key match is not possible)</p></li>
+<li><p>For LRU tables only, use branchless logic to update the bucket LRU list
+(the current key becomes the new MRU) only on lookup hit.</p></li>
+<li><p>Prefetch the key value (key data) associated with the matched key (to
+avoid branches, this is done on both lookup hit and miss).</p></li>
+</ol>
+</td>
+</tr>
+</tbody>
+</table>
+<p>Additional notes:</p>
+<ol class="arabic simple">
+<li><p>The pipelined version of the bucket search algorithm is executed only if there are at least 5 packets in the burst of input packets.
+If there are less than 5 packets in the burst of input packets, a non-optimized implementation of the bucket search algorithm is executed.</p></li>
+<li><p>For extendable bucket hash tables only,
+once the pipelined version of the bucket search algorithm has been executed for all the packets in the burst of input packets,
+the non-optimized implementation of the bucket search algorithm is also executed for any packets that did not produce a lookup hit,
+but have the bucket in extended state.
+As result of executing the non-optimized version, some of these packets may produce a lookup hit or lookup miss.
+This does not impact the performance of the key lookup operation,
+as the probability of having the bucket in extended state is relatively small.</p></li>
+</ol>
+</section>
+</section>
+</section>
+</section>
+<section id="pipeline-library-design">
+<h2><span class="section-number">59.5. </span>Pipeline Library Design</h2>
+<p>A pipeline is defined by:</p>
+<ol class="arabic simple">
+<li><p>The set of input ports;</p></li>
+<li><p>The set of output ports;</p></li>
+<li><p>The set of tables;</p></li>
+<li><p>The set of actions.</p></li>
+</ol>
+<p>The input ports are connected with the output ports through tree-like topologies of interconnected tables.
+The table entries contain the actions defining the operations to be executed on the input packets and the packet flow within the pipeline.</p>
+<section id="connectivity-of-ports-and-tables">
+<h3><span class="section-number">59.5.1. </span>Connectivity of Ports and Tables</h3>
+<p>To avoid any dependencies on the order in which pipeline elements are created,
+the connectivity of pipeline elements is defined after all the pipeline input ports,
+output ports and tables have been created.</p>
+<p>General connectivity rules:</p>
+<ol class="arabic simple">
+<li><p>Each input port is connected to a single table. No input port should be left unconnected;</p></li>
+<li><p>The table connectivity to other tables or to output ports is regulated by the next hop actions of each table entry and the default table entry.
+The table connectivity is fluid, as the table entries and the default table entry can be updated during run-time.</p>
+<ul class="simple">
+<li><p>A table can have multiple entries (including the default entry) connected to the same output port.
+A table can have different entries connected to different output ports.
+Different tables can have entries (including default table entry) connected to the same output port.</p></li>
+<li><p>A table can have multiple entries (including the default entry) connected to another table,
+in which case all these entries have to point to the same table.
+This constraint is enforced by the API and prevents tree-like topologies from being created (allowing table chaining only),
+with the purpose of simplifying the implementation of the pipeline run-time execution engine.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="port-actions">
+<h3><span class="section-number">59.5.2. </span>Port Actions</h3>
+<section id="port-action-handler">
+<h4><span class="section-number">59.5.2.1. </span>Port Action Handler</h4>
+<p>An action handler can be assigned to each input/output port to define actions to be executed on each input packet that is received by the port.
+Defining the action handler for a specific input/output port is optional (i.e. the action handler can be disabled).</p>
+<p>For input ports, the action handler is executed after RX function. For output ports, the action handler is executed before the TX function.</p>
+<p>The action handler can decide to drop packets.</p>
+</section>
+</section>
+<section id="table-actions">
+<h3><span class="section-number">59.5.3. </span>Table Actions</h3>
+<section id="table-action-handler">
+<h4><span class="section-number">59.5.3.1. </span>Table Action Handler</h4>
+<p>An action handler to be executed on each input packet can be assigned to each table.
+Defining the action handler for a specific table is optional (i.e. the action handler can be disabled).</p>
+<p>The action handler is executed after the table lookup operation is performed and the table entry associated with each input packet is identified.
+The action handler can only handle the user-defined actions, while the reserved actions (e.g. the next hop actions) are handled by the Packet Framework.
+The action handler can decide to drop the input packet.</p>
+</section>
+<section id="reserved-actions">
+<h4><span class="section-number">59.5.3.2. </span>Reserved Actions</h4>
+<p>The reserved actions are handled directly by the Packet Framework without the user being able to change their meaning
+through the table action handler configuration.
+A special category of the reserved actions is represented by the next hop actions, which regulate the packet flow between input ports,
+tables and output ports through the pipeline.
+<a class="reference internal" href="#table-qos-33"><span class="std std-numref">Table 59.16</span></a> lists the next hop actions.</p>
+<span id="table-qos-33"></span><table class="docutils align-default" id="id23">
+<caption><span class="caption-number">Table 59.16 </span><span class="caption-text">Next Hop Actions (Reserved)</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 20%" />
+<col style="width: 78%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>Next hop action</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Drop</p></td>
+<td><p>Drop the current packet.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Send to output port</p></td>
+<td><p>Send the current packet to specified output port. The output port ID is metadata
+stored in the same table entry.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>Send to table</p></td>
+<td><p>Send the current packet to specified table. The table ID is metadata stored in
+the same table entry.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="user-actions">
+<h4><span class="section-number">59.5.3.3. </span>User Actions</h4>
+<p>For each table, the meaning of user actions is defined through the configuration of the table action handler.
+Different tables can be configured with different action handlers, therefore the meaning of the user actions
+and their associated meta-data is private to each table.
+Within the same table, all the table entries (including the table default entry) share the same definition
+for the user actions and their associated meta-data,
+with each table entry having its own set of enabled user actions and its own copy of the action meta-data.
+<a class="reference internal" href="#table-qos-34"><span class="std std-numref">Table 59.17</span></a> contains a non-exhaustive list of user action examples.</p>
+<span id="table-qos-34"></span><table class="docutils align-default" id="id24">
+<caption><span class="caption-number">Table 59.17 </span><span class="caption-text">User Action Examples</span></caption>
+<colgroup>
+<col style="width: 3%" />
+<col style="width: 33%" />
+<col style="width: 64%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>#</p></th>
+<th class="head"><p>User action</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>1</p></td>
+<td><p>Metering</p></td>
+<td><p>Per flow traffic metering using the srTCM and trTCM algorithms.</p></td>
+</tr>
+<tr class="row-odd"><td><p>2</p></td>
+<td><p>Statistics</p></td>
+<td><p>Update the statistics counters maintained per flow.</p></td>
+</tr>
+<tr class="row-even"><td><p>3</p></td>
+<td><p>App ID</p></td>
+<td><p>Per flow state machine fed by variable length sequence of packets
+at the flow initialization with the purpose of identifying the
+traffic type and application.</p></td>
+</tr>
+<tr class="row-odd"><td><p>4</p></td>
+<td><p>Push/pop labels</p></td>
+<td><p>Push/pop VLAN/MPLS labels to/from the current packet.</p></td>
+</tr>
+<tr class="row-even"><td><p>5</p></td>
+<td><p>Network Address Translation (NAT)</p></td>
+<td><p>Translate between the internal (LAN) and external (WAN) IP
+destination/source address and/or L4 protocol destination/source
+port.</p></td>
+</tr>
+<tr class="row-odd"><td><p>6</p></td>
+<td><p>TTL update</p></td>
+<td><p>Decrement IP TTL and, in case of IPv4 packets, update the IP
+checksum.</p></td>
+</tr>
+<tr class="row-even"><td><p>7</p></td>
+<td><p>Sym Crypto</p></td>
+<td><p>Generate Cryptodev session based on the user-specified algorithm
+and key(s), and assemble the cryptodev operation based on the
+predefined offsets.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+<section id="multicore-scaling">
+<h2><span class="section-number">59.6. </span>Multicore Scaling</h2>
+<p>A complex application is typically split across multiple cores, with cores communicating through SW queues.
+There is usually a performance limit on the number of table lookups
+and actions that can be fitted on the same CPU core due to HW constraints like:
+available CPU cycles, cache memory size, cache transfer BW, memory transfer BW, etc.</p>
+<p>As the application is split across multiple CPU cores, the Packet Framework facilitates the creation of several pipelines,
+the assignment of each such pipeline to a different CPU core
+and the interconnection of all CPU core-level pipelines into a single application-level complex pipeline.
+For example, if CPU core A is assigned to run pipeline P1 and CPU core B pipeline P2,
+then the interconnection of P1 with P2 could be achieved by having the same set of SW queues act like output ports
+for P1 and input ports for P2.</p>
+<p>This approach enables the application development using the pipeline, run-to-completion (clustered) or hybrid (mixed) models.</p>
+<p>It is allowed for the same core to run several pipelines, but it is not allowed for several cores to run the same pipeline.</p>
+<section id="shared-data-structures">
+<h3><span class="section-number">59.6.1. </span>Shared Data Structures</h3>
+<p>The threads performing table lookup are actually table writers rather than just readers.
+Even if the specific table lookup algorithm is thread-safe for multiple readers
+(e. g. read-only access of the search algorithm data structures is enough to conduct the lookup operation),
+once the table entry for the current packet is identified, the thread is typically expected to update the action meta-data stored in the table entry
+(e.g. increment the counter tracking the number of packets that hit this table entry), and thus modify the table entry.
+During the time this thread is accessing this table entry (either writing or reading; duration is application specific),
+for data consistency reasons, no other threads (threads performing table lookup or entry add/delete operations) are allowed to modify this table entry.</p>
+<p>Mechanisms to share the same table between multiple threads:</p>
+<ol class="arabic simple">
+<li><p><strong>Multiple writer threads.</strong>
+Threads need to use synchronization primitives like semaphores (distinct semaphore per table entry) or atomic instructions.
+The cost of semaphores is usually high, even when the semaphore is free.
+The cost of atomic instructions is normally higher than the cost of regular instructions.</p></li>
+<li><p><strong>Multiple writer threads, with single thread performing table lookup operations and multiple threads performing table entry add/delete operations.</strong>
+The threads performing table entry add/delete operations send table update requests to the reader (typically through message passing queues),
+which does the actual table updates and then sends the response back to the request initiator.</p></li>
+<li><p><strong>Single writer thread performing table entry add/delete operations and multiple reader threads that perform table lookup operations with read-only access to the table entries.</strong>
+The reader threads use the main table copy while the writer is updating the mirror copy.
+Once the writer update is done, the writer can signal to the readers and busy wait until all readers swaps between the mirror copy (which now becomes the main copy) and
+the mirror copy (which now becomes the main copy).</p></li>
+</ol>
+</section>
+</section>
+<section id="interfacing-with-accelerators">
+<h2><span class="section-number">59.7. </span>Interfacing with Accelerators</h2>
+<p>The presence of accelerators is usually detected during the initialization phase by inspecting the HW devices that are part of the system (e.g. by PCI bus enumeration).
+Typical devices with acceleration capabilities are:</p>
+<ul class="simple">
+<li><p>Inline accelerators: NICs, switches, FPGAs, etc;</p></li>
+<li><p>Look-aside accelerators: chipsets, FPGAs, Intel QuickAssist, etc.</p></li>
+</ul>
+<p>Usually, to support a specific functional block, specific implementation of Packet Framework tables and/or ports and/or actions has to be provided for each accelerator,
+with all the implementations sharing the same API: pure SW implementation (no acceleration), implementation using accelerator A, implementation using accelerator B, etc.
+The selection between these implementations could be done at build time or at run-time (recommended), based on which accelerators are present in the system,
+with no application changes required.</p>
+</section>
+<section id="the-software-switch-swx-pipeline">
+<h2><span class="section-number">59.8. </span>The Software Switch (SWX) Pipeline</h2>
+<p>The Software Switch (SWX) pipeline is designed to combine the DPDK performance with the flexibility of the P4-16 language [1]. It can be used either by itself
+to code a complete software switch or data plane application, or in combination with the open-source P4 compiler P4C [2], acting as a P4C back-end that allows
+the P4 programs to be translated to the DPDK SWX API and run on multi-core CPUs.</p>
+<p>The main features of the SWX pipeline are:</p>
+<ul class="simple">
+<li><p>Nothing is hard-wired, everything is dynamically defined: The packet headers (i.e. the network protocols), the packet meta-data, the actions, the tables
+and the pipeline itself are dynamically defined instead of selected from a predefined set.</p></li>
+<li><p>Instructions: The actions and the life of the packet through the pipeline are defined with instructions that manipulate the pipeline objects mentioned
+above. The pipeline is the main function of the packet program, with actions as subroutines triggered by the tables.</p></li>
+<li><p>Call external plugins: Extern objects and functions can be defined to call functionality that cannot be efficiently implemented with the existing
+pipeline-oriented instruction set, such as: error detecting/correcting codes, cryptographic operations, meters, statistics counter arrays, heuristics, etc.</p></li>
+<li><p>Better control plane interaction: Transaction-oriented table update mechanism that supports multi-table atomic updates. Multiple tables can be updated in a
+single step with only the before-update and the after-update table entries visible to the packets. Alignment with the P4Runtime [3] protocol.</p></li>
+<li><p>Performance: Multiple packets are in-flight within the pipeline at any moment. Each packet is owned by a different time-sharing thread in
+run-to-completion, with the thread pausing before memory access operations such as packet I/O and table lookup to allow the memory prefetch to complete.
+The instructions are verified and translated at initialization time with no run-time impact. The instructions are also optimized to detect and “fuse”
+frequently used patterns into vector-like instructions transparently to the user.</p></li>
+</ul>
+<p>The main SWX pipeline components are:</p>
+<ul class="simple">
+<li><p>Input and output ports: Each port instantiates a port type that defines the port operations, e.g. Ethernet device port, PCAP port, etc. The RX interface
+of the input ports and the TX interface of the output ports are single packet based, with packet batching typically implemented internally by each port for
+performance reasons.</p></li>
+<li><p>Structure types: Each structure type is used to define the logical layout of a memory block, such as: packet headers, packet meta-data, action data stored
+in a table entry, mailboxes of extern objects and functions. Similar to C language structs, each structure type is a well defined sequence of fields, with
+each field having a unique name and a constant size.</p></li>
+<li><p>Packet headers: Each packet typically has one or multiple headers. The headers are extracted from the input packet as part of the packet parsing operation,
+which is likely executed immediately after the packet reception. As result of the extract operation, each header is logically removed from the packet, so
+once the packet parsing operation is completed, the input packet is reduced to opaque payload. Just before transmission, one or several headers are pushed
+in front of each output packet through the emit operation; these headers can be part of the set of headers that were previously extracted from the input
+packet (and potentially modified afterwards) or some new headers whose contents is generated by the pipeline (e.g. by reading them from tables). The format
+of each packet header is defined by instantiating a structure type.</p></li>
+<li><p>Packet meta-data: The packet meta-data is filled in by the pipeline (e.g. by reading it from tables) or computed by the pipeline. It is not sent out unless
+some of the meta-data fields are explicitly written into the headers emitted into the output packet. The format of the packet meta-data is defined by
+instantiating a structure type.</p></li>
+<li><p>Extern objects and functions: Used to plug into the pipeline any functionality that cannot be efficiently implemented with the existing pipeline instruction
+set. Each extern object and extern function has its own mailbox, which is used to pass the input arguments to and retrieve the output arguments from the
+extern object member functions or the extern function.  The mailbox format is defined by instantiating a structure type.</p></li>
+<li><p>Instructions: The pipeline and its actions are defined with instructions from a predefined instruction set. The instructions are used to receive and
+transmit the current packet, extract and emit headers from/into the packet, read/write the packet headers, packet meta-data and mailboxes, start table
+lookup operations, read the action arguments from the table entry, call extern object member functions or extern functions. See the rte_swx_pipeline.h file
+for the complete list of instructions.</p></li>
+<li><p>Actions: The pipeline actions are dynamically defined through instructions as opposed to predefined. Essentially, the actions are subroutines of the
+pipeline program and their execution is triggered by the table lookup. The input arguments of each action are read from the table entry (in case of table
+lookup hit) or the default table action (in case of table lookup miss) and are read-only; their format is defined by instantiating a structure type. The
+actions have read-write access to the packet headers and meta-data.</p></li>
+<li><p>Table: Each pipeline typically has one or more lookup tables. The match fields of each table are flexibly selected from the packet headers and meta-data
+defined for the current pipeline. The set of table actions is flexibly selected for each table from the set of actions defined for the current pipeline. The
+tables can be looked at as special pipeline operators that result in one of the table actions being called, depending on the result of the table lookup
+operation.</p></li>
+<li><p>Pipeline: The pipeline represents the main program that defines the life of the packet, with subroutines (actions) executed on table lookup. As packets
+go through the pipeline, the packet headers and meta-data are transformed along the way.</p></li>
+</ul>
+<p>References:</p>
+<p>[1] P4-16 specification: <a class="reference external" href="https://p4.org/specs/">https://p4.org/specs/</a></p>
+<p>[2] P4-16 compiler: <a class="reference external" href="https://github.com/p4lang/p4c">https://github.com/p4lang/p4c</a></p>
+<p>[3] P4Runtime specification: <a class="reference external" href="https://p4.org/specs/">https://p4.org/specs/</a></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="packet_classif_access_ctrl.html" title="previous chapter"><span class="section-number">58. </span>Packet Classification and Access Control</a></li>
+      <li>Next: <a href="vhost_lib.html" title="next chapter"><span class="section-number">60. </span>Vhost Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/packet_framework.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

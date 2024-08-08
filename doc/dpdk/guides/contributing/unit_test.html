@@ -1,0 +1,537 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. DPDK Unit Testing Guidelines &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Adding a new library" href="new_library.html" />
+    <link rel="prev" title="5. DPDK Documentation Guidelines" href="documentation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-unit-testing-guidelines">
+<h1><span class="section-number">6. </span>DPDK Unit Testing Guidelines</h1>
+<p>This document outlines the guidelines for running and adding new
+tests to the in-tree DPDK test suites.</p>
+<p>The DPDK test suite model is loosely based on the xUnit model,
+where tests are grouped into test suites, and suites are run by runners.
+For a basic overview, see the basic Wikipedia article on <a class="reference external" href="https://en.wikipedia.org/wiki/XUnit">xUnit</a>.</p>
+<section id="background">
+<h2><span class="section-number">6.1. </span>Background</h2>
+<p>The in-tree testing infrastructure for DPDK consists of
+multiple applications and support tools.
+The primary tools are the <cite>dpdk-test</cite> application,
+and the <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> infrastructure.
+These two are the primary ways through which
+a user will interact with the DPDK testing infrastructure.</p>
+<p>There exists a bit of confusion with the test suite and test case separation
+with respect to <cite>dpdk-test</cite> and <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code>.
+Both have a concept of test suite and test case.
+In both, the concept is similar.
+A test suite is a group of test cases,
+and a test case represents the steps needed to test a particular set of code.
+Where needed, they will be disambiguated by the word <cite>Meson</cite>
+to denote a Meson test suite / case.</p>
+</section>
+<section id="running-a-test">
+<h2><span class="section-number">6.2. </span>Running a test</h2>
+<p>DPDK tests are run via the main test runner, the <cite>dpdk-test</cite> app.
+The <cite>dpdk-test</cite> app is a command-line interface that facilitates
+running various tests or test suites.</p>
+<p>There are three modes of operation.
+The first mode is as an interactive command shell
+that allows launching specific test suites.
+This is the default operating mode of <cite>dpdk-test</cite> and can be done by:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./build/app/test/dpdk-test --dpdk-options-here
+EAL: Detected 4 lcore(s)
+EAL: Detected 1 NUMA nodes
+EAL: Static memory layout is selected, amount of reserved memory...
+EAL: Multi-process socket /run/user/26934/dpdk/rte/mp_socket
+EAL: Selected IOVA mode &#39;VA&#39;
+EAL: Probing VFIO support...
+EAL: PCI device 0000:00:1f.6 on NUMA socket -1
+EAL:   Invalid NUMA socket, default to 0
+EAL:   probe driver: 8086:15d7 net_e1000_em
+APP: HPET is not enabled, using TSC as default timer
+RTE&gt;&gt;
+</pre></div>
+</div>
+<p>At the prompt, simply type the name of the test suite you wish to run
+and it will execute.</p>
+<p>The second form is useful for a scripting environment,
+and is used by the DPDK Meson build system.
+This mode is invoked by
+assigning a specific test suite name to the environment variable <code class="docutils literal notranslate"><span class="pre">DPDK_TEST</span></code>
+before invoking the <cite>dpdk-test</cite> command, such as:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ DPDK_TEST=version_autotest ./build/app/test/dpdk-test --dpdk-options-here
+EAL: Detected 4 lcore(s)
+EAL: Detected 1 NUMA nodes
+EAL: Static memory layout is selected, amount of reserved memory can be...
+EAL: Multi-process socket /run/user/26934/dpdk/rte/mp_socket
+EAL: Selected IOVA mode &#39;VA&#39;
+EAL: Probing VFIO support...
+EAL: PCI device 0000:00:1f.6 on NUMA socket -1
+EAL:   Invalid NUMA socket, default to 0
+EAL:   probe driver: 8086:15d7 net_e1000_em
+APP: HPET is not enabled, using TSC as default timer
+RTE&gt;&gt;version_autotest
+Version string: &#39;DPDK 20.02.0-rc0&#39;
+Test OK
+RTE&gt;&gt;$
+</pre></div>
+</div>
+<p>The above shows running a specific test case.
+On success, the return code will be ‘0’,
+otherwise it will be set to some error value (such as ‘255’, or a negative value).</p>
+<p>The third form is an alternative
+to providing the test suite name in an environment variable.
+The unit test app can accept test suite names via command line arguments:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./build/app/test/dpdk-test --dpdk-options-here version_autotest version_autotest
+EAL: Detected 8 lcore(s)
+EAL: Detected 1 NUMA nodes
+EAL: Static memory layout is selected, amount of reserved memory can be...
+EAL: Detected static linkage of DPDK
+EAL: Multi-process socket /run/user/26934/dpdk/rte/mp_socket
+EAL: Selected IOVA mode &#39;VA&#39;
+TELEMETRY: No legacy callbacks, legacy socket not created
+APP: HPET is not enabled, using TSC as default timer
+RTE&gt;&gt;version_autotest
+Version string: &#39;DPDK 21.08.0-rc0&#39;
+Test OK
+RTE&gt;&gt;version_autotest
+Version string: &#39;DPDK 21.08.0-rc0&#39;
+Test OK
+RTE&gt;&gt;
+</pre></div>
+</div>
+<p>The primary benefit here is specifying multiple test names,
+which is not possible with the <code class="docutils literal notranslate"><span class="pre">DPDK_TEST</span></code> environment variable.</p>
+<p>Additionally, it is possible to specify additional test parameters
+via the <code class="docutils literal notranslate"><span class="pre">DPDK_TEST_PARAMS</span></code> argument,
+in case some tests need additional configuration.
+This isn’t currently used in the Meson test suites.</p>
+</section>
+<section id="running-test-cases-via-meson">
+<h2><span class="section-number">6.3. </span>Running test cases via Meson</h2>
+<p>In order to allow developers to quickly execute all the standard internal tests
+without needing to remember or look up each test suite name,
+the build system includes a standard way of executing the Meson test suites.
+After building via <code class="docutils literal notranslate"><span class="pre">ninja</span></code>, the <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> command
+with no arguments will execute the Meson test suites.</p>
+<p>There are a number of pre-configured Meson test suites.
+The first is the <strong>fast</strong> test suite, which is the largest group of test cases.
+These are the bulk of the unit tests to validate functional blocks.
+The second is the <strong>perf</strong> tests.
+These test suites can take longer to run and do performance evaluations.
+The third is the <strong>driver</strong> test suite,
+which is mostly for special hardware related testing (such as <cite>cryptodev</cite>).
+The fourth, and currently the last, suite is the <strong>debug</strong> suite.
+These tests mostly are used to dump system information.</p>
+<p>The Meson test suites can be selected by adding the <code class="docutils literal notranslate"><span class="pre">--suite</span></code> option
+to the <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> command.
+Ex: <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span> <span class="pre">--suite</span> <span class="pre">fast-tests</span></code>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test -C build --suite fast-tests
+ninja: Entering directory `/home/aconole/git/dpdk/build&#39;
+[2543/2543] Linking target app/test/dpdk-test.
+1/60 DPDK:fast-tests / acl_autotest          OK       3.17 s
+2/60 DPDK:fast-tests / bitops_autotest       OK       0.22 s
+3/60 DPDK:fast-tests / byteorder_autotest    OK       0.22 s
+4/60 DPDK:fast-tests / cmdline_autotest      OK       0.28 s
+5/60 DPDK:fast-tests / common_autotest       OK       0.57 s
+6/60 DPDK:fast-tests / cpuflags_autotest     OK       0.27 s
+...
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> command can also execute individual Meson test cases
+via the command line by adding the test names as an argument:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test -C build version_autotest
+ninja: Entering directory `/home/aconole/git/dpdk/build&#39;
+[2543/2543] Linking target app/test/dpdk-test.
+1/1 DPDK:fast-tests / version_autotest OK             0.17s
+...
+</pre></div>
+</div>
+<p>Note that these test cases must be known to Meson
+for the <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">test</span></code> command to run them.
+Simply adding a new test to the <cite>dpdk-test</cite> application isn’t enough.
+See the section <a class="reference internal" href="#adding-a-suite-or-test-case-to-meson">Adding a suite or test case to Meson</a> for more details.</p>
+</section>
+<section id="adding-tests-to-dpdk-test-application">
+<h2><span class="section-number">6.4. </span>Adding tests to dpdk-test application</h2>
+<p>Unit tests should be added to the system
+whenever we introduce new functionality to DPDK,
+as well as whenever a bug is resolved.
+This helps the DPDK project to catch regressions as they are introduced.</p>
+<dl class="simple">
+<dt>The DPDK test application supports two layers of tests:</dt><dd><ol class="arabic simple">
+<li><p><em>test cases</em> which are individual tests</p></li>
+<li><p><em>test suites</em> which are groups of test cases</p></li>
+</ol>
+</dd>
+</dl>
+<p>To add a new test suite to the DPDK test application,
+create a new test file for that suite
+(ex: see <em>app/test/test_version.c</em> for the <code class="docutils literal notranslate"><span class="pre">version_autotest</span></code> test suite).
+There are two important functions for interacting with the test harness:</p>
+<blockquote>
+<div><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">REGISTER_&lt;MESON_SUITE&gt;_TEST(command_name,</span> <span class="pre">function_to_execute)</span></code></dt><dd><p>Registers a test command with the name <cite>command_name</cite>
+and which runs the function <cite>function_to_execute</cite> when <cite>command_name</cite> is invoked.
+The test is automatically added to the Meson test suite <cite>&lt;MESON_SUITE&gt;</cite> by this macro.
+Examples would be <code class="docutils literal notranslate"><span class="pre">REGISTER_DRIVER_TEST</span></code>, or <code class="docutils literal notranslate"><span class="pre">REGISTER_PERF_TEST</span></code>.
+<strong>NOTE:</strong> The <code class="docutils literal notranslate"><span class="pre">REGISTER_FAST_TEST</span></code> macro is slightly different,
+in that it takes two additional parameters,
+specifying whether the test can be run using <code class="docutils literal notranslate"><span class="pre">--no-huge</span></code>,
+and whether the test can be run using Address Sanitization (ASAN)</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">unit_test_suite_runner(struct</span> <span class="pre">unit_test_suite</span> <span class="pre">*)</span></code></dt><dd><p>Returns a runner for a full test suite object,
+which contains a test suite name, setup, tear down,
+a pointer to a list of sub-testsuites,
+and vector of unit test cases.</p>
+</dd>
+</dl>
+</div></blockquote>
+<p>Each test suite has a setup and tear down function
+that runs at the beginning and end of the test suite execution.
+Each unit test has a similar function for test case setup and tear down.</p>
+<p>Each test suite may use a nested list of sub-testsuites,
+which are iterated by the <code class="docutils literal notranslate"><span class="pre">unit_test_suite_runner</span></code>.
+This support allows for better granularity when designing test suites.
+The sub-testsuites list can also be used in parallel with the vector of test cases,
+in this case the test cases will be run,
+and then each sub-testsuite is executed.
+To see an example of a test suite using sub-testsuites,
+see <em>app/test/test_cryptodev.c</em>.</p>
+<p>Test cases are added to the <code class="docutils literal notranslate"><span class="pre">.unit_test_cases</span></code> element
+of the appropriate unit test suite structure.
+An example of both a test suite and a case:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;time.h&gt;</span><span class="cp"></span>
+<span class="linenos"> 2</span>
+<span class="linenos"> 3</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_common.h&gt;</span><span class="cp"></span>
+<span class="linenos"> 4</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_cycles.h&gt;</span><span class="cp"></span>
+<span class="linenos"> 5</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_hexdump.h&gt;</span><span class="cp"></span>
+<span class="linenos"> 6</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_random.h&gt;</span><span class="cp"></span>
+<span class="linenos"> 7</span>
+<span class="linenos"> 8</span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;test.h&quot;</span><span class="cp"></span>
+<span class="linenos"> 9</span>
+<span class="linenos">10</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">testsuite_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">11</span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">testsuite_teardown</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">12</span>
+<span class="linenos">13</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">ut_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">14</span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ut_teardown</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">15</span>
+<span class="linenos">16</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">test_case_first</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">17</span>
+<span class="linenos">18</span><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="n">example_testsuite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">19</span><span class="w">       </span><span class="p">.</span><span class="n">suite_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;EXAMPLE TEST SUITE&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">20</span><span class="w">       </span><span class="p">.</span><span class="n">setup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">testsuite_setup</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">21</span><span class="w">       </span><span class="p">.</span><span class="n">teardown</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">testsuite_teardown</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">22</span><span class="w">       </span><span class="p">.</span><span class="n">unit_test_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">23</span><span class="w">            </span><span class="n">TEST_CASE_ST</span><span class="p">(</span><span class="n">ut_setup</span><span class="p">,</span><span class="w"> </span><span class="n">ut_teardown</span><span class="p">,</span><span class="w"> </span><span class="n">test_case_first</span><span class="p">),</span><span class="w"></span>
+<span class="linenos">24</span>
+<span class="linenos">25</span><span class="w">            </span><span class="n">TEST_CASES_END</span><span class="p">(),</span><span class="w"> </span><span class="cm">/**&lt; NULL terminate unit test array */</span><span class="w"></span>
+<span class="linenos">26</span><span class="w">       </span><span class="p">},</span><span class="w"></span>
+<span class="linenos">27</span><span class="p">};</span><span class="w"></span>
+<span class="linenos">28</span>
+<span class="linenos">29</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">example_tests</span><span class="p">()</span><span class="w"></span>
+<span class="linenos">30</span><span class="p">{</span><span class="w"></span>
+<span class="linenos">31</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">unit_test_suite_runner</span><span class="p">(</span><span class="o">&amp;</span><span class="n">example_testsuite</span><span class="p">);</span><span class="w"></span>
+<span class="linenos">32</span><span class="p">}</span><span class="w"></span>
+<span class="linenos">33</span>
+<span class="linenos">34</span><span class="n">REGISTER_PERF_TEST</span><span class="p">(</span><span class="n">example_autotest</span><span class="p">,</span><span class="w"> </span><span class="n">example_tests</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The above code block is a small example
+that can be used to create a complete test suite with test case.</p>
+<p>Sub-testsuites can be added to the <code class="docutils literal notranslate"><span class="pre">.unit_test_suites</span></code> element
+of the unit test suite structure, for example:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="linenos"> 1</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">testsuite_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos"> 2</span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">testsuite_teardown</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos"> 3</span>
+<span class="linenos"> 4</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">ut_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos"> 5</span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">ut_teardown</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos"> 6</span>
+<span class="linenos"> 7</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">test_case_first</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos"> 8</span>
+<span class="linenos"> 9</span><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="n">example_parent_testsuite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">10</span><span class="w">       </span><span class="p">.</span><span class="n">suite_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;EXAMPLE PARENT TEST SUITE&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">11</span><span class="w">       </span><span class="p">.</span><span class="n">setup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">testsuite_setup</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">12</span><span class="w">       </span><span class="p">.</span><span class="n">teardown</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">testsuite_teardown</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">13</span><span class="w">       </span><span class="p">.</span><span class="n">unit_test_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">TEST_CASES_END</span><span class="p">()}</span><span class="w"></span>
+<span class="linenos">14</span><span class="p">};</span><span class="w"></span>
+<span class="linenos">15</span>
+<span class="linenos">16</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">sub_testsuite_setup</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">TEST_SUCCESS</span><span class="p">;</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">17</span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">sub_testsuite_teardown</span><span class="p">(</span><span class="kt">void</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+<span class="linenos">18</span>
+<span class="linenos">19</span><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="n">example_sub_testsuite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">20</span><span class="w">       </span><span class="p">.</span><span class="n">suite_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;EXAMPLE SUB TEST SUITE&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">21</span><span class="w">       </span><span class="p">.</span><span class="n">setup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sub_testsuite_setup</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">22</span><span class="w">       </span><span class="p">.</span><span class="n">teardown</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sub_testsuite_teardown</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">23</span><span class="w">       </span><span class="p">.</span><span class="n">unit_test_cases</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">24</span><span class="w">            </span><span class="n">TEST_CASE_ST</span><span class="p">(</span><span class="n">ut_setup</span><span class="p">,</span><span class="w"> </span><span class="n">ut_teardown</span><span class="p">,</span><span class="w"> </span><span class="n">test_case_first</span><span class="p">),</span><span class="w"></span>
+<span class="linenos">25</span>
+<span class="linenos">26</span><span class="w">            </span><span class="n">TEST_CASES_END</span><span class="p">(),</span><span class="w"> </span><span class="cm">/**&lt; NULL terminate unit test array */</span><span class="w"></span>
+<span class="linenos">27</span><span class="w">       </span><span class="p">},</span><span class="w"></span>
+<span class="linenos">28</span><span class="p">};</span><span class="w"></span>
+<span class="linenos">29</span>
+<span class="linenos">30</span><span class="k">static</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="n">end_testsuite</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">31</span><span class="w">       </span><span class="p">.</span><span class="n">suite_name</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">32</span><span class="w">       </span><span class="p">.</span><span class="n">setup</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">33</span><span class="w">       </span><span class="p">.</span><span class="n">teardown</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">34</span><span class="w">       </span><span class="p">.</span><span class="n">unit_test_suites</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="w"></span>
+<span class="linenos">35</span><span class="p">};</span><span class="w"></span>
+<span class="linenos">36</span>
+<span class="linenos">37</span><span class="k">static</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="nf">example_tests</span><span class="p">()</span><span class="w"></span>
+<span class="linenos">38</span><span class="p">{</span><span class="w"></span>
+<span class="linenos">39</span><span class="w">    </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">ret</span><span class="p">,</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="linenos">40</span><span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="o">*</span><span class="n">sub_suites</span><span class="p">[]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="linenos">41</span><span class="w">           </span><span class="o">&amp;</span><span class="n">example_sub_testsuite</span><span class="p">,</span><span class="w"></span>
+<span class="linenos">42</span><span class="w">           </span><span class="o">&amp;</span><span class="n">end_testsuite</span><span class="w"> </span><span class="cm">/**&lt; NULL test suite to indicate end of list */</span><span class="w"></span>
+<span class="linenos">43</span><span class="w">     </span><span class="p">};</span><span class="w"></span>
+<span class="linenos">44</span>
+<span class="linenos">45</span><span class="w">    </span><span class="n">example_parent_testsuite</span><span class="p">.</span><span class="n">unit_test_suites</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="linenos">46</span><span class="w">            </span><span class="n">malloc</span><span class="p">(</span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">unit_test_suite</span><span class="w"> </span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">sub_suites</span><span class="p">));</span><span class="w"></span>
+<span class="linenos">47</span>
+<span class="linenos">48</span><span class="w">    </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">RTE_DIM</span><span class="p">(</span><span class="n">sub_suites</span><span class="p">);</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"></span>
+<span class="linenos">49</span><span class="w">        </span><span class="n">example_parent_testsuite</span><span class="p">.</span><span class="n">unit_test_suites</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">sub_suites</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+<span class="linenos">50</span>
+<span class="linenos">51</span><span class="w">    </span><span class="n">ret</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">unit_test_suite_runner</span><span class="p">(</span><span class="o">&amp;</span><span class="n">example_parent_testsuite</span><span class="p">);</span><span class="w"></span>
+<span class="linenos">52</span><span class="w">    </span><span class="n">free</span><span class="p">(</span><span class="n">example_parent_testsuite</span><span class="p">.</span><span class="n">unit_test_suites</span><span class="p">);</span><span class="w"></span>
+<span class="linenos">53</span>
+<span class="linenos">54</span><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="n">ret</span><span class="p">;</span><span class="w"></span>
+<span class="linenos">55</span><span class="p">}</span><span class="w"></span>
+<span class="linenos">56</span>
+<span class="linenos">57</span><span class="n">REGISTER_FAST_TEST</span><span class="p">(</span><span class="n">example_autotest</span><span class="p">,</span><span class="w"> </span><span class="nb">true</span><span class="w"> </span><span class="cm">/*no-huge*/</span><span class="p">,</span><span class="w"> </span><span class="nb">false</span><span class="w"> </span><span class="cm">/*ASan*/</span><span class="p">,</span><span class="w"> </span><span class="n">example_tests</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="designing-a-test">
+<h2><span class="section-number">6.5. </span>Designing a test</h2>
+<p>Test cases have multiple ways of indicating an error has occurred,
+in order to reflect failure state back to the runner.
+Using the various methods of indicating errors can assist
+in not only validating the requisite functionality is working,
+but also to help debug when a change in environment or code
+has caused things to go wrong.</p>
+<p>The first way to indicate a generic error is
+by returning a test result failure, using the <code class="docutils literal notranslate"><span class="pre">TEST_FAILED</span></code> error code.
+This is the most basic way of indicating that an error
+has occurred in a test routine.
+It isn’t very informative to the user, so it should really be used in cases
+where the test has catastrophically failed.</p>
+<p>The preferred method of indicating an error is
+via the <code class="docutils literal notranslate"><span class="pre">RTE_TEST_ASSERT</span></code> family of macros,
+which will immediately return <code class="docutils literal notranslate"><span class="pre">TEST_FAILED</span></code> error condition,
+but will also log details about the failure.
+The basic form is:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">RTE_TEST_ASSERT</span><span class="p">(</span><span class="n">cond</span><span class="p">,</span><span class="w"> </span><span class="n">msg</span><span class="p">,</span><span class="w"> </span><span class="p">...)</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In the above macro, <em>cond</em> is the condition to evaluate to <strong>true</strong>.
+Any generic condition can go here.
+The <em>msg</em> parameter will be a message to display if <em>cond</em> evaluates to <strong>false</strong>.
+Some specialized macros already exist.
+See <cite>lib/librte_eal/include/rte_test.h</cite> for a list of defined test assertions.</p>
+<p>Sometimes it is important to indicate that a test needs to be skipped,
+either because the environment isn’t able to support running the test,
+or because some requisite functionality isn’t available.
+The test suite supports returning a result of <code class="docutils literal notranslate"><span class="pre">TEST_SKIPPED</span></code>
+during test case setup, or during test case execution
+to indicate that the preconditions of the test aren’t available.
+Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test -C build --suite fast-tests
+ninja: Entering directory `/home/aconole/git/dpdk/build
+[2543/2543] Linking target app/test/dpdk-test.
+1/60 DPDK:fast-tests / acl_autotest          OK       3.17 s
+2/60 DPDK:fast-tests / bitops_autotest       OK       0.22 s
+3/60 DPDK:fast-tests / byteorder_autotest    OK       0.22 s
+...
+46/60 DPDK:fast-tests / ipsec_autotest       SKIP     0.22 s
+...
+</pre></div>
+</div>
+</section>
+<section id="checking-code-coverage">
+<h2><span class="section-number">6.6. </span>Checking code coverage</h2>
+<p>The Meson build system supports generating a code coverage report
+via the <code class="docutils literal notranslate"><span class="pre">-Db_coverage=true</span></code> option,
+in conjunction with a package like <strong>lcov</strong>,
+to generate an HTML code coverage report.
+Example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson setup build -Db_coverage=true
+$ meson test -C build --suite fast-tests
+$ ninja coverage-html -C build
+</pre></div>
+</div>
+<p>The above will generate an HTML report
+in the <cite>build/meson-logs/coveragereport/</cite> directory
+that can be explored for detailed code covered information.
+This can be used to assist in test development.</p>
+</section>
+<section id="adding-a-suite-or-test-case-to-meson">
+<h2><span class="section-number">6.7. </span>Adding a suite or test case to Meson</h2>
+<p>Adding to one of the Meson test suites involves using the appropriate macro
+to register the test in dpdk-test, as described above.
+For example,
+defining the test command using <code class="docutils literal notranslate"><span class="pre">REGISTER_PERF_TEST</span></code> automatically
+adds the test to the perf-test meson suite.
+Once added, the new test will be run
+as part of the appropriate class (fast, perf, driver, etc.).</p>
+<p>A user or developer can confirm that a test is known to Meson
+by using the <code class="docutils literal notranslate"><span class="pre">--list</span></code> option:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ meson test -C build --list
+DPDK:fast-tests / acl_autotest
+DPDK:fast-tests / bitops_autotest
+...
+</pre></div>
+</div>
+<p>Some of these test suites are run during continuous integration tests,
+making regression checking automatic for new patches submitted to the project.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The use of the old <code class="docutils literal notranslate"><span class="pre">REGISTER_TEST_COMMAND</span></code> macro
+to add a command without adding it to a meson test suite is deprecated.
+All new tests must be added to a test suite
+using the appropriate <code class="docutils literal notranslate"><span class="pre">REGISTER_&lt;SUITE&gt;_TEST</span></code> macro.</p>
+</div>
+</section>
+<section id="running-cryptodev-tests">
+<h2><span class="section-number">6.8. </span>Running cryptodev tests</h2>
+<p>When running cryptodev tests, the user must create any required virtual device
+via EAL arguments, as this is not automatically done by the test:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ./build/app/test/dpdk-test --vdev crypto_aesni_mb
+$ meson test -C build --suite driver-tests \
+             --test-args=&quot;--vdev crypto_aesni_mb&quot;
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">cryptodev_scheduler_autotest</span></code> is the only exception to this.
+This vdev will be created automatically by the test app,
+as it requires a more complex setup than other vdevs.</p>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="documentation.html" title="previous chapter"><span class="section-number">5. </span>DPDK Documentation Guidelines</a></li>
+      <li>Next: <a href="new_library.html" title="next chapter"><span class="section-number">7. </span>Adding a new library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/unit_test.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

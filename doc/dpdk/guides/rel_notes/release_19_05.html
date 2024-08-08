@@ -1,0 +1,787 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>17. DPDK Release 19.05 &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="18. DPDK Release 19.02" href="release_19_02.html" />
+    <link rel="prev" title="16. DPDK Release 19.08" href="release_19_08.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dpdk-release-19-05">
+<h1><span class="section-number">17. </span>DPDK Release 19.05</h1>
+<section id="new-features">
+<h2><span class="section-number">17.1. </span>New Features</h2>
+<ul>
+<li><p><strong>Added new armv8 machine targets.</strong></p>
+<p>Added new armv8 machine targets:</p>
+<ul class="simple">
+<li><p>BlueField (Mellanox)</p></li>
+<li><p>OcteonTX2 (Marvell)</p></li>
+<li><p>ThunderX2 (Marvell)</p></li>
+</ul>
+</li>
+<li><p><strong>Added Windows Support.</strong></p>
+<p>Added Windows support to build Hello World sample application.</p>
+</li>
+<li><p><strong>Added Stack Library.</strong></p>
+<p>Added a new stack library and APIs for configuration and use of a bounded
+stack of pointers. The API provides multi-thread safe push and pop
+operations that can operate on one or more pointers per operation.</p>
+<p>The library supports two stack implementations: standard (lock-based) and
+lock-free.  The lock-free implementation is currently limited to x86-64
+platforms.</p>
+</li>
+<li><p><strong>Added Lock-Free Stack Mempool Handler.</strong></p>
+<p>Added a new lock-free stack handler, which uses the newly added stack
+library.</p>
+</li>
+<li><p><strong>Added RCU library.</strong></p>
+<p>Added RCU library supporting a quiescent state based memory reclamation method.
+This library helps identify the quiescent state of the reader threads so
+that the writers can free the memory associated with the lock free data
+structures.</p>
+</li>
+<li><p><strong>Updated KNI module and PMD.</strong></p>
+<p>Updated the KNI kernel module to set the <code class="docutils literal notranslate"><span class="pre">max_mtu</span></code> according to the given
+initial MTU size. Without it, the maximum MTU was 1500.</p>
+<p>Updated the KNI PMD to set the <code class="docutils literal notranslate"><span class="pre">mbuf_size</span></code> and MTU based on
+the given mb-pool. This provide the ability to pass jumbo frames
+if the mb-pool contains a suitable buffer size.</p>
+</li>
+<li><p><strong>Added the AF_XDP PMD.</strong></p>
+<p>Added a Linux-specific PMD for AF_XDP. This PMD can create an AF_XDP socket
+and bind it to a specific netdev queue. It allows a DPDK application to send
+and receive raw packets through the socket which would bypass the kernel
+network stack to achieve high performance packet processing.</p>
+</li>
+<li><p><strong>Added a net PMD NFB.</strong></p>
+<p>Added the new <code class="docutils literal notranslate"><span class="pre">nfb</span></code> net driver for Netcope NFB cards. See
+the <a class="reference internal" href="../nics/nfb.html"><span class="doc">NFB poll mode driver library</span></a> NIC guide for more details on this new driver.</p>
+</li>
+<li><p><strong>Added IPN3KE net PMD.</strong></p>
+<p>Added the new <code class="docutils literal notranslate"><span class="pre">ipn3ke</span></code> net driver for the Intel® FPGA PAC (Programmable
+Acceleration Card) N3000. See the <a class="reference internal" href="../nics/ipn3ke.html"><span class="doc">IPN3KE Poll Mode Driver</span></a> NIC guide for more
+details on this new driver.</p>
+<p>In addition <code class="docutils literal notranslate"><span class="pre">ifpga_rawdev</span></code> was also updated to support Intel® FPGA PAC
+N3000 with SPI interface access, I2C Read/Write, and Ethernet PHY configuration.</p>
+</li>
+<li><p><strong>Updated Solarflare network PMD.</strong></p>
+<p>Updated the Solarflare <code class="docutils literal notranslate"><span class="pre">sfc_efx</span></code> driver with changes including:</p>
+<ul class="simple">
+<li><p>Added support for Rx descriptor status and related API in a secondary
+process.</p></li>
+<li><p>Added support for Tx descriptor status API in a secondary process.</p></li>
+<li><p>Added support for RSS RETA and hash configuration reading API in a
+secondary process.</p></li>
+<li><p>Added support for Rx packet types list in a secondary process.</p></li>
+<li><p>Added Tx prepare to do Tx offloads checks.</p></li>
+<li><p>Added support for VXLAN and GENEVE encapsulated TSO.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated Mellanox mlx4 driver.</strong></p>
+<blockquote>
+<div><p>Updated Mellanox mlx4 driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added firmware version reading.</p></li>
+<li><p>Added support for secondary processes.</p></li>
+<li><p>Added support of per-process device registers. Reserving identical VA space
+is not needed anymore.</p></li>
+<li><p>Added support for multicast address list interfaces.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Updated Mellanox mlx5 driver.</strong></p>
+<blockquote>
+<div><p>Updated Mellanox mlx5 driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added firmware version reading.</p></li>
+<li><p>Added support for new naming scheme of representor.</p></li>
+<li><p>Added support for new PCI device DMA map/unmap API.</p></li>
+<li><p>Added support for multiport InfiniBand device.</p></li>
+<li><p>Added control of excessive memory pinning by kernel.</p></li>
+<li><p>Added support of DMA memory registration by secondary process.</p></li>
+<li><p>Added support of per-process device registers. Reserving identical VA space
+is not required anymore.</p></li>
+<li><p>Added support for jump action for both E-Switch and NIC.</p></li>
+<li><p>Added Support for multiple rte_flow groups in NIC steering.</p></li>
+<li><dl class="simple">
+<dt>Flow engine re-designed to support large scale deployments. this includes:</dt><dd><ul>
+<li><p>Support millions of offloaded flow rules.</p></li>
+<li><p>Fast flow insertion and deletion up to 1M flow update per second.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p><strong>Renamed avf to iavf.</strong></p>
+<p>Renamed Intel Ethernet Adaptive Virtual Function driver <code class="docutils literal notranslate"><span class="pre">avf</span></code> to <code class="docutils literal notranslate"><span class="pre">iavf</span></code>,
+which includes the directory name, lib name, filenames, makefile, docs,
+macros, functions, structs and any other strings in the code.</p>
+</li>
+<li><p><strong>Updated the enic driver.</strong></p>
+<blockquote>
+<div><p>Updated enic driver with new features and improvements, including:</p>
+</div></blockquote>
+<ul class="simple">
+<li><p>Fixed several flow (director) bugs related to MARK, SCTP, VLAN, VXLAN, and
+inner packet matching.</p></li>
+<li><p>Added limited support for RAW.</p></li>
+<li><p>Added limited support for RSS.</p></li>
+<li><p>Added limited support for PASSTHRU.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the ixgbe driver.</strong></p>
+<p>Updated the ixgbe driver to add promiscuous mode support for the VF.</p>
+</li>
+<li><p><strong>Updated the ice driver.</strong></p>
+<p>Updated ice driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added support of SSE and AVX2 instructions in Rx and Tx paths.</p></li>
+<li><p>Added package download support.</p></li>
+<li><p>Added Safe Mode support.</p></li>
+<li><p>Supported RSS for UPD/TCP/SCTP+IPV4/IPV6 packets.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the i40e driver.</strong></p>
+<p>New features for PF in the i40e driver:</p>
+<ul class="simple">
+<li><p>Added support for VXLAN-GPE packet.</p></li>
+<li><p>Added support for VXLAN-GPE classification.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the ENETC driver.</strong></p>
+<p>Updated ENETC driver with new features and improvements, including:</p>
+<ul class="simple">
+<li><p>Added physical addressing mode support.</p></li>
+<li><p>Added SXGMII interface support.</p></li>
+<li><p>Added basic statistics support.</p></li>
+<li><p>Added promiscuous and allmulticast mode support.</p></li>
+<li><p>Added MTU update support.</p></li>
+<li><p>Added jumbo frame support.</p></li>
+<li><p>Added queue start/stop.</p></li>
+<li><p>Added CRC offload support.</p></li>
+<li><p>Added Rx checksum offload validation support.</p></li>
+</ul>
+</li>
+<li><p><strong>Updated the atlantic PMD.</strong></p>
+<p>Added MACSEC hardware offload experimental API.</p>
+</li>
+<li><p><strong>Updated the Intel QuickAssist Technology (QAT) compression PMD.</strong></p>
+<p>Updated the Intel QuickAssist Technology (QAT) compression PMD to simplify,
+and make more robust, the handling of Scatter Gather Lists (SGLs) with more
+than 16 segments.</p>
+</li>
+<li><p><strong>Updated the QuickAssist Technology (QAT) symmetric crypto PMD.</strong></p>
+<p>Added support for AES-XTS with 128 and 256 bit AES keys.</p>
+</li>
+<li><p><strong>Added Intel QuickAssist Technology PMD for asymmetric crypto.</strong></p>
+<p>Added a new QAT Crypto PMD which provides asymmetric cryptography
+algorithms. Modular exponentiation and modular multiplicative
+inverse algorithms were added in this release.</p>
+</li>
+<li><p><strong>Updated AESNI-MB PMD.</strong></p>
+<p>Added support for out-of-place operations.</p>
+</li>
+<li><p><strong>Updated the IPsec library.</strong></p>
+<p>The IPsec library has been updated with AES-CTR and 3DES-CBC cipher algorithms
+support. The related <code class="docutils literal notranslate"><span class="pre">ipsec-secgw</span></code> test scripts have been added.</p>
+</li>
+<li><p><strong>Updated the testpmd application.</strong></p>
+<p>Improved the <code class="docutils literal notranslate"><span class="pre">testpmd</span></code> application performance on ARM platform. For <code class="docutils literal notranslate"><span class="pre">macswap</span></code>
+forwarding mode, NEON intrinsics are now used to do swap to save CPU cycles.</p>
+</li>
+<li><p><strong>Updated power management library.</strong></p>
+<p>Added support for Intel Speed Select Technology - Base Frequency (SST-BF).
+The <code class="docutils literal notranslate"><span class="pre">rte_power_get_capabilities</span></code> struct now has a bit in it’s returned mask
+indicating if it is a high frequency core.</p>
+</li>
+<li><p><strong>Updated distributor sample application.</strong></p>
+<p>Added support for the Intel SST-BF feature so that the distributor core is
+pinned to a high frequency core if available.</p>
+</li>
+</ul>
+</section>
+<section id="api-changes">
+<h2><span class="section-number">17.2. </span>API Changes</h2>
+<ul class="simple">
+<li><p>eal: the type of the <code class="docutils literal notranslate"><span class="pre">attr_value</span></code> parameter of the function
+<code class="docutils literal notranslate"><span class="pre">rte_service_attr_get()</span></code> has been changed
+from <code class="docutils literal notranslate"><span class="pre">uint32_t</span> <span class="pre">*</span></code> to <code class="docutils literal notranslate"><span class="pre">uint64_t</span> <span class="pre">*</span></code>.</p></li>
+<li><p>meter: replace <code class="docutils literal notranslate"><span class="pre">enum</span> <span class="pre">rte_meter_color</span></code> in the meter library with new
+<code class="docutils literal notranslate"><span class="pre">rte_color</span></code> definition added in 19.02. Replacements with <code class="docutils literal notranslate"><span class="pre">rte_color</span></code>
+values has been performed in many places such as <code class="docutils literal notranslate"><span class="pre">rte_mtr.h</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_tm.h</span></code> to consolidate multiple color definitions.</p></li>
+<li><p>vfio: Functions <code class="docutils literal notranslate"><span class="pre">rte_vfio_container_dma_map</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_vfio_container_dma_unmap</span></code> have been extended with an option to
+request mapping or un-mapping to the default vfio container fd.</p></li>
+<li><p>power: <code class="docutils literal notranslate"><span class="pre">rte_power_set_env</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_power_unset_env</span></code> functions
+have been modified to be thread safe.</p></li>
+<li><p>timer: Functions have been introduced that allow multiple instances of the
+timer lists to be created. In addition they are now allocated in shared
+memory. New functions allow particular timer lists to be selected when
+timers are being started, stopped, and managed.</p></li>
+</ul>
+</section>
+<section id="abi-changes">
+<h2><span class="section-number">17.3. </span>ABI Changes</h2>
+<ul>
+<li><p>ethdev: Additional fields in rte_eth_dev_info.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info</span></code> structure has had two extra fields
+added: <code class="docutils literal notranslate"><span class="pre">min_mtu</span></code> and <code class="docutils literal notranslate"><span class="pre">max_mtu</span></code>. Each of these are of type <code class="docutils literal notranslate"><span class="pre">uint16_t</span></code>.
+The values of these fields can be set specifically by the PMDs as
+supported values can vary from device to device.</p>
+</li>
+<li><p>cryptodev: in 18.08 a new structure <code class="docutils literal notranslate"><span class="pre">rte_crypto_asym_op</span></code> was introduced and
+included into <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code>. As the <code class="docutils literal notranslate"><span class="pre">rte_crypto_asym_op</span></code> structure was
+defined as cache-line aligned that caused unintended changes in
+<code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code> structure layout and alignment. Remove cache-line
+alignment for <code class="docutils literal notranslate"><span class="pre">rte_crypto_asym_op</span></code> to restore expected <code class="docutils literal notranslate"><span class="pre">rte_crypto_op</span></code>
+layout and alignment.</p></li>
+<li><p>timer: <code class="docutils literal notranslate"><span class="pre">rte_timer_subsystem_init</span></code> now returns success or failure to reflect
+whether it was able to allocate memory.</p></li>
+</ul>
+</section>
+<section id="shared-library-versions">
+<h2><span class="section-number">17.4. </span>Shared Library Versions</h2>
+<p>The libraries prepended with a plus sign were incremented in this version.</p>
+<div class="highlight-diff notranslate"><div class="highlight"><pre><span></span><span class="w"> </span> librte_acl.so.2<span class="w"></span>
+<span class="w"> </span> librte_bbdev.so.1<span class="w"></span>
+<span class="w"> </span> librte_bitratestats.so.2<span class="w"></span>
+<span class="w"> </span> librte_bpf.so.1<span class="w"></span>
+<span class="w"> </span> librte_bus_dpaa.so.2<span class="w"></span>
+<span class="w"> </span> librte_bus_fslmc.so.2<span class="w"></span>
+<span class="w"> </span> librte_bus_ifpga.so.2<span class="w"></span>
+<span class="w"> </span> librte_bus_pci.so.2<span class="w"></span>
+<span class="w"> </span> librte_bus_vdev.so.2<span class="w"></span>
+<span class="w"> </span> librte_bus_vmbus.so.2<span class="w"></span>
+<span class="w"> </span> librte_cfgfile.so.2<span class="w"></span>
+<span class="w"> </span> librte_cmdline.so.2<span class="w"></span>
+<span class="w"> </span> librte_compressdev.so.1<span class="w"></span>
+<span class="gi">+ librte_cryptodev.so.7</span><span class="w"></span>
+<span class="w"> </span> librte_distributor.so.1<span class="w"></span>
+<span class="gi">+ librte_eal.so.10</span><span class="w"></span>
+<span class="w"> </span> librte_efd.so.1<span class="w"></span>
+<span class="gi">+ librte_ethdev.so.12</span><span class="w"></span>
+<span class="w"> </span> librte_eventdev.so.6<span class="w"></span>
+<span class="w"> </span> librte_flow_classify.so.1<span class="w"></span>
+<span class="w"> </span> librte_gro.so.1<span class="w"></span>
+<span class="w"> </span> librte_gso.so.1<span class="w"></span>
+<span class="w"> </span> librte_hash.so.2<span class="w"></span>
+<span class="w"> </span> librte_ip_frag.so.1<span class="w"></span>
+<span class="w"> </span> librte_ipsec.so.1<span class="w"></span>
+<span class="w"> </span> librte_jobstats.so.1<span class="w"></span>
+<span class="w"> </span> librte_kni.so.2<span class="w"></span>
+<span class="w"> </span> librte_kvargs.so.1<span class="w"></span>
+<span class="w"> </span> librte_latencystats.so.1<span class="w"></span>
+<span class="w"> </span> librte_lpm.so.2<span class="w"></span>
+<span class="w"> </span> librte_mbuf.so.5<span class="w"></span>
+<span class="w"> </span> librte_member.so.1<span class="w"></span>
+<span class="w"> </span> librte_mempool.so.5<span class="w"></span>
+<span class="w"> </span> librte_meter.so.3<span class="w"></span>
+<span class="w"> </span> librte_metrics.so.1<span class="w"></span>
+<span class="w"> </span> librte_net.so.1<span class="w"></span>
+<span class="w"> </span> librte_pci.so.1<span class="w"></span>
+<span class="w"> </span> librte_pdump.so.3<span class="w"></span>
+<span class="w"> </span> librte_pipeline.so.3<span class="w"></span>
+<span class="w"> </span> librte_pmd_bnxt.so.2<span class="w"></span>
+<span class="w"> </span> librte_pmd_bond.so.2<span class="w"></span>
+<span class="w"> </span> librte_pmd_i40e.so.2<span class="w"></span>
+<span class="w"> </span> librte_pmd_ixgbe.so.2<span class="w"></span>
+<span class="w"> </span> librte_pmd_dpaa2_qdma.so.1<span class="w"></span>
+<span class="w"> </span> librte_pmd_ring.so.2<span class="w"></span>
+<span class="w"> </span> librte_pmd_softnic.so.1<span class="w"></span>
+<span class="w"> </span> librte_pmd_vhost.so.2<span class="w"></span>
+<span class="w"> </span> librte_port.so.3<span class="w"></span>
+<span class="w"> </span> librte_power.so.1<span class="w"></span>
+<span class="w"> </span> librte_rawdev.so.1<span class="w"></span>
+<span class="gi">+ librte_rcu.so.1</span><span class="w"></span>
+<span class="w"> </span> librte_reorder.so.1<span class="w"></span>
+<span class="w"> </span> librte_ring.so.2<span class="w"></span>
+<span class="w"> </span> librte_sched.so.2<span class="w"></span>
+<span class="w"> </span> librte_security.so.2<span class="w"></span>
+<span class="gi">+ librte_stack.so.1</span><span class="w"></span>
+<span class="w"> </span> librte_table.so.3<span class="w"></span>
+<span class="w"> </span> librte_timer.so.1<span class="w"></span>
+<span class="w"> </span> librte_vhost.so.4<span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="known-issues">
+<h2><span class="section-number">17.5. </span>Known Issues</h2>
+<ul>
+<li><p><strong>On x86 platforms, AVX512 support is disabled with binutils 2.31.</strong></p>
+<p>Due to a defect in binutils 2.31 AVX512 support is disabled.
+DPDK defect: <a class="reference external" href="https://bugs.dpdk.org/show_bug.cgi?id=249">https://bugs.dpdk.org/show_bug.cgi?id=249</a>
+GCC defect: <a class="reference external" href="https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90028">https://gcc.gnu.org/bugzilla/show_bug.cgi?id=90028</a></p>
+</li>
+<li><p><strong>No software AES-XTS implementation.</strong></p>
+<p>There are currently no cryptodev software PMDs available which implement
+support for the AES-XTS algorithm, so this feature can only be used
+if compatible hardware and an associated PMD is available.</p>
+</li>
+</ul>
+</section>
+<section id="tested-platforms">
+<h2><span class="section-number">17.6. </span>Tested Platforms</h2>
+<ul class="simple">
+<li><p>Intel(R) platforms with Intel(R) NICs combinations</p>
+<ul>
+<li><p>CPU</p>
+<ul>
+<li><p>Intel(R) Atom(TM) CPU C3758 &#64; 2.20GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU D-1541 &#64; 2.10GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2699 v3 &#64; 2.30GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2699 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel(R) Xeon(R) Platinum 8180 CPU &#64; 2.50GHz</p></li>
+<li><p>Intel(R) Xeon(R) Gold 6139 CPU &#64; 2.30GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>CentOS 7.4</p></li>
+<li><p>CentOS 7.5</p></li>
+<li><p>Fedora 25</p></li>
+<li><p>Fedora 28</p></li>
+<li><p>Fedora 29</p></li>
+<li><p>FreeBSD 12.0</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.4</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.5</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.6</p></li>
+<li><p>SUSE12SP3</p></li>
+<li><p>Open SUSE 15</p></li>
+<li><p>Wind River Linux 8</p></li>
+<li><p>Ubuntu 14.04</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>Ubuntu 16.10</p></li>
+<li><p>Ubuntu 18.04</p></li>
+<li><p>Ubuntu 18.10</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Intel(R) 82599ES 10 Gigabit Ethernet Controller</p>
+<ul>
+<li><p>Firmware version: 0x61bf0001</p></li>
+<li><p>Device id (pf/vf): 8086:10fb / 8086:10ed</p></li>
+<li><p>Driver version: 5.2.3 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Corporation Ethernet Connection X552/X557-AT 10GBASE-T</p>
+<ul>
+<li><p>Firmware version: 0x800003e7</p></li>
+<li><p>Device id (pf/vf): 8086:15ad / 8086:15a8</p></li>
+<li><p>Driver version: 4.4.6 (ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel Corporation Ethernet Controller 10G X550T</p>
+<ul>
+<li><p>Firmware version: 0x80000482</p></li>
+<li><p>Device id (pf): 8086:1563</p></li>
+<li><p>Driver version: 5.1.0-k(ixgbe)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter X710-DA4 (4x10G)</p>
+<ul>
+<li><p>Firmware version: 6.80 0x80003cc1</p></li>
+<li><p>Device id (pf/vf): 8086:1572 / 8086:154c</p></li>
+<li><p>Driver version: 2.7.29 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Corporation Ethernet Connection X722 for 10GbE SFP+ (4x10G)</p>
+<ul>
+<li><p>Firmware version: 3.33 0x80000fd5 0.0.0</p></li>
+<li><p>Device id (pf/vf): 8086:37d0 / 8086:37cd</p></li>
+<li><p>Driver version: 2.7.29 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter XXV710-DA2 (2x25G)</p>
+<ul>
+<li><p>Firmware version: 6.80 0x80003d05</p></li>
+<li><p>Device id (pf/vf): 8086:158b / 8086:154c</p></li>
+<li><p>Driver version: 2.7.29 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Ethernet Converged Network Adapter XL710-QDA2 (2X40G)</p>
+<ul>
+<li><p>Firmware version: 6.80 0x80003cfb</p></li>
+<li><p>Device id (pf/vf): 8086:1583 / 8086:154c</p></li>
+<li><p>Driver version: 2.7.29 (i40e)</p></li>
+</ul>
+</li>
+<li><p>Intel(R) Corporation I350 Gigabit Network Connection</p>
+<ul>
+<li><p>Firmware version: 1.63, 0x80000dda</p></li>
+<li><p>Device id (pf/vf): 8086:1521 / 8086:1520</p></li>
+<li><p>Driver version: 5.4.0-k (igb)</p></li>
+</ul>
+</li>
+<li><p>Intel Corporation I210 Gigabit Network Connection</p>
+<ul>
+<li><p>Firmware version: 3.25, 0x800006eb, 1.1824.0</p></li>
+<li><p>Device id (pf): 8086:1533</p></li>
+<li><p>Driver version: 5.4.0-k(igb)</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Intel(R) platforms with Mellanox(R) NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>Intel(R) Xeon(R) Gold 6154 CPU &#64; 3.00GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2697A v4 &#64; 2.60GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2697 v3 &#64; 2.60GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2680 v2 &#64; 2.80GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2650 v4 &#64; 2.20GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2640 &#64; 2.50GHz</p></li>
+<li><p>Intel(R) Xeon(R) CPU E5-2620 v4 &#64; 2.10GHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux Server release 7.6 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.5 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.4 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.3 (Maipo)</p></li>
+<li><p>Red Hat Enterprise Linux Server release 7.2 (Maipo)</p></li>
+<li><p>Ubuntu 19.04</p></li>
+<li><p>Ubuntu 18.10</p></li>
+<li><p>Ubuntu 18.04</p></li>
+<li><p>Ubuntu 16.04</p></li>
+<li><p>SUSE Linux Enterprise Server 15</p></li>
+</ul>
+</li>
+<li><p>MLNX_OFED: 4.5-1.0.1.0</p></li>
+<li><p>MLNX_OFED: 4.6-1.0.1.1</p></li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox(R) ConnectX(R)-3 Pro 40G MCX354A-FCC_Ax (2x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1007</p></li>
+<li><p>Firmware version: 2.42.5000</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 10G MCX4111A-XCAT (1x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 10G MCX4121A-XCAT (2x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 25G MCX4111A-ACAT (1x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 40G MCX4131A-BCAT/MCX413A-BCAT (1x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 40G MCX415A-BCAT (1x40G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX4131A-GCAT/MCX413A-GCAT (1x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX414A-BCAT (2x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX415A-GCAT/MCX416A-BCAT/MCX416A-GCAT (2x50G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 50G MCX415A-CCAT (1x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 100G MCX416A-CCAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1013</p></li>
+<li><p>Firmware version: 12.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 10G MCX4121A-XCAT (2x10G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.25.1020 and above</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-5 Ex EN 100G MCX516A-CDAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 4.0 x16</p></li>
+<li><p>Device ID: 15b3:1019</p></li>
+<li><p>Firmware version: 16.25.1020 and above</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Arm platforms with Mellanox(R) NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>Qualcomm Arm 1.1 2500MHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Red Hat Enterprise Linux Server release 7.5 (Maipo)</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox(R) ConnectX(R)-4 Lx 25G MCX4121A-ACAT (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x8</p></li>
+<li><p>Device ID: 15b3:1015</p></li>
+<li><p>Firmware version: 14.24.0220</p></li>
+</ul>
+</li>
+<li><p>Mellanox(R) ConnectX(R)-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.24.0220</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>Mellanox(R) BlueField SmartNIC</p>
+<ul>
+<li><p>Mellanox(R) BlueField SmartNIC MT416842 (2x25G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:a2d2</p></li>
+<li><p>Firmware version: 18.25.1010</p></li>
+</ul>
+</li>
+<li><p>SoC Arm cores running OS:</p>
+<ul>
+<li><p>CentOS Linux release 7.4.1708 (AltArch)</p></li>
+<li><p>MLNX_OFED 4.6-1.0.0.0</p></li>
+</ul>
+</li>
+<li><p>DPDK application running on Arm cores inside SmartNIC</p></li>
+</ul>
+</li>
+<li><p>IBM Power 9 platforms with Mellanox(R) NICs combinations</p>
+<ul>
+<li><p>CPU:</p>
+<ul>
+<li><p>POWER9 2.2 (pvr 004e 1202) 2300MHz</p></li>
+</ul>
+</li>
+<li><p>OS:</p>
+<ul>
+<li><p>Ubuntu 18.04.1 LTS (Bionic Beaver)</p></li>
+</ul>
+</li>
+<li><p>NICs:</p>
+<ul>
+<li><p>Mellanox(R) ConnectX(R)-5 100G MCX556A-ECAT (2x100G)</p>
+<ul>
+<li><p>Host interface: PCI Express 3.0 x16</p></li>
+<li><p>Device ID: 15b3:1017</p></li>
+<li><p>Firmware version: 16.24.1000</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>OFED:</p>
+<ul>
+<li><p>MLNX_OFED_LINUX-4.6-1.0.1.0</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Release Notes</a><ul>
+      <li>Previous: <a href="release_19_08.html" title="previous chapter"><span class="section-number">16. </span>DPDK Release 19.08</a></li>
+      <li>Next: <a href="release_19_02.html" title="next chapter"><span class="section-number">18. </span>DPDK Release 19.02</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/rel_notes/release_19_05.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

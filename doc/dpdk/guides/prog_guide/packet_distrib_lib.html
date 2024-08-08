@@ -1,0 +1,213 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>38. Packet Distributor Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="39. Reorder Library" href="reorder_lib.html" />
+    <link rel="prev" title="37. RIB Library" href="rib_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="packet-distributor-library">
+<h1><span class="section-number">38. </span>Packet Distributor Library</h1>
+<p>The DPDK Packet Distributor library is a library designed to be used for dynamic load balancing of traffic
+while supporting single packet at a time operation.
+When using this library, the logical cores in use are to be considered in two roles: firstly a distributor lcore,
+which is responsible for load balancing or distributing packets,
+and a set of worker lcores which are responsible for receiving the packets from the distributor and operating on them.
+The model of operation is shown in the diagram below.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/packet_distributor1.png" src="../_images/packet_distributor1.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 38.2 </span><span class="caption-text">Packet Distributor mode of operation</span></p>
+</figcaption>
+</figure>
+<p>There are two modes of operation of the API in the distributor library,
+one which sends one packet at a time to workers using 32-bits for flow_id,
+and an optimized mode which sends bursts of up to 8 packets at a time to workers, using 15 bits of flow_id.
+The mode is selected by the type field in the <code class="docutils literal notranslate"><span class="pre">rte_distributor_create()</span></code> function.</p>
+<section id="distributor-core-operation">
+<h2><span class="section-number">38.1. </span>Distributor Core Operation</h2>
+<p>The distributor core does the majority of the processing for ensuring that packets are fairly shared among workers.
+The operation of the distributor is as follows:</p>
+<ol class="arabic simple">
+<li><p>Packets are passed to the distributor component by having the distributor lcore thread call the “rte_distributor_process()” API</p></li>
+<li><p>The worker lcores all share a single cache line with the distributor core in order to pass messages and packets to and from the worker.
+The process API call will poll all the worker cache lines to see what workers are requesting packets.</p></li>
+<li><p>As workers request packets, the distributor takes packets from the set of packets passed in and distributes them to the workers.
+As it does so, it examines the “tag” – stored in the RSS hash field in the mbuf – for each packet
+and records what tags are being processed by each  worker.</p></li>
+<li><p>If the next packet in the input set has a tag which is already being processed by a worker,
+then that packet will be queued up for processing by that worker
+and given to it in preference to other packets when that work next makes a request for work.
+This ensures that no two packets with the same tag are processed in parallel,
+and that all packets with the same tag are processed in input order.</p></li>
+<li><p>Once all input packets passed to the process API have either been distributed to workers
+or been queued up for a worker which is processing a given tag,
+then the process API returns to the caller.</p></li>
+</ol>
+<p>Other functions which are available to the distributor lcore are:</p>
+<ul class="simple">
+<li><p>rte_distributor_returned_pkts()</p></li>
+<li><p>rte_distributor_flush()</p></li>
+<li><p>rte_distributor_clear_returns()</p></li>
+</ul>
+<p>Of these the most important API call is “rte_distributor_returned_pkts()”
+which should only be called on the lcore which also calls the process API.
+It returns to the caller all packets which have finished processing by all worker cores.
+Within this set of returned packets, all packets sharing the same tag will be returned in their original order.</p>
+<p><strong>NOTE:</strong>
+If worker lcores buffer up packets internally for transmission in bulk afterwards,
+the packets sharing a tag will likely get out of order.
+Once a worker lcore requests a new packet, the distributor assumes that it has completely finished with the previous packet and
+therefore that additional packets with the same tag can safely be distributed to other workers –
+who may then flush their buffered packets sooner and cause packets to get out of order.</p>
+<p><strong>NOTE:</strong>
+No packet ordering guarantees are made about packets which do not share a common packet tag.</p>
+<p>Using the process and returned_pkts API, the following application workflow can be used,
+while allowing packet order within a packet flow – identified by a tag – to be maintained.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/packet_distributor2.png" src="../_images/packet_distributor2.png" />
+<figcaption>
+<p><span class="caption-number">Fig. 38.3 </span><span class="caption-text">Application workflow</span></p>
+</figcaption>
+</figure>
+<p>The flush and clear_returns API calls, mentioned previously,
+are likely of less use that the process and returned_pkts APIS, and are principally provided to aid in unit testing of the library.
+Descriptions of these functions and their use can be found in the DPDK API Reference document.</p>
+</section>
+<section id="worker-operation">
+<h2><span class="section-number">38.2. </span>Worker Operation</h2>
+<p>Worker cores are the cores which do the actual manipulation of the packets distributed by the packet distributor.
+Each worker calls “rte_distributor_get_pkt()” API to request a new packet when it has finished processing the previous one.
+[The previous packet should be returned to the distributor component by passing it as the final parameter to this API call.]</p>
+<p>Since it may be desirable to vary the number of worker cores, depending on the traffic load
+i.e. to save power at times of lighter load,
+it is possible to have a worker stop processing packets by calling “rte_distributor_return_pkt()” to indicate that
+it has finished the current packet and does not want a new one.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="rib_lib.html" title="previous chapter"><span class="section-number">37. </span>RIB Library</a></li>
+      <li>Next: <a href="reorder_lib.html" title="next chapter"><span class="section-number">39. </span>Reorder Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/packet_distrib_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

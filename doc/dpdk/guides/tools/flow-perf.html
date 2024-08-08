@@ -1,0 +1,453 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>8. Flow Performance Tool &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="9. Security Performance Tool" href="securityperf.html" />
+    <link rel="prev" title="7. dpdk-test-dma-perf Application" href="dmaperf.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="flow-performance-tool">
+<h1><span class="section-number">8. </span>Flow Performance Tool</h1>
+<p>Application for rte_flow performance testing.
+The application provides the ability to test insertion rate of specific
+rte_flow rule, by stressing it to the NIC, and calculates the insertion
+and deletion rates.</p>
+<p>The application allows to configure which rule to apply through several
+options of the command line.</p>
+<p>After that the application will start producing rules with same pattern
+but increasing the outer IP source address by 1 each time, thus it will
+give different flow each time, and all other items will have open masks.</p>
+<p>To assess the rule insertion rate, the flow performance tool breaks
+down the entire number of flow rule operations into windows of fixed size
+(defaults to 100000 flow rule operations per window, but can be configured).
+Then, the flow performance tool measures the total time per window and
+computes an average time across all windows.</p>
+<p>The application also provides the ability to measure rte flow deletion rate,
+in addition to memory consumption before and after the flow rules’ creation.</p>
+<p>The app supports single and multiple core performance measurements, and
+support multiple cores insertion/deletion as well.</p>
+<section id="compiling-the-application">
+<h2><span class="section-number">8.1. </span>Compiling the Application</h2>
+<p>The <code class="docutils literal notranslate"><span class="pre">test-flow-perf</span></code> application is compiled as part of the main compilation
+of the DPDK libraries and tools.</p>
+<p>Refer to the DPDK Getting Started Guides for details.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">8.2. </span>Running the Application</h2>
+<section id="eal-command-line-options">
+<h3><span class="section-number">8.2.1. </span>EAL Command-line Options</h3>
+<p>Please refer to <a class="reference internal" href="../linux_gsg/linux_eal_parameters.html"><span class="doc">EAL parameters (Linux)</span></a>
+or <a class="reference internal" href="../freebsd_gsg/freebsd_eal_parameters.html"><span class="doc">EAL parameters (FreeBSD)</span></a> for
+a list of available EAL command-line options.</p>
+</section>
+<section id="flow-performance-options">
+<h3><span class="section-number">8.2.2. </span>Flow Performance Options</h3>
+<p>The following are the command-line options for the flow performance application.
+They must be separated from the EAL options, shown in the previous section,
+with a <code class="docutils literal notranslate"><span class="pre">--</span></code> separator:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sudo ./dpdk-test-flow_perf -n 4 -a 08:00.0 -- --ingress --ether --ipv4 --queue --rules-count=1000000</span>
+</pre></div>
+</div>
+<p>The command line options are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--help</span></code>
+Display a help message and quit.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rules-count=N</span></code>
+Set the total number of flow rules to insert,
+where 1 &lt;= N &lt;= “number of flow rules”.
+The default value is 4,000,000.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rules-batch=N</span></code>
+Set the number of flow rules to insert per iteration window,
+where 1 &lt;= N &lt;= “number of flow rules per iteration window”.
+The default value is 100,000 flow rules per iteration window.
+For a total of –rules-count=1000000 flow rules to be inserted
+and an iteration window size of –rules-batch=100000 flow rules,
+the application will measure the insertion rate 10 times
+(i.e., once every 100000 flow rules) and then report an average
+insertion rate across the 10 measurements.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dump-iterations</span></code>
+Print rates for each iteration window.
+Default iteration window equals to the rules-batch size (i.e., 100,000).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--deletion-rate</span></code>
+Enable deletion rate calculations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dump-socket-mem</span></code>
+Dump the memory stats for each socket before the insertion and after.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-fwd</span></code>
+Enable packets forwarding after insertion/deletion operations.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--portmask=N</span></code>
+hexadecimal bitmask of ports to be used.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--cores=N</span></code>
+Set the number of needed cores to insert/delete rte_flow rules.
+Default cores count is 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--random-priority=N,S</span></code>
+Create flows with the priority attribute set randomly between 0 to N - 1
+and use S as seed for the pseudo-random number generator.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--meter-profile-alg</span></code>
+Set the traffic metering algorithm.
+Example: meter-profile-alg=srtcmp, default algorithm is srtcm_rfc2697</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--unique-data</span></code>
+Flag to set using unique data for all actions that support data,
+Such as header modify and encap actions. Default is using fixed
+data for any action that support data for all flows.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxq=N</span></code>
+Set the count of receive queues, default is 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txq=N</span></code>
+Set the count of send queues, default is 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rxd=N</span></code>
+Set the count of rxd, default is 256.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--txd=N</span></code>
+Set the count of txd, default is 256.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mbuf-size=N</span></code>
+Set the size of mbuf, default size is 2048.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mbuf-cache-size=N</span></code>
+Set the size of mbuf cache, default size is 512.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--total-mbuf-count=N</span></code>
+Set the count of total mbuf number, default count is 32000.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--meter-profile=N1,N2,N3</span></code>
+Set the CIR, CBS and EBS parameters, default values are 1250000, 156250 and 0.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--packet-mode</span></code>
+Enable packet mode for meter profile.</p></li>
+</ul>
+<p>Attributes:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--ingress</span></code>
+Set Ingress attribute to all flows attributes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--egress</span></code>
+Set Egress attribute to all flows attributes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--transfer</span></code>
+Set Transfer attribute to all flows attributes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--group=N</span></code>
+Set group for all flows, where N &gt;= 0.
+Default group is 0.</p></li>
+</ul>
+<p>Items:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ether</span></code>
+Add Ether item to all flows items, This item have open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vlan</span></code>
+Add VLAN item to all flows items,
+This item have VLAN value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">VNI_VALUE</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ipv4</span></code>
+Add IPv4 item to all flows items,
+This item have incremental source IP, with full mask.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--ipv6</span></code>
+Add IPv6 item to all flows item,
+This item have incremental source IP, with full mask.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tcp</span></code>
+Add TCP item to all flows items, This item have open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--udp</span></code>
+Add UDP item to all flows items, This item have open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vxlan</span></code>
+Add VXLAN item to all flows items,
+This item have VNI value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">VNI_VALUE</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vxlan-gpe</span></code>
+Add VXLAN-GPE item to all flows items,
+This item have VNI value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">VNI_VALUE</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--gre</span></code>
+Add GRE item to all flows items,
+This item have protocol value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">GRE_PROTO</span></code> with full mask, default protocol = 0x6558 “Ether”
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--geneve</span></code>
+Add GENEVE item to all flows items,
+This item have VNI value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">VNI_VALUE</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--gtp</span></code>
+Add GTP item to all flows items,
+This item have TEID value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">TEID_VALUE</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--meta</span></code>
+Add Meta item to all flows items,
+This item have data value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">META_DATA</span></code> with full mask, default value = 1.
+Other fields are open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tag</span></code>
+Add Tag item to all flows items,
+This item have data value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">META_DATA</span></code> with full mask, default value = 1.</p>
+<p>Also it have tag value defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">TAG_INDEX</span></code> with full mask, default value = 0.
+Other fields are open mask.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--icmpv4</span></code>
+Add icmpv4 item to all flows items, This item have open mask.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--icmpv6</span></code>
+Add icmpv6 item to all flows items, This item have open mask.</p></li>
+</ul>
+<p>Actions:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--port-id</span></code>
+Add port redirection action to all flows actions.
+Port redirection destination is defined in user_parameters.h
+under PORT_ID_DST, default value = 1.</p></li>
+</ul>
+<blockquote>
+<div><p>It can also has optional parameter like –port-id=N[,M] to
+specify the destination port, the number of values should be
+the same with number of set bits in portmask.</p>
+</div></blockquote>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--rss</span></code>
+Add RSS action to all flows actions,
+The queues in RSS action will be all queues configured
+in the app.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--queue</span></code>
+Add queue action to all flows items,
+The queue will change in round robin state for each flow.</p>
+<dl class="simple">
+<dt>For example:</dt><dd><p>The app running with 4 RX queues
+Flow #0: queue index 0
+Flow #1: queue index 1
+Flow #2: queue index 2
+Flow #3: queue index 3
+Flow #4: queue index 0
+…</p>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--jump</span></code>
+Add jump action to all flows actions.
+Jump action destination is defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">JUMP_ACTION_TABLE</span></code>, default value = 2.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--mark</span></code>
+Add mark action to all flows actions.
+Mark action id is defined in user_parameters.h
+under <code class="docutils literal notranslate"><span class="pre">MARK_ID</span></code>, default value = 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--count</span></code>
+Add count action to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-meta</span></code>
+Add set-meta action to all flows actions.
+Meta data is defined in user_parameters.h under <code class="docutils literal notranslate"><span class="pre">META_DATA</span></code>
+with full mask, default value = 1.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-tag</span></code>
+Add set-tag action to all flows actions.
+Meta data is defined in user_parameters.h under <code class="docutils literal notranslate"><span class="pre">META_DATA</span></code>
+with full mask, default value = 1.</p>
+<p>Tag index is defined in user_parameters.h under <code class="docutils literal notranslate"><span class="pre">TAG_INDEX</span></code>
+with full mask, default value = 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--drop</span></code>
+Add drop action to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hairpin-queue=N</span></code>
+Add hairpin queue action to all flows actions.
+The queue will change in round robin state for each flow.</p>
+<dl class="simple">
+<dt>For example:</dt><dd><p>The app running with 4 RX hairpin queues and 4 normal RX queues
+Flow #0: queue index 4
+Flow #1: queue index 5
+Flow #2: queue index 6
+Flow #3: queue index 7
+Flow #4: queue index 4
+…</p>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--hairpin-rss=N</span></code>
+Add hairpin RSS action to all flows actions.
+The queues in RSS action will be all hairpin queues configured
+in the app.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-src-mac</span></code>
+Add set source mac action to all flows actions.
+The mac to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-dst-mac</span></code>
+Add set destination mac action to all flows actions.
+The mac to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-set-src-ipv4</span></code>
+Add set source ipv4 action to all flows actions.
+The ipv4 header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-dst-ipv4</span></code>
+Add set destination ipv4 action to all flows actions.
+The ipv4 header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-src-ipv6</span></code>
+Add set source ipv6 action to all flows actions.
+The ipv6 header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-dst-ipv6</span></code>
+Add set destination ipv6 action to all flows actions.
+The ipv6 header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-src-tp</span></code>
+Add set source tp action to all flows actions.
+The tp sport header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-dst-tp</span></code>
+Add set destination tp action to all flows actions.
+The tp dport header to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--inc-tcp-ack</span></code>
+Add increment TCP acknowledgment by one to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dec-tcp-ack</span></code>
+Add decrement TCP acknowledgment by one to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--inc-tcp-seq</span></code>
+Add increment TCP sequence by one to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dec-tcp-seq</span></code>
+Add decrement TCP sequence by one to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-ttl</span></code>
+Add set IP ttl action to all flows actions.
+The ttl value to be set is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dec-ttl</span></code>
+Add decrement IP ttl by one to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-ipv4-dscp</span></code>
+Add set IPv4 dscp action to all flows actions.
+The dscp value to be is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--set-ipv6-dscp</span></code>
+Add set IPv6 dscp action to all flows actions.
+The dscp value to be is random each flow.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--flag</span></code>
+Add flag action to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--raw-encap=&lt;DATA&gt;</span></code>
+Add raw encap action to all flows actions.
+Data is the data needed to be encaped, with fixed values.
+Example: raw-encap=ether,ipv4,udp,vxlan</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--raw-decap=&lt;DATA&gt;</span></code>
+Add raw decap action to all flows actions.
+Data is the data needed to be decaped, with fixed values.
+Example: raw-decap=ether,ipv4,gre</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vxlan-encap</span></code>
+Add vxlan encap action to all flows actions.
+Data to encap is fixed with pattern: ether,ipv4,udp,vxlan,
+all encapped items have fixed values.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--vxlan-decap</span></code>
+Add vxlan decap action to all flows actions.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--policy-mtr=&lt;str&gt;</span></code>
+Add policy-mtr to create meter with policy and specify policy actions.
+Example: policy-mtr=rss,mark::drop</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--meter</span></code>
+Add meter action to all flows actions.
+Currently, 1 meter profile -&gt; N meter rules -&gt; N rte flows.</p></li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">DPDK Tools User Guides</a><ul>
+      <li>Previous: <a href="dmaperf.html" title="previous chapter"><span class="section-number">7. </span>dpdk-test-dma-perf Application</a></li>
+      <li>Next: <a href="securityperf.html" title="next chapter"><span class="section-number">9. </span>Security Performance Tool</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/tools/flow-perf.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

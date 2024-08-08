@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>9. Virtio_user as Exception Path &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="10. DPDK packet capture libraries and tools" href="packet_capture_framework.html" />
+    <link rel="prev" title="8. Virtio_user for Container Networking" href="virtio_user_for_container_networking.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="virtio-user-as-exception-path">
+<span id="id1"></span><h1><span class="section-number">9. </span>Virtio_user as Exception Path</h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This solution is only applicable to Linux systems.</p>
+</div>
+<p>The virtual device, virtio-user, was originally introduced with the vhost-user
+backend as a high performance solution for IPC (Inter-Process Communication)
+and user space container networking.</p>
+<p>Beyond this originally intended use,
+virtio-user can be used in conjunction with the vhost-kernel backend
+as a solution for dealing with exception path packets
+which need to be injected into the Linux kernel for processing there.
+In this regard, virtio-user and vhost in kernel space are an alternative to DPDK KNI
+for transferring packets between a DPDK packet processing application and the kernel stack.</p>
+<p>This solution has a number of advantages over alternatives such as KNI:</p>
+<ul>
+<li><p>Maintenance</p>
+<p>All kernel modules needed by this solution, vhost and vhost-net (kernel),
+are upstreamed and extensively used.</p>
+</li>
+<li><p>Features</p>
+<p>vhost-net is designed to be a networking solution, and, as such,
+has lots of networking related features,
+such as multi queue support, TSO, multi-segment buffer support, etc.</p>
+</li>
+<li><p>Performance</p>
+<p>Similar to KNI, this solution would use one or more kthreads
+to send/receive packets to/from user space DPDK applications,
+which minimises the impact on the polling DPDK threads.</p>
+</li>
+</ul>
+<p>The overview of an application using virtio-user as exception path is shown
+in <a class="reference internal" href="#figure-virtio-user-as-exception-path"><span class="std std-numref">Fig. 9.2</span></a>.</p>
+<figure class="align-default" id="id2">
+<span id="figure-virtio-user-as-exception-path"></span><img alt="../_images/virtio_user_as_exception_path.svg" src="../_images/virtio_user_as_exception_path.svg" /><figcaption>
+<p><span class="caption-number">Fig. 9.2 </span><span class="caption-text">Overview of a DPDK app using virtio-user as exception path</span></p>
+</figcaption>
+</figure>
+<section id="example-usage-with-testpmd">
+<h2><span class="section-number">9.1. </span>Example Usage With Testpmd</h2>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>These instructions assume that the vhost/vhost-net kernel modules are available
+and have already been loaded into the running kernel.
+It also assumes that the DPDK virtio driver has not been disabled in the DPDK build.</p>
+</div>
+<p>To run a simple test of virtio-user as exception path using testpmd:</p>
+<ol class="arabic">
+<li><p>Compile DPDK and bind a NIC to vfio-pci as documented in <a class="reference internal" href="../linux_gsg/linux_drivers.html#linux-gsg-linux-drivers"><span class="std std-ref">Linux Drivers</span></a>.</p>
+<p>This physical NIC is for communicating with the outside world,
+and serves as a packet source in this example.</p>
+</li>
+<li><p>Run testpmd to forward packets from NIC to kernel,
+passing in a suitable list of logical cores to run on  (<code class="docutils literal notranslate"><span class="pre">-l</span></code> parameter),
+and optionally the PCI address of the physical NIC to use (<code class="docutils literal notranslate"><span class="pre">-a</span></code> parameter).
+The virtio-user device for interfacing to the kernel is specified via a <code class="docutils literal notranslate"><span class="pre">--vdev</span></code> argument,
+taking the parameters described below.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/path/to/dpdk-testpmd -l &lt;cores&gt; -a &lt;pci BDF&gt; \</span>
+<span class="go">    --vdev=virtio_user0,path=/dev/vhost-net,queues=1,queue_size=1024</span>
+</pre></div>
+</div>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">path</span></code></dt><dd><p>The path to the kernel vhost-net device.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">queue_size</span></code></dt><dd><p>256 by default. To avoid shortage of descriptors, we can increase it to 1024.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">queues</span></code></dt><dd><p>Number of virt-queues. Each queue will be served by a kthread.</p>
+</dd>
+</dl>
+</li>
+<li><p>Once testpmd is running, a new network interface - called <code class="docutils literal notranslate"><span class="pre">tap0</span></code> by default -
+will be present on the system.
+This should be configured with an IP address and then enabled for use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ip addr add 192.168.1.1/24 dev tap0</span>
+<span class="go">ip link set dev tap0 up</span>
+</pre></div>
+</div>
+</li>
+<li><p>To observe packet forwarding through the kernel,
+a second testpmd instance can be run on the system,
+taking packets from the kernel using an <code class="docutils literal notranslate"><span class="pre">af_packet</span></code> socket on the <code class="docutils literal notranslate"><span class="pre">tap0</span></code> interface.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/path/to/dpdk-testpmd -l &lt;cores&gt; --vdev=net_af_packet0,iface=tap0 --in-memory --no-pci</span>
+</pre></div>
+</div>
+<p>When running this instance,
+we can use <code class="docutils literal notranslate"><span class="pre">--in-memory</span></code> flag to avoid hugepage naming conflicts with the previous instance,
+and we also use <code class="docutils literal notranslate"><span class="pre">--no-pci</span></code> flag to only use the <code class="docutils literal notranslate"><span class="pre">af_packet</span></code> interface
+for all traffic forwarding.</p>
+</li>
+<li><p>Running traffic into the system through the NIC should see that traffic returned back again,
+having been forwarded through both testpmd instances.
+This can be confirmed by checking the testpmd statistics on testpmd exit.</p></li>
+</ol>
+<p>For more advanced use of virtio-user with testpmd in this scenario,
+some other more advanced options may also be used.
+For example:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">--tx-offloads=0x02c</span></code></p>
+<p>This testpmd option enables Tx offloads for UDP and TCP checksum on transmit,
+as well as TCP TSO support.
+The list of the offload flag values can be seen in header
+<a class="reference external" href="https://doc.dpdk.org/api/rte__ethdev_8h.html">rte_ethdev.h</a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--enable-lro</span></code></p>
+<p>This testpmd option is used to negotiate VIRTIO_NET_F_GUEST_TSO4 and
+VIRTIO_NET_F_GUEST_TSO6 feature so that large packets from the kernel can be
+transmitted to the DPDK application and further TSOed by physical NIC.
+If unsupported by the physical NIC, errors may be reported by testpmd with this option.</p>
+</li>
+<li><p>Enabling Rx checksum offloads for physical port:</p>
+<p>Within testpmd, you can enable and disable offloads on a per-port basis,
+rather than enabling them for both ports.
+For the physical NIC, it may be desirable to enable checksum offload on packet Rx.
+This may be done as below, if testpmd is run with <code class="docutils literal notranslate"><span class="pre">-i</span></code> flag for interactive mode.</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port stop 0</span>
+<span class="go">testpmd&gt; port config 0 rx_offload tcp_cksum on</span>
+<span class="go">testpmd&gt; port config 0 rx_offload udp_cksum on</span>
+<span class="go">testpmd&gt; port start 0</span>
+</pre></div>
+</div>
+</div></blockquote>
+</li>
+<li><p>Multiple queue support</p>
+<p>Better performance may be achieved by using multiple queues,
+so that multiple kernel threads are handling the traffic on the kernel side.
+For example, to use 2 queues on both NIC and virtio ports,
+while also enabling TX offloads and LRO support:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">/path/to/dpdk-testpmd --vdev=virtio_user0,path=/dev/vhost-net,queues=2,queue_size=1024 -- \</span>
+<span class="go">    -i --tx-offloads=0x002c --enable-lro --txq=2 --rxq=2 --txd=1024 --rxd=1024</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="creating-virtio-user-ports-within-an-application">
+<h2><span class="section-number">9.2. </span>Creating Virtio-User Ports within an Application</h2>
+<p>To use virtio-user ports within an application,
+it is not necessary to explicitly initialize those ports using EAL arguments at startup.
+Instead, one can use the generic EAL API
+<a class="reference external" href="https://doc.dpdk.org/api/rte__dev_8h.html#ad32e8eebf1f81ef9f290cb296b0c90bb">rte_eal_hotplug_add</a>
+function to create a new instance at startup.
+For example, to create a basic virtio-user port, the following code could be used:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="n">rte_eal_hotplug_add</span><span class="p">(</span><span class="s">&quot;vdev&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;virtio_user0&quot;</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;path=/dev/vhost-net&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>A fuller code example is shown below, where a virtio-user port, and hence kernel netdev,
+is created for each NIC port discovered by DPDK.
+Each virtio-user port is given the MAC address of its matching physical port
+(assuming app was run without vdev args on command line, so all ports auto-discovered are HW ones).
+These new virtio-user netdevs will appear in the kernel port listings
+as <code class="docutils literal notranslate"><span class="pre">virtio_user0</span></code>, <code class="docutils literal notranslate"><span class="pre">virtio_user1</span></code>, etc.,
+based on the names passed in as <code class="docutils literal notranslate"><span class="pre">iface=</span></code> via the <code class="docutils literal notranslate"><span class="pre">portargs</span></code> parameter.</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="n">nb_ports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_eth_dev_count_avail</span><span class="p">();</span><span class="w"></span>
+
+<span class="cm">/* Create a vhost_user port for each physical port */</span><span class="w"></span>
+<span class="kt">unsigned</span><span class="w"> </span><span class="n">port_count</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="n">RTE_ETH_FOREACH_DEV</span><span class="p">(</span><span class="n">portid</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">portname</span><span class="p">[</span><span class="mi">32</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="kt">char</span><span class="w"> </span><span class="n">portargs</span><span class="p">[</span><span class="mi">256</span><span class="p">];</span><span class="w"></span>
+<span class="w">    </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_ether_addr</span><span class="w"> </span><span class="n">addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">};</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* once we have created a virtio port for each physical port, stop creating more */</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">++</span><span class="n">port_count</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="n">nb_ports</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* get MAC address of physical port to use as MAC of virtio_user port */</span><span class="w"></span>
+<span class="w">    </span><span class="n">rte_eth_macaddr_get</span><span class="p">(</span><span class="n">portid</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">addr</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* set the name and arguments */</span><span class="w"></span>
+<span class="w">    </span><span class="n">snprintf</span><span class="p">(</span><span class="n">portname</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">portname</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;virtio_user%u&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">portid</span><span class="p">);</span><span class="w"></span>
+<span class="w">    </span><span class="n">snprintf</span><span class="p">(</span><span class="n">portargs</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="n">portargs</span><span class="p">),</span><span class="w"></span>
+<span class="w">            </span><span class="s">&quot;path=/dev/vhost-net,queues=1,queue_size=%u,iface=%s,mac=&quot;</span><span class="w"> </span><span class="n">RTE_ETHER_ADDR_PRT_FMT</span><span class="p">,</span><span class="w"></span>
+<span class="w">            </span><span class="n">RX_RING_SIZE</span><span class="p">,</span><span class="w"> </span><span class="n">portname</span><span class="p">,</span><span class="w"> </span><span class="n">RTE_ETHER_ADDR_BYTES</span><span class="p">(</span><span class="o">&amp;</span><span class="n">addr</span><span class="p">));</span><span class="w"></span>
+
+<span class="w">    </span><span class="cm">/* add the vdev for virtio_user */</span><span class="w"></span>
+<span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="n">rte_eal_hotplug_add</span><span class="p">(</span><span class="s">&quot;vdev&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">portname</span><span class="p">,</span><span class="w"> </span><span class="n">portargs</span><span class="p">)</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"></span>
+<span class="w">        </span><span class="n">rte_exit</span><span class="p">(</span><span class="n">EXIT_FAILURE</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Cannot create paired port for port %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">portid</span><span class="p">);</span><span class="w"></span>
+
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Once these virtio-user ports have been created in the loop,
+all ports, both physical and virtual,
+may be initialized and used as normal in the application.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="virtio_user_for_container_networking.html" title="previous chapter"><span class="section-number">8. </span>Virtio_user for Container Networking</a></li>
+      <li>Next: <a href="packet_capture_framework.html" title="next chapter"><span class="section-number">10. </span>DPDK packet capture libraries and tools</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/virtio_user_as_exception_path.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

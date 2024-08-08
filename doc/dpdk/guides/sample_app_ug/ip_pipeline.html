@@ -1,0 +1,739 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>37. Internet Protocol (IP) Pipeline Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="38. Test Pipeline Application" href="test_pipeline.html" />
+    <link rel="prev" title="36. Vdpa Sample Application" href="vdpa.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="internet-protocol-ip-pipeline-application">
+<h1><span class="section-number">37. </span>Internet Protocol (IP) Pipeline Application</h1>
+<section id="application-overview">
+<h2><span class="section-number">37.1. </span>Application overview</h2>
+<p>The <em>Internet Protocol (IP) Pipeline</em> application is intended to be a vehicle for rapid development of packet processing
+applications on multi-core CPUs.</p>
+<p>Following OpenFlow and P4 design principles, the application can be used to create functional blocks called pipelines out
+of input/output ports, tables and actions in a modular way. Multiple pipelines can be inter-connected through packet queues
+to create complete applications (super-pipelines).</p>
+<p>The pipelines are mapped to application threads, with each pipeline executed by a single thread and each thread able to run
+one or several pipelines. The possibilities of creating pipelines out of ports, tables and actions, connecting multiple
+pipelines together and mapping the pipelines to execution threads are endless, therefore this application can be seen as
+a true application generator.</p>
+<p>Pipelines are created and managed through Command Line Interface (CLI):</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Any standard TCP client (e.g. telnet, netcat, custom script, etc) is typically able to connect to the application, send
+commands through the network and wait for the response before pushing the next command.</p></li>
+<li><dl class="simple">
+<dt>All the application objects are created and managed through CLI commands:</dt><dd><ul>
+<li><p>‘Primitive’ objects used to create pipeline ports: memory pools, links (i.e. network interfaces), SW queues, traffic managers, etc.</p></li>
+<li><p>Action profiles: used to define the actions to be executed by pipeline input/output ports and tables.</p></li>
+<li><p>Pipeline components: input/output ports, tables, pipelines, mapping of pipelines to execution threads.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div></blockquote>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">37.2. </span>Running the application</h2>
+<p>The application startup command line is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-ip_pipeline [EAL_ARGS] -- [-s SCRIPT_FILE] [-h HOST] [-p PORT]
+</pre></div>
+</div>
+<p>The application startup arguments are:</p>
+<p><code class="docutils literal notranslate"><span class="pre">-s</span> <span class="pre">SCRIPT_FILE</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Optional: Yes</p></li>
+<li><p>Default: Not present</p></li>
+<li><p>Argument: Path to the CLI script file to be run at application startup.
+No CLI script file will run at startup if this argument is not present.</p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">-h</span> <span class="pre">HOST</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Optional: Yes</p></li>
+<li><p>Default: <code class="docutils literal notranslate"><span class="pre">0.0.0.0</span></code></p></li>
+<li><p>Argument: IP Address of the host running ip pipeline application to be used by
+remote TCP based client (telnet, netcat, etc.) for connection.</p></li>
+</ul>
+</div></blockquote>
+<p><code class="docutils literal notranslate"><span class="pre">-p</span> <span class="pre">PORT</span></code></p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Optional: Yes</p></li>
+<li><p>Default: <code class="docutils literal notranslate"><span class="pre">8086</span></code></p></li>
+<li><p>Argument: TCP port number at which the ip pipeline is running.
+This port number should be used by remote TCP client (such as telnet, netcat, etc.) to connect to host application.</p></li>
+</ul>
+</div></blockquote>
+<p>Refer to <em>DPDK Getting Started Guide</em> for general information on running applications and the Environment Abstraction Layer (EAL) options.</p>
+<p>The following is an example command to run ip pipeline application configured for layer 2 forwarding:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>./&lt;build_dir&gt;/examples/dpdk-ip_pipeline -c 0x3 -- -s examples/route_ecmp.cli
+</pre></div>
+</div>
+<p>The application should start successfully and display as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">EAL: Detected 40 lcore(s)</span>
+<span class="go">EAL: Detected 2 NUMA nodes</span>
+<span class="go">EAL: Multi-process socket /var/run/.rte_unix</span>
+<span class="go">EAL: Probing VFIO support...</span>
+<span class="go">EAL: PCI device 0000:02:00.0 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 8086:10fb net_ixgbe</span>
+<span class="go">...</span>
+</pre></div>
+</div>
+<p>To run remote client (e.g. telnet) to communicate with the ip pipeline application:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>telnet <span class="m">127</span>.0.0.1 <span class="m">8086</span>
+</pre></div>
+</div>
+<p>When running a telnet client as above, command prompt is displayed:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">Trying 127.0.0.1...</span>
+<span class="go">Connected to 127.0.0.1.</span>
+<span class="go">Escape character is &#39;^]&#39;.</span>
+
+<span class="go">Welcome to IP Pipeline!</span>
+
+<span class="go">pipeline&gt;</span>
+</pre></div>
+</div>
+<p>Once application and telnet client start running, messages can be sent from client to application.
+At any stage, telnet client can be terminated using the quit command.</p>
+</section>
+<section id="application-stages">
+<h2><span class="section-number">37.3. </span>Application stages</h2>
+<section id="initialization">
+<h3><span class="section-number">37.3.1. </span>Initialization</h3>
+<p>During this stage, EAL layer is initialised and application specific arguments are parsed. Furthermore, the data structures
+(i.e. linked lists) for application objects are initialized. In case of any initialization error, an error message
+is displayed and the application is terminated.</p>
+</section>
+<section id="run-time">
+<span id="ip-pipeline-runtime"></span><h3><span class="section-number">37.3.2. </span>Run-time</h3>
+<p>The main thread is creating and managing all the application objects based on CLI input.</p>
+<p>Each data plane thread runs one or several pipelines previously assigned to it in round-robin order. Each data plane thread
+executes two tasks in time-sharing mode:</p>
+<ol class="arabic simple">
+<li><p><em>Packet processing task</em>: Process bursts of input packets read from the pipeline input ports.</p></li>
+<li><p><em>Message handling task</em>: Periodically, the data plane thread pauses the packet processing task and polls for request
+messages send by the main thread. Examples: add/remove pipeline to/from current data plane thread, add/delete rules
+to/from given table of a specific pipeline owned by the current data plane thread, read statistics, etc.</p></li>
+</ol>
+</section>
+</section>
+<section id="examples">
+<h2><span class="section-number">37.4. </span>Examples</h2>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-number">Table 37.1 </span><span class="caption-text">Pipeline examples provided with the application</span></caption>
+<colgroup>
+<col style="width: 24%" />
+<col style="width: 23%" />
+<col style="width: 16%" />
+<col style="width: 37%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Table(s)</p></th>
+<th class="head"><p>Actions</p></th>
+<th class="head"><p>Messages</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>L2fwd</p>
+<p>Note: Implemented
+using pipeline with
+a simple pass-through
+connection between
+input and output
+ports.</p>
+</td>
+<td><p>Stub</p></td>
+<td><p>Forward</p></td>
+<td><ol class="arabic simple">
+<li><p>Mempool create</p></li>
+<li><p>Link create</p></li>
+<li><p>Pipeline create</p></li>
+<li><p>Pipeline port in/out</p></li>
+<li><p>Pipeline table</p></li>
+<li><p>Pipeline port in table</p></li>
+<li><p>Pipeline enable</p></li>
+<li><p>Pipeline table rule add</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Flow classification</p></td>
+<td><p>Exact match</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>Key = byte array</dt><dd><p>(16 bytes)</p>
+</dd>
+</dl>
+</li>
+<li><p>Offset = 278</p></li>
+<li><p>Table size = 64K</p></li>
+</ul>
+</td>
+<td><p>Forward</p></td>
+<td><ol class="arabic simple">
+<li><p>Mempool create</p></li>
+<li><p>Link create</p></li>
+<li><p>Pipeline create</p></li>
+<li><p>Pipeline port in/out</p></li>
+<li><p>Pipeline table</p></li>
+<li><p>Pipeline port in table</p></li>
+<li><p>Pipeline enable</p></li>
+<li><p>Pipeline table rule add default</p></li>
+<li><p>Pipeline table rule add</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-even"><td><p>Firewall</p></td>
+<td><p>ACL</p>
+<ul class="simple">
+<li><p>Key = n-tuple</p></li>
+<li><p>Offset = 270</p></li>
+<li><p>Table size = 4K</p></li>
+</ul>
+</td>
+<td><p>Allow/Drop</p></td>
+<td><ol class="arabic simple">
+<li><p>Mempool create</p></li>
+<li><p>Link create</p></li>
+<li><p>Pipeline create</p></li>
+<li><p>Pipeline port in/out</p></li>
+<li><p>Pipeline table</p></li>
+<li><p>Pipeline port in table</p></li>
+<li><p>Pipeline enable</p></li>
+<li><p>Pipeline table rule add default</p></li>
+<li><p>Pipeline table rule add</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-odd"><td><p>IP routing</p></td>
+<td><p>LPM (IPv4)</p>
+<ul class="simple">
+<li><p>Key = IP dest addr</p></li>
+<li><p>Offset = 286</p></li>
+<li><p>Table size = 4K</p></li>
+</ul>
+</td>
+<td><p>Forward</p></td>
+<td><ol class="arabic simple">
+<li><p>Mempool Create</p></li>
+<li><p>Link create</p></li>
+<li><p>Pipeline create</p></li>
+<li><p>Pipeline port in/out</p></li>
+<li><p>Pipeline table</p></li>
+<li><p>Pipeline port in table</p></li>
+<li><p>Pipeline enable</p></li>
+<li><p>Pipeline table rule add default</p></li>
+<li><p>Pipeline table rule add</p></li>
+</ol>
+</td>
+</tr>
+<tr class="row-even"><td><p>Equal-cost multi-path
+routing (ECMP)</p></td>
+<td><p>LPM (IPv4)</p>
+<ul class="simple">
+<li><p>Key = IP dest addr</p></li>
+<li><p>Offset = 286</p></li>
+<li><p>Table size = 4K</p></li>
+</ul>
+<p>Array</p>
+<ul class="simple">
+<li><p>Key = Array index</p></li>
+<li><p>Offset = 256</p></li>
+<li><p>Size = 64K</p></li>
+</ul>
+</td>
+<td><p>Forward,
+load balance,
+encap ether</p></td>
+<td><ol class="arabic simple">
+<li><p>Mempool Create</p></li>
+<li><p>Link create</p></li>
+<li><p>Pipeline create</p></li>
+<li><p>Pipeline port in/out</p></li>
+<li><p>Pipeline table (LPM)</p></li>
+<li><p>Pipeline table (Array)</p></li>
+<li><p>Pipeline port in table (LPM)</p></li>
+<li><p>Pipeline enable</p></li>
+<li><p>Pipeline table rule add default</p></li>
+<li><p>Pipeline table rule add(LPM)</p></li>
+<li><p>Pipeline table rule add(Array)</p></li>
+</ol>
+</td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="command-line-interface-cli">
+<h2><span class="section-number">37.5. </span>Command Line Interface (CLI)</h2>
+<section id="link">
+<h3><span class="section-number">37.5.1. </span>Link</h3>
+<blockquote>
+<div><p>Link configuration</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>link &lt;link_name&gt;
+ dev &lt;device_name&gt;|port &lt;port_id&gt;
+ rxq &lt;n_queues&gt; &lt;queue_size&gt; &lt;mempool_name&gt;
+ txq &lt;n_queues&gt; &lt;queue_size&gt; promiscuous on | off
+ [rss &lt;qid_0&gt; ... &lt;qid_n&gt;]
+</pre></div>
+</div>
+<p>Note: The PCI device name must be specified in the Domain:Bus:Device.Function format.</p>
+</div></blockquote>
+</section>
+<section id="mempool">
+<h3><span class="section-number">37.5.2. </span>Mempool</h3>
+<blockquote>
+<div><p>Mempool create</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mempool &lt;mempool_name&gt; buffer &lt;buffer_size&gt;
+pool &lt;pool_size&gt; cache &lt;cache_size&gt; cpu &lt;cpu_id&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="software-queue">
+<h3><span class="section-number">37.5.3. </span>Software queue</h3>
+<blockquote>
+<div><p>Create software queue</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>swq &lt;swq_name&gt; size &lt;size&gt; cpu &lt;cpu_id&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="traffic-manager">
+<h3><span class="section-number">37.5.4. </span>Traffic manager</h3>
+<blockquote>
+<div><p>Add traffic manager subport profile</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmgr subport profile
+ &lt;tb_rate&gt; &lt;tb_size&gt;
+ &lt;tc0_rate&gt; &lt;tc1_rate&gt; &lt;tc2_rate&gt; &lt;tc3_rate&gt; &lt;tc4_rate&gt;
+ &lt;tc5_rate&gt; &lt;tc6_rate&gt; &lt;tc7_rate&gt; &lt;tc8_rate&gt;
+ &lt;tc9_rate&gt; &lt;tc10_rate&gt; &lt;tc11_rate&gt; &lt;tc12_rate&gt;
+ &lt;tc_period&gt;
+</pre></div>
+</div>
+<p>Add traffic manager pipe profile</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmgr pipe profile
+ &lt;tb_rate&gt; &lt;tb_size&gt;
+ &lt;tc0_rate&gt; &lt;tc1_rate&gt; &lt;tc2_rate&gt; &lt;tc3_rate&gt; &lt;tc4_rate&gt;
+ &lt;tc5_rate&gt; &lt;tc6_rate&gt; &lt;tc7_rate&gt; &lt;tc8_rate&gt;
+ &lt;tc9_rate&gt; &lt;tc10_rate&gt; &lt;tc11_rate&gt; &lt;tc12_rate&gt;
+ &lt;tc_period&gt;
+ &lt;tc_ov_weight&gt;
+ &lt;wrr_weight0..3&gt;
+</pre></div>
+</div>
+<p>Create traffic manager port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmgr &lt;tmgr_name&gt;
+ rate &lt;rate&gt;
+ spp &lt;n_subports_per_port&gt;
+ pps &lt;n_pipes_per_subport&gt;
+ fo &lt;frame_overhead&gt;
+ mtu &lt;mtu&gt;
+ cpu &lt;cpu_id&gt;
+</pre></div>
+</div>
+<p>Configure traffic manager subport</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmgr &lt;tmgr_name&gt;
+ subport &lt;subport_id&gt;
+ profile &lt;subport_profile_id&gt;
+</pre></div>
+</div>
+<p>Configure traffic manager pipe</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tmgr &lt;tmgr_name&gt;
+ subport &lt;subport_id&gt;
+ pipe from &lt;pipe_id_first&gt; to &lt;pipe_id_last&gt;
+ profile &lt;pipe_profile_id&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="tap">
+<h3><span class="section-number">37.5.5. </span>Tap</h3>
+<blockquote>
+<div><p>Create tap port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>tap &lt;name&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="cryptodev">
+<h3><span class="section-number">37.5.6. </span>Cryptodev</h3>
+<blockquote>
+<div><p>Create cryptodev port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>cryptodev &lt;cryptodev_name&gt;
+ dev &lt;DPDK Cryptodev PMD name&gt;
+ queue &lt;n_queues&gt; &lt;queue_size&gt;
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="action-profile">
+<h3><span class="section-number">37.5.7. </span>Action profile</h3>
+<blockquote>
+<div><p>Create action profile for pipeline input port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>port in action profile &lt;profile_name&gt;
+ [filter match | mismatch offset &lt;key_offset&gt; mask &lt;key_mask&gt; key &lt;key_value&gt; port &lt;port_id&gt;]
+ [balance offset &lt;key_offset&gt; mask &lt;key_mask&gt; port &lt;port_id0&gt; ... &lt;port_id15&gt;]
+</pre></div>
+</div>
+<p>Create action profile for the pipeline table</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>table action profile &lt;profile_name&gt;
+ ipv4 | ipv6
+ offset &lt;ip_offset&gt;
+ fwd
+ [balance offset &lt;key_offset&gt; mask &lt;key_mask&gt; outoffset &lt;out_offset&gt;]
+ [meter srtcm | trtcm
+     tc &lt;n_tc&gt;
+     stats none | pkts | bytes | both]
+ [tm spp &lt;n_subports_per_port&gt; pps &lt;n_pipes_per_subport&gt;]
+ [encap ether | vlan | qinq | mpls | pppoe]
+ [nat src | dst
+     proto udp | tcp]
+ [ttl drop | fwd
+     stats none | pkts]
+ [stats pkts | bytes | both]
+ [sym_crypto cryptodev &lt;cryptodev_name&gt;
+     mempool_create &lt;mempool_name&gt; mempool_init &lt;mempool_name&gt;]
+ [time]
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="pipeline">
+<h3><span class="section-number">37.5.8. </span>Pipeline</h3>
+<p>Create pipeline</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt;
+ period &lt;timer_period_ms&gt;
+ offset_port_id &lt;offset_port_id&gt;
+ cpu &lt;cpu_id&gt;
+</pre></div>
+</div>
+<p>Create pipeline input port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port in
+ bsz &lt;burst_size&gt;
+ link &lt;link_name&gt; rxq &lt;queue_id&gt;
+ | swq &lt;swq_name&gt;
+ | tmgr &lt;tmgr_name&gt;
+ | tap &lt;tap_name&gt; mempool &lt;mempool_name&gt; mtu &lt;mtu&gt;
+ | source mempool &lt;mempool_name&gt; file &lt;file_name&gt; bpp &lt;n_bytes_per_pkt&gt;
+ [action &lt;port_in_action_profile_name&gt;]
+ [disabled]
+</pre></div>
+</div>
+<p>Create pipeline output port</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port out
+ bsz &lt;burst_size&gt;
+ link &lt;link_name&gt; txq &lt;txq_id&gt;
+ | swq &lt;swq_name&gt;
+ | tmgr &lt;tmgr_name&gt;
+ | tap &lt;tap_name&gt;
+ | sink [file &lt;file_name&gt; pkts &lt;max_n_pkts&gt;]
+</pre></div>
+</div>
+<p>Create pipeline table</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table
+     match
+     acl
+         ipv4 | ipv6
+         offset &lt;ip_header_offset&gt;
+         size &lt;n_rules&gt;
+     | array
+         offset &lt;key_offset&gt;
+         size &lt;n_keys&gt;
+     | hash
+         ext | lru
+         key &lt;key_size&gt;
+         mask &lt;key_mask&gt;
+         offset &lt;key_offset&gt;
+         buckets &lt;n_buckets&gt;
+         size &lt;n_keys&gt;
+     | lpm
+         ipv4 | ipv6
+         offset &lt;ip_header_offset&gt;
+         size &lt;n_rules&gt;
+     | stub
+ [action &lt;table_action_profile_name&gt;]
+</pre></div>
+</div>
+<p>Connect pipeline input port to table</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port in &lt;port_id&gt; table &lt;table_id&gt;
+</pre></div>
+</div>
+<p>Display statistics for specific pipeline input port, output port
+or table</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port in &lt;port_id&gt; stats read [clear]
+pipeline &lt;pipeline_name&gt; port out &lt;port_id&gt; stats read [clear]
+pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; stats read [clear]
+</pre></div>
+</div>
+<p>Enable given input port for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port out &lt;port_id&gt; disable
+</pre></div>
+</div>
+<p>Disable given input port for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; port out &lt;port_id&gt; disable
+</pre></div>
+</div>
+<p>Add default rule to table for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; rule add
+   match
+      default
+   action
+      fwd
+         drop
+         | port &lt;port_id&gt;
+         | meta
+         | table &lt;table_id&gt;
+</pre></div>
+</div>
+<p>Add rule to table for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; rule add
+
+match
+   acl
+      priority &lt;priority&gt;
+      ipv4 | ipv6 &lt;sa&gt; &lt;sa_depth&gt; &lt;da&gt; &lt;da_depth&gt;
+      &lt;sp0&gt; &lt;sp1&gt; &lt;dp0&gt; &lt;dp1&gt; &lt;proto&gt;
+   | array &lt;pos&gt;
+   | hash
+      raw &lt;key&gt;
+      | ipv4_5tuple &lt;sa&gt; &lt;da&gt; &lt;sp&gt; &lt;dp&gt; &lt;proto&gt;
+      | ipv6_5tuple &lt;sa&gt; &lt;da&gt; &lt;sp&gt; &lt;dp&gt; &lt;proto&gt;
+      | ipv4_addr &lt;addr&gt;
+      | ipv6_addr &lt;addr&gt;
+      | qinq &lt;svlan&gt; &lt;cvlan&gt;
+   | lpm
+      ipv4 | ipv6 &lt;addr&gt; &lt;depth&gt;
+
+action
+   fwd
+      drop
+      | port &lt;port_id&gt;
+      | meta
+      | table &lt;table_id&gt;
+   [balance &lt;out0&gt; ... &lt;out7&gt;]
+   [meter
+      tc0 meter &lt;meter_profile_id&gt; policer g &lt;pa&gt; y &lt;pa&gt; r &lt;pa&gt;
+      [tc1 meter &lt;meter_profile_id&gt; policer g &lt;pa&gt; y &lt;pa&gt; r &lt;pa&gt;
+      tc2 meter &lt;meter_profile_id&gt; policer g &lt;pa&gt; y &lt;pa&gt; r &lt;pa&gt;
+      tc3 meter &lt;meter_profile_id&gt; policer g &lt;pa&gt; y &lt;pa&gt; r &lt;pa&gt;]]
+   [tm subport &lt;subport_id&gt; pipe &lt;pipe_id&gt;]
+   [encap
+      ether &lt;da&gt; &lt;sa&gt;
+      | vlan &lt;da&gt; &lt;sa&gt; &lt;pcp&gt; &lt;dei&gt; &lt;vid&gt;
+      | qinq &lt;da&gt; &lt;sa&gt; &lt;pcp&gt; &lt;dei&gt; &lt;vid&gt; &lt;pcp&gt; &lt;dei&gt; &lt;vid&gt;
+      | mpls unicast | multicast
+         &lt;da&gt; &lt;sa&gt;
+         label0 &lt;label&gt; &lt;tc&gt; &lt;ttl&gt;
+         [label1 &lt;label&gt; &lt;tc&gt; &lt;ttl&gt;
+         [label2 &lt;label&gt; &lt;tc&gt; &lt;ttl&gt;
+         [label3 &lt;label&gt; &lt;tc&gt; &lt;ttl&gt;]]]
+      | pppoe &lt;da&gt; &lt;sa&gt; &lt;session_id&gt;]
+   [nat ipv4 | ipv6 &lt;addr&gt; &lt;port&gt;]
+   [ttl dec | keep]
+   [stats]
+   [time]
+   [sym_crypto
+      encrypt | decrypt
+      type
+      | cipher
+         cipher_algo &lt;algo&gt; cipher_key &lt;key&gt; cipher_iv &lt;iv&gt;
+      | cipher_auth
+         cipher_algo &lt;algo&gt; cipher_key &lt;key&gt; cipher_iv &lt;iv&gt;
+         auth_algo &lt;algo&gt; auth_key &lt;key&gt; digest_size &lt;size&gt;
+      | aead
+         aead_algo &lt;algo&gt; aead_key &lt;key&gt; aead_iv &lt;iv&gt; aead_aad &lt;aad&gt;
+         digest_size &lt;size&gt;
+      data_offset &lt;data_offset&gt;]
+
+where:
+   &lt;pa&gt; ::= g | y | r | drop
+</pre></div>
+</div>
+<p>Add bulk rules to table for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; rule add bulk &lt;file_name&gt; &lt;n_rules&gt;
+
+Where:
+- file_name = path to file
+- File line format = match &lt;match&gt; action &lt;action&gt;
+</pre></div>
+</div>
+<p>Delete table rule for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; rule delete
+   match &lt;match&gt;
+</pre></div>
+</div>
+<p>Delete default table rule for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; rule delete
+   match
+      default
+</pre></div>
+</div>
+<p>Add meter profile to the table for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; meter profile &lt;meter_profile_id&gt;
+ add srtcm cir &lt;cir&gt; cbs &lt;cbs&gt; ebs &lt;ebs&gt;
+ | trtcm cir &lt;cir&gt; pir &lt;pir&gt; cbs &lt;cbs&gt; pbs &lt;pbs&gt;
+</pre></div>
+</div>
+<p>Delete meter profile from the table for specific pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt;
+ meter profile &lt;meter_profile_id&gt; delete
+</pre></div>
+</div>
+<p>Update the dscp table for meter or traffic manager action for specific
+pipeline instance</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pipeline &lt;pipeline_name&gt; table &lt;table_id&gt; dscp &lt;file_name&gt;
+
+Where:
+   - file_name = path to file
+   - exactly 64 lines
+   - File line format = &lt;tc_id&gt; &lt;tc_queue_id&gt; &lt;color&gt;, with &lt;color&gt; as: g | y | r
+</pre></div>
+</div>
+</section>
+<section id="pipeline-enable-disable">
+<h3><span class="section-number">37.5.9. </span>Pipeline enable/disable</h3>
+<blockquote>
+<div><p>Enable given pipeline instance for specific data plane thread</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>thread &lt;thread_id&gt; pipeline &lt;pipeline_name&gt; enable
+</pre></div>
+</div>
+<p>Disable given pipeline instance for specific data plane thread</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>thread &lt;thread_id&gt; pipeline &lt;pipeline_name&gt; disable
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="vdpa.html" title="previous chapter"><span class="section-number">36. </span>Vdpa Sample Application</a></li>
+      <li>Next: <a href="test_pipeline.html" title="next chapter"><span class="section-number">38. </span>Test Pipeline Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/ip_pipeline.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

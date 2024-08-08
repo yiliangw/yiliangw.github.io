@@ -1,0 +1,236 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>19. ENETC Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="20. ENETFEC Poll Mode Driver" href="enetfec.html" />
+    <link rel="prev" title="18. ENA Poll Mode Driver" href="ena.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="enetc-poll-mode-driver">
+<h1><span class="section-number">19. </span>ENETC Poll Mode Driver</h1>
+<p>The ENETC NIC PMD (<strong>librte_net_enetc</strong>) provides poll mode driver
+support for the inbuilt NIC found in the <strong>NXP LS1028</strong> SoC.</p>
+<p>More information can be found at <a class="reference external" href="https://www.nxp.com/products/processors-and-microcontrollers/arm-based-processors-and-mcus/qoriq-layerscape-arm-processors/qoriq-layerscape-1028a-industrial-applications-processor:LS1028A">NXP Official Website</a>.</p>
+<p>This section provides an overview of the NXP ENETC
+and how it is integrated into the DPDK.</p>
+<p>Contents summary</p>
+<ul class="simple">
+<li><p>ENETC overview</p></li>
+<li><p>Supported ENETC SoCs</p></li>
+<li><p>ENETC features</p></li>
+<li><p>PCI bus driver</p></li>
+<li><p>NIC driver</p></li>
+<li><p>Prerequisites</p></li>
+<li><p>Driver compilation and testing</p></li>
+</ul>
+<section id="enetc-overview">
+<h2><span class="section-number">19.1. </span>ENETC Overview</h2>
+<p>ENETC is a PCI Integrated End Point(IEP). IEP implements
+peripheral devices in an SoC such that software sees them as PCIe device.
+ENETC is an evolution of BDR(Buffer Descriptor Ring) based networking
+IPs.</p>
+<p>This infrastructure simplifies adding support for IEP and facilitates in following:</p>
+<ul class="simple">
+<li><p>Device discovery and location</p></li>
+<li><p>Resource requirement discovery and allocation (e.g. interrupt assignment,
+device register address)</p></li>
+<li><p>Event reporting</p></li>
+</ul>
+</section>
+<section id="supported-enetc-socs">
+<h2><span class="section-number">19.2. </span>Supported ENETC SoCs</h2>
+<ul class="simple">
+<li><p>LS1028</p></li>
+</ul>
+</section>
+<section id="enetc-features">
+<h2><span class="section-number">19.3. </span>ENETC Features</h2>
+<ul class="simple">
+<li><p>Link Status</p></li>
+<li><p>Packet type information</p></li>
+<li><p>Basic stats</p></li>
+<li><p>Promiscuous</p></li>
+<li><p>Multicast</p></li>
+<li><p>Jumbo packets</p></li>
+<li><p>Queue Start/Stop</p></li>
+<li><p>Deferred Queue Start</p></li>
+<li><p>CRC offload</p></li>
+</ul>
+</section>
+<section id="nic-driver-pmd">
+<h2><span class="section-number">19.4. </span>NIC Driver (PMD)</h2>
+<p>ENETC PMD is traditional DPDK PMD which provides necessary interface between
+RTE framework and ENETC internal drivers.</p>
+<ul class="simple">
+<li><p>Driver registers the device vendor table in PCI subsystem.</p></li>
+<li><p>RTE framework scans the PCI bus for connected devices.</p></li>
+<li><p>This scanning will invoke the probe function of ENETC driver.</p></li>
+<li><p>The probe function will set the basic device registers and also setups BD rings.</p></li>
+<li><p>On packet Rx the respective BD Ring status bit is set which is then used for
+packet processing.</p></li>
+<li><p>Then Tx is done first followed by Rx.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">19.5. </span>Prerequisites</h2>
+<p>There are three main pre-requisites for executing ENETC PMD on a ENETC
+compatible board:</p>
+<ol class="arabic">
+<li><p><strong>ARM 64 Tool Chain</strong></p>
+<p>For example, the <a class="reference external" href="https://releases.linaro.org/components/toolchain/binaries/7.3-2018.05/aarch64-linux-gnu/gcc-linaro-7.3.1-2018.05-i686_aarch64-linux-gnu.tar.xz">*aarch64* Linaro Toolchain</a>.</p>
+</li>
+<li><p><strong>Linux Kernel</strong></p>
+<p>It can be obtained from <a class="reference external" href="https://source.codeaurora.org/external/qoriq/qoriq-components/linux">NXP’s Github hosting</a>.</p>
+</li>
+<li><p><strong>Rootfile system</strong></p>
+<p>Any <em>aarch64</em> supporting filesystem can be used. For example,
+Ubuntu 16.04 LTS (Xenial) or 18.04 (Bionic) userland which can be obtained
+from <a class="reference external" href="http://cdimage.ubuntu.com/ubuntu-base/releases/18.04/release/ubuntu-base-18.04.1-base-arm64.tar.gz">here</a>.</p>
+</li>
+</ol>
+<p>The following dependencies are not part of DPDK and must be installed
+separately:</p>
+<ul>
+<li><p><strong>NXP Linux LSDK</strong></p>
+<p>NXP Layerscape software development kit (LSDK) includes support for family
+of QorIQ® ARM-Architecture-based system on chip (SoC) processors
+and corresponding boards.</p>
+<p>It includes the Linux board support packages (BSPs) for NXP SoCs,
+a fully operational tool chain, kernel and board specific modules.</p>
+<p>LSDK and related information can be obtained from:  <a class="reference external" href="https://www.nxp.com/support/developer-resources/run-time-software/linux-software-and-development-tools/layerscape-software-development-kit:LAYERSCAPE-SDK">LSDK</a></p>
+</li>
+</ul>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">19.6. </span>Driver compilation and testing</h2>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to launch <strong>testpmd</strong></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="ena.html" title="previous chapter"><span class="section-number">18. </span>ENA Poll Mode Driver</a></li>
+      <li>Next: <a href="enetfec.html" title="next chapter"><span class="section-number">20. </span>ENETFEC Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/enetc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

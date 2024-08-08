@@ -1,0 +1,542 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>12. Debug &amp; Troubleshoot guide &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="13. Enable DPDK on OpenWrt" href="openwrt.html" />
+    <link rel="prev" title="11. DPDK Telemetry User Guide" href="telemetry.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="debug-troubleshoot-guide">
+<h1><span class="section-number">12. </span>Debug &amp; Troubleshoot guide</h1>
+<p>DPDK applications can be designed to have simple or complex pipeline processing
+stages making use of single or multiple threads. Applications can use poll mode
+hardware devices which helps in offloading CPU cycles too. It is common to find
+solutions designed with</p>
+<ul class="simple">
+<li><p>single or multiple primary processes</p></li>
+<li><p>single primary and single secondary</p></li>
+<li><p>single primary and multiple secondaries</p></li>
+</ul>
+<p>In all the above cases, it is tedious to isolate, debug, and understand various
+behaviors which occur randomly or periodically. The goal of the guide is to
+consolidate a few commonly seen issues for reference. Then, isolate to identify
+the root cause through step by step debug at various stages.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>It is difficult to cover all possible issues; in a single attempt. With
+feedback and suggestions from the community, more cases can be covered.</p>
+</div>
+<section id="application-overview">
+<h2><span class="section-number">12.1. </span>Application Overview</h2>
+<p>By making use of the application model as a reference, we can discuss multiple
+causes of issues in the guide. Let us assume the sample makes use of a single
+primary process, with various processing stages running on multiple cores. The
+application may also make uses of Poll Mode Driver, and libraries like service
+cores, mempool, mbuf, eventdev, cryptodev, QoS, and ethdev.</p>
+<p>The overview of an application modeled using PMD is shown in
+<a class="reference internal" href="#dtg-sample-app-model"><span class="std std-numref">Fig. 12.4</span></a>.</p>
+<figure class="align-default" id="id1">
+<span id="dtg-sample-app-model"></span><img alt="../_images/dtg_sample_app_model.svg" src="../_images/dtg_sample_app_model.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.4 </span><span class="caption-text">Overview of pipeline stage of an application</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="bottleneck-analysis">
+<h2><span class="section-number">12.2. </span>Bottleneck Analysis</h2>
+<p>A couple of factors that lead the design decision could be the platform, scale
+factor, and target. This distinct preference leads to multiple combinations,
+that are built using PMD and libraries of DPDK. While the compiler, library
+mode, and optimization flags are the components are to be constant, that
+affects the application too.</p>
+<section id="is-there-mismatch-in-packet-received-desired-rate">
+<h3><span class="section-number">12.2.1. </span>Is there mismatch in packet (received &lt; desired) rate?</h3>
+<p>RX Port and associated core <a class="reference internal" href="#dtg-rx-rate"><span class="std std-numref">Fig. 12.5</span></a>.</p>
+<figure class="align-default" id="id2">
+<span id="dtg-rx-rate"></span><img alt="../_images/dtg_rx_rate.svg" src="../_images/dtg_rx_rate.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.5 </span><span class="caption-text">RX packet rate compared against received rate.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Is the configuration for the RX setup correctly?</p>
+<ul class="simple">
+<li><p>Identify if port Speed and Duplex is matching to desired values with
+<code class="docutils literal notranslate"><span class="pre">rte_eth_link_get</span></code>.</p></li>
+<li><p>Check promiscuous mode if the drops do not occur for unique MAC address
+with <code class="docutils literal notranslate"><span class="pre">rte_eth_promiscuous_get</span></code>.</p></li>
+</ul>
+</li>
+<li><p>Is the drop isolated to certain NIC only?</p>
+<ul class="simple">
+<li><p>Make use of <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stats</span></code> to identify the drops cause.</p></li>
+<li><p>If there are mbuf drops, check nb_desc for RX descriptor as it might not
+be sufficient for the application.</p></li>
+<li><p>If <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stats</span></code> shows drops are on specific RX queues, ensure RX
+lcore threads has enough cycles for <code class="docutils literal notranslate"><span class="pre">rte_eth_rx_burst</span></code> on the port queue
+pair.</p></li>
+<li><p>If there are redirect to a specific port queue pair with, ensure RX lcore
+threads gets enough cycles.</p></li>
+<li><p>Check the RSS configuration <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_rss_hash_conf_get</span></code> if the
+spread is not even and causing drops.</p></li>
+<li><p>If PMD stats are not updating, then there might be offload or configuration
+which is dropping the incoming traffic.</p></li>
+</ul>
+</li>
+<li><p>Is there drops still seen?</p>
+<ul class="simple">
+<li><p>If there are multiple port queue pair, it might be the RX thread, RX
+distributor, or event RX adapter not having enough cycles.</p></li>
+<li><p>If there are drops seen for RX adapter or RX distributor, try using
+<code class="docutils literal notranslate"><span class="pre">rte_prefetch_non_temporal</span></code> which intimates the core that the mbuf in the
+cache is temporary.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-packet-drops-at-receive-or-transmit">
+<h3><span class="section-number">12.2.2. </span>Is there packet drops at receive or transmit?</h3>
+<p>RX-TX port and associated cores <a class="reference internal" href="#dtg-rx-tx-drop"><span class="std std-numref">Fig. 12.6</span></a>.</p>
+<figure class="align-default" id="id3">
+<span id="dtg-rx-tx-drop"></span><img alt="../_images/dtg_rx_tx_drop.svg" src="../_images/dtg_rx_tx_drop.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.6 </span><span class="caption-text">RX-TX drops</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>At RX</p>
+<ul class="simple">
+<li><p>Identify if there are multiple RX queue configured for port by
+<code class="docutils literal notranslate"><span class="pre">nb_rx_queues</span></code> using <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info_get</span></code>.</p></li>
+<li><p>Using <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stats</span></code> fetch drops in q_errors, check if RX thread
+is configured to fetch packets from the port queue pair.</p></li>
+<li><p>Using <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stats</span></code> shows drops in <code class="docutils literal notranslate"><span class="pre">rx_nombuf</span></code>, check if RX
+thread has enough cycles to consume the packets from the queue.</p></li>
+</ul>
+</li>
+<li><p>At TX</p>
+<ul class="simple">
+<li><p>If the TX rate is falling behind the application fill rate, identify if
+there are enough descriptors with <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_info_get</span></code> for TX.</p></li>
+<li><p>Check the <code class="docutils literal notranslate"><span class="pre">nb_pkt</span></code> in <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst</span></code> is done for multiple packets.</p></li>
+<li><p>Check <code class="docutils literal notranslate"><span class="pre">rte_eth_tx_burst</span></code> invokes the vector function call for the PMD.</p></li>
+<li><p>If oerrors are getting incremented, TX packet validations are failing.
+Check if there queue specific offload failures.</p></li>
+<li><p>If the drops occur for large size packets, check MTU and multi-segment
+support configured for NIC.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-object-drops-in-producer-point-for-the-ring-library">
+<h3><span class="section-number">12.2.3. </span>Is there object drops in producer point for the ring library?</h3>
+<p>Producer point for ring <a class="reference internal" href="#dtg-producer-ring"><span class="std std-numref">Fig. 12.7</span></a>.</p>
+<figure class="align-default" id="id4">
+<span id="dtg-producer-ring"></span><img alt="../_images/dtg_producer_ring.svg" src="../_images/dtg_producer_ring.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.7 </span><span class="caption-text">Producer point for Rings</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Performance issue isolation at producer</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">rte_ring_dump</span></code> to validate for all single producer flag is set to
+<code class="docutils literal notranslate"><span class="pre">RING_F_SP_ENQ</span></code>.</p></li>
+<li><p>There should be sufficient <code class="docutils literal notranslate"><span class="pre">rte_ring_free_count</span></code> at any point in time.</p></li>
+<li><p>Extreme stalls in dequeue stage of the pipeline will cause
+<code class="docutils literal notranslate"><span class="pre">rte_ring_full</span></code> to be true.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-object-drops-in-consumer-point-for-the-ring-library">
+<h3><span class="section-number">12.2.4. </span>Is there object drops in consumer point for the ring library?</h3>
+<p>Consumer point for ring <a class="reference internal" href="#dtg-consumer-ring"><span class="std std-numref">Fig. 12.8</span></a>.</p>
+<figure class="align-default" id="id5">
+<span id="dtg-consumer-ring"></span><img alt="../_images/dtg_consumer_ring.svg" src="../_images/dtg_consumer_ring.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.8 </span><span class="caption-text">Consumer point for Rings</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Performance issue isolation at consumer</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">rte_ring_dump</span></code> to validate for all single consumer flag is set to
+<code class="docutils literal notranslate"><span class="pre">RING_F_SC_DEQ</span></code>.</p></li>
+<li><p>If the desired burst dequeue falls behind the actual dequeue, the enqueue
+stage is not filling up the ring as required.</p></li>
+<li><p>Extreme stall in the enqueue will lead to <code class="docutils literal notranslate"><span class="pre">rte_ring_empty</span></code> to be true.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-a-variance-in-packet-or-object-processing-rate-in-the-pipeline">
+<h3><span class="section-number">12.2.5. </span>Is there a variance in packet or object processing rate in the pipeline?</h3>
+<p>Memory objects close to NUMA <a class="reference internal" href="#dtg-mempool"><span class="std std-numref">Fig. 12.9</span></a>.</p>
+<figure class="align-default" id="id6">
+<span id="dtg-mempool"></span><img alt="../_images/dtg_mempool.svg" src="../_images/dtg_mempool.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.9 </span><span class="caption-text">Memory objects have to be close to the device per NUMA.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Stall in processing pipeline can be attributes of MBUF release delays.
+These can be narrowed down to</p>
+<ul class="simple">
+<li><p>Heavy processing cycles at single or multiple processing stages.</p></li>
+<li><p>Cache is spread due to the increased stages in the pipeline.</p></li>
+<li><p>CPU thread responsible for TX is not able to keep up with the burst of
+traffic.</p></li>
+<li><p>Extra cycles to linearize multi-segment buffer and software offload like
+checksum, TSO, and VLAN strip.</p></li>
+<li><p>Packet buffer copy in fast path also results in stalls in MBUF release if
+not done selectively.</p></li>
+<li><p>Application logic sets <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_refcnt_set</span></code> to higher than the
+desired value and frequently uses <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_prefree_seg</span></code> and does
+not release MBUF back to mempool.</p></li>
+</ul>
+</li>
+<li><p>Lower performance between the pipeline processing stages can be</p>
+<ul class="simple">
+<li><p>The NUMA instance for packets or objects from NIC, mempool, and ring
+should be the same.</p></li>
+<li><p>Drops on a specific socket are due to insufficient objects in the pool.
+Use <code class="docutils literal notranslate"><span class="pre">rte_mempool_get_count</span></code> or <code class="docutils literal notranslate"><span class="pre">rte_mempool_avail_count</span></code> to monitor
+when drops occurs.</p></li>
+<li><p>Try prefetching the content in processing pipeline logic to minimize the
+stalls.</p></li>
+</ul>
+</li>
+<li><p>Performance issue can be due to special cases</p>
+<ul class="simple">
+<li><p>Check if MBUF continuous with <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_is_contiguous</span></code> as certain
+offload requires the same.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">rte_mempool_cache_create</span></code> for user threads require access to
+mempool objects.</p></li>
+<li><p>If the variance is absent for larger huge pages, then try rte_mem_lock_page
+on the objects, packets, lookup tables to isolate the issue.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-a-variance-in-cryptodev-performance">
+<h3><span class="section-number">12.2.6. </span>Is there a variance in cryptodev performance?</h3>
+<p>Crypto device and PMD <a class="reference internal" href="#dtg-crypto"><span class="std std-numref">Fig. 12.10</span></a>.</p>
+<figure class="align-default" id="id7">
+<span id="dtg-crypto"></span><img alt="../_images/dtg_crypto.svg" src="../_images/dtg_crypto.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.10 </span><span class="caption-text">CRYPTO and interaction with PMD device.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Performance issue isolation for enqueue</p>
+<ul class="simple">
+<li><p>Ensure cryptodev, resources and enqueue is running on NUMA cores.</p></li>
+<li><p>Isolate if the cause of errors for err_count using <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_stats</span></code>.</p></li>
+<li><p>Parallelize enqueue thread for varied multiple queue pair.</p></li>
+</ul>
+</li>
+<li><p>Performance issue isolation for dequeue</p>
+<ul class="simple">
+<li><p>Ensure cryptodev, resources and dequeue are running on NUMA cores.</p></li>
+<li><p>Isolate if the cause of errors for err_count using <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_stats</span></code>.</p></li>
+<li><p>Parallelize dequeue thread for varied multiple queue pair.</p></li>
+</ul>
+</li>
+<li><p>Performance issue isolation for crypto operation</p>
+<ul class="simple">
+<li><p>If the cryptodev software-assist is in use, ensure the library is built
+with right (SIMD) flags or check if the queue pair using CPU ISA for
+feature_flags AVX|SSE|NEON using <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_info_get</span></code>.</p></li>
+<li><p>If the cryptodev hardware-assist is in use, ensure both firmware and
+drivers are up to date.</p></li>
+</ul>
+</li>
+<li><p>Configuration issue isolation</p>
+<ul class="simple">
+<li><p>Identify cryptodev instances with <code class="docutils literal notranslate"><span class="pre">rte_cryptodev_count</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_cryptodev_info_get</span></code>.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-user-functions-performance-is-not-as-expected">
+<h3><span class="section-number">12.2.7. </span>Is user functions performance is not as expected?</h3>
+<p>Custom worker function <a class="reference internal" href="#dtg-distributor-worker"><span class="std std-numref">Fig. 12.11</span></a>.</p>
+<figure class="align-default" id="id8">
+<span id="dtg-distributor-worker"></span><img alt="../_images/dtg_distributor_worker.svg" src="../_images/dtg_distributor_worker.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.11 </span><span class="caption-text">Custom worker function performance drops.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Performance issue isolation</p>
+<ul class="simple">
+<li><p>The functions running on CPU cores without context switches are the
+performing scenarios. Identify lcore with <code class="docutils literal notranslate"><span class="pre">rte_lcore</span></code> and lcore index
+mapping with CPU using <code class="docutils literal notranslate"><span class="pre">rte_lcore_index</span></code>.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">rte_thread_get_affinity</span></code> to isolate functions running on the same
+CPU core.</p></li>
+</ul>
+</li>
+<li><p>Configuration issue isolation</p>
+<ul class="simple">
+<li><p>Identify core role using <code class="docutils literal notranslate"><span class="pre">rte_eal_lcore_role</span></code> to identify RTE, OFF,
+SERVICE and NON_EAL. Check performance functions are mapped to run on the
+cores.</p></li>
+<li><p>For high-performance execution logic ensure running it on correct NUMA
+and worker core.</p></li>
+<li><p>Analyze run logic with <code class="docutils literal notranslate"><span class="pre">rte_dump_stack</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_memdump</span></code> for more insights.</p></li>
+<li><p>Make use of objdump to ensure opcode is matching to the desired state.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-the-execution-cycles-for-dynamic-service-functions-are-not-frequent">
+<h3><span class="section-number">12.2.8. </span>Is the execution cycles for dynamic service functions are not frequent?</h3>
+<p>service functions on service cores <a class="reference internal" href="#dtg-service"><span class="std std-numref">Fig. 12.12</span></a>.</p>
+<figure class="align-default" id="id9">
+<span id="dtg-service"></span><img alt="../_images/dtg_service.svg" src="../_images/dtg_service.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.12 </span><span class="caption-text">functions running on service cores</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Performance issue isolation</p>
+<ul class="simple">
+<li><p>Services configured for parallel execution should have
+<code class="docutils literal notranslate"><span class="pre">rte_service_lcore_count</span></code> should be equal to
+<code class="docutils literal notranslate"><span class="pre">rte_service_lcore_count_services</span></code>.</p></li>
+<li><p>A service to run parallel on all cores should return
+<code class="docutils literal notranslate"><span class="pre">RTE_SERVICE_CAP_MT_SAFE</span></code> for <code class="docutils literal notranslate"><span class="pre">rte_service_probe_capability</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_service_map_lcore_get</span></code> returns unique lcore.</p></li>
+<li><p>If service function execution cycles for dynamic service functions are
+not frequent?</p></li>
+<li><p>If services share the lcore, overall execution should fit budget.</p></li>
+</ul>
+</li>
+<li><p>Configuration issue isolation</p>
+<ul class="simple">
+<li><p>Check if service is running with <code class="docutils literal notranslate"><span class="pre">rte_service_runstate_get</span></code>.</p></li>
+<li><p>Generic debug via <code class="docutils literal notranslate"><span class="pre">rte_service_dump</span></code>.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-a-bottleneck-in-the-performance-of-eventdev">
+<h3><span class="section-number">12.2.9. </span>Is there a bottleneck in the performance of eventdev?</h3>
+<ol class="arabic simple">
+<li><p>Check for generic configuration</p>
+<ul class="simple">
+<li><p>Ensure the event devices created are right NUMA using
+<code class="docutils literal notranslate"><span class="pre">rte_event_dev_count</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_event_dev_socket_id</span></code>.</p></li>
+<li><p>Check for event stages if the events are looped back into the same queue.</p></li>
+<li><p>If the failure is on the enqueue stage for events, check if queue depth
+with <code class="docutils literal notranslate"><span class="pre">rte_event_dev_info_get</span></code>.</p></li>
+</ul>
+</li>
+<li><p>If there are performance drops in the enqueue stage</p>
+<ul class="simple">
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">rte_event_dev_dump</span></code> to dump the eventdev information.</p></li>
+<li><p>Periodically checks stats for queue and port to identify the starvation.</p></li>
+<li><p>Check the in-flight events for the desired queue for enqueue and dequeue.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="is-there-a-variance-in-traffic-manager">
+<h3><span class="section-number">12.2.10. </span>Is there a variance in traffic manager?</h3>
+<p>Traffic Manager on TX interface <a class="reference internal" href="#dtg-qos-tx"><span class="std std-numref">Fig. 12.13</span></a>.</p>
+<figure class="align-default" id="id10">
+<span id="dtg-qos-tx"></span><img alt="../_images/dtg_qos_tx.svg" src="../_images/dtg_qos_tx.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.13 </span><span class="caption-text">Traffic Manager just before TX.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic simple">
+<li><p>Identify the cause for a variance from expected behavior, is due to
+insufficient CPU cycles. Use <code class="docutils literal notranslate"><span class="pre">rte_tm_capabilities_get</span></code> to fetch features
+for hierarchies, WRED and priority schedulers to be offloaded hardware.</p></li>
+<li><p>Undesired flow drops can be narrowed down to WRED, priority, and rates
+limiters.</p></li>
+<li><p>Isolate the flow in which the undesired drops occur. Use
+<code class="docutils literal notranslate"><span class="pre">rte_tn_get_number_of_leaf_node</span></code> and flow table to ping down the leaf
+where drops occur.</p></li>
+<li><p>Check the stats using <code class="docutils literal notranslate"><span class="pre">rte_tm_stats_update</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_tm_node_stats_read</span></code>
+for drops for hierarchy, schedulers and WRED configurations.</p></li>
+</ol>
+</section>
+<section id="is-the-packet-in-the-unexpected-format">
+<h3><span class="section-number">12.2.11. </span>Is the packet in the unexpected format?</h3>
+<p>Packet capture before and after processing <a class="reference internal" href="#dtg-pdump"><span class="std std-numref">Fig. 12.14</span></a>.</p>
+<figure class="align-default" id="id11">
+<span id="dtg-pdump"></span><img alt="../_images/dtg_pdump.svg" src="../_images/dtg_pdump.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.14 </span><span class="caption-text">Capture points of Traffic at RX-TX.</span></p>
+</figcaption>
+</figure>
+<ol class="arabic">
+<li><p>To isolate the possible packet corruption in the processing pipeline,
+carefully staged capture packets are to be implemented.</p>
+<ul>
+<li><p>First, isolate at NIC entry and exit.</p>
+<p>Use pdump in primary to allow secondary to access port-queue pair. The
+packets get copied over in RX|TX callback by the secondary process using
+ring buffers.</p>
+</li>
+<li><p>Second, isolate at pipeline entry and exit.</p>
+<p>Using hooks or callbacks capture the packet middle of the pipeline stage
+to copy the packets, which can be shared to the secondary debug process
+via user-defined custom rings.</p>
+</li>
+</ul>
+</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Use similar analysis to objects and metadata corruption.</p>
+</div>
+</section>
+<section id="does-the-issue-still-persist">
+<h3><span class="section-number">12.2.12. </span>Does the issue still persist?</h3>
+<p>The issue can be further narrowed down to the following causes.</p>
+<ol class="arabic simple">
+<li><p>If there are vendor or application specific metadata, check for errors due
+to META data error flags. Dumping private meta-data in the objects can give
+insight into details for debugging.</p></li>
+<li><p>If there are multi-process for either data or configuration, check for
+possible errors in the secondary process where the configuration fails and
+possible data corruption in the data plane.</p></li>
+<li><p>Random drops in the RX or TX when opening other application is an indication
+of the effect of a noisy neighbor. Try using the cache allocation technique
+to minimize the effect between applications.</p></li>
+</ol>
+</section>
+</section>
+<section id="how-to-develop-a-custom-code-to-debug">
+<h2><span class="section-number">12.3. </span>How to develop a custom code to debug?</h2>
+<ol class="arabic simple">
+<li><p>For an application that runs as the primary process only, debug functionality
+is added in the same process. These can be invoked by timer call-back,
+service core and signal handler.</p></li>
+<li><p>For the application that runs as multiple processes. debug functionality in
+a standalone secondary process.</p></li>
+</ol>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="telemetry.html" title="previous chapter"><span class="section-number">11. </span>DPDK Telemetry User Guide</a></li>
+      <li>Next: <a href="openwrt.html" title="next chapter"><span class="section-number">13. </span>Enable DPDK on OpenWrt</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/debug_troubleshoot.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

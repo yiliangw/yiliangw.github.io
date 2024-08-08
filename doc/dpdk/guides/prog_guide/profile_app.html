@@ -1,0 +1,220 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>71. Profile Your Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="72. Running AddressSanitizer" href="asan.html" />
+    <link rel="prev" title="70. Link Time Optimization" href="lto.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="profile-your-application">
+<h1><span class="section-number">71. </span>Profile Your Application</h1>
+<p>The following sections describe methods of profiling DPDK applications on
+different architectures.</p>
+<section id="profiling-on-x86">
+<h2><span class="section-number">71.1. </span>Profiling on x86</h2>
+<p>Intel processors provide performance counters to monitor events.
+Some tools provided by Intel, such as Intel® VTune™ Amplifier, can be used
+to profile and benchmark an application.
+See the <em>VTune Performance Analyzer Essentials</em> publication from Intel Press for more information.</p>
+<p>For a DPDK application, this can be done in a Linux* application environment only.</p>
+<p>The main situations that should be monitored through event counters are:</p>
+<ul class="simple">
+<li><p>Cache misses</p></li>
+<li><p>Branch mis-predicts</p></li>
+<li><p>DTLB misses</p></li>
+<li><p>Long latency instructions and exceptions</p></li>
+</ul>
+<p>Refer to the
+<a class="reference external" href="http://software.intel.com/sites/products/collateral/hpc/vtune/performance_analysis_guide.pdf">Intel Performance Analysis Guide</a>
+for details about application profiling.</p>
+<section id="profiling-with-vtune">
+<h3><span class="section-number">71.1.1. </span>Profiling with VTune</h3>
+<p>To allow VTune attaching to the DPDK application, reconfigure a DPDK build
+folder by passing <code class="docutils literal notranslate"><span class="pre">-Dc_args=-DRTE_ETHDEV_PROFILE_WITH_VTUNE</span></code> meson option
+and recompile the DPDK:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup build</span>
+<span class="go">meson configure build -Dc_args=-DRTE_ETHDEV_PROFILE_WITH_VTUNE</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="profiling-on-arm64">
+<h2><span class="section-number">71.2. </span>Profiling on ARM64</h2>
+<section id="using-linux-perf">
+<h3><span class="section-number">71.2.1. </span>Using Linux perf</h3>
+<p>The ARM64 architecture provide performance counters to monitor events.  The
+Linux <code class="docutils literal notranslate"><span class="pre">perf</span></code> tool can be used to profile and benchmark an application.  In
+addition to the standard events, <code class="docutils literal notranslate"><span class="pre">perf</span></code> can be used to profile arm64
+specific PMU (Performance Monitor Unit) events through raw events (<code class="docutils literal notranslate"><span class="pre">-e</span></code>
+<code class="docutils literal notranslate"><span class="pre">-rXX</span></code>).</p>
+<p>For more derails refer to the
+<a class="reference external" href="http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.100095_0002_04_en/way1382543438508.html">ARM64 specific PMU events enumeration</a>.</p>
+</section>
+<section id="low-resolution-generic-counter">
+<h3><span class="section-number">71.2.2. </span>Low-resolution generic counter</h3>
+<p>The default <code class="docutils literal notranslate"><span class="pre">cntvct_el0</span></code> based <code class="docutils literal notranslate"><span class="pre">rte_rdtsc()</span></code> provides a portable means to
+get a wall clock counter in user space. Typically it runs at a lower clock frequency than the CPU clock frequency.
+Cycles counted using this method should be scaled to CPU clock frequency.</p>
+</section>
+<section id="high-resolution-cycle-counter">
+<h3><span class="section-number">71.2.3. </span>High-resolution cycle counter</h3>
+<p>The alternative method to enable <code class="docutils literal notranslate"><span class="pre">rte_rdtsc()</span></code> for a high resolution wall
+clock counter is through the ARMv8 PMU subsystem. The PMU cycle counter runs
+at CPU frequency. However, access to the PMU cycle counter from user space is
+not enabled by default in the arm64 linux kernel. It is possible to enable
+cycle counter for user space access by configuring the PMU from the privileged
+mode (kernel space).</p>
+<p>By default the <code class="docutils literal notranslate"><span class="pre">rte_rdtsc()</span></code> implementation uses a portable <code class="docutils literal notranslate"><span class="pre">cntvct_el0</span></code>
+scheme.</p>
+<p>The example below shows the steps to configure the PMU based cycle counter on
+an ARMv8 machine.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/jerinjacobk/armv8_pmu_cycle_counter_el0</span>
+<span class="go">cd armv8_pmu_cycle_counter_el0</span>
+<span class="go">make</span>
+<span class="go">sudo insmod pmu_el0_cycle_counter.ko</span>
+</pre></div>
+</div>
+<p>Please refer to <a class="reference internal" href="../linux_gsg/build_dpdk.html"><span class="doc">Compiling the DPDK Target from Source</span></a> for generic details on compiling DPDK with meson.</p>
+<p>In order to enable <code class="docutils literal notranslate"><span class="pre">PMU</span></code> based <code class="docutils literal notranslate"><span class="pre">rte_rdtsc()</span></code>, user needs to configure the
+build with <code class="docutils literal notranslate"><span class="pre">-Dc_args='-DRTE_ARM_EAL_RDTSC_USE_PMU'</span></code>.</p>
+<p>Example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup --cross config/arm/arm64_armv8_linux_gcc -Dc_args=&#39;-DRTE_ARM_EAL_RDTSC_USE_PMU&#39; build</span>
+</pre></div>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The PMU based scheme is useful for high accuracy performance profiling with
+<code class="docutils literal notranslate"><span class="pre">rte_rdtsc()</span></code>. However, this method can not be used in conjunction with
+Linux userspace profiling tools like <code class="docutils literal notranslate"><span class="pre">perf</span></code> as this scheme alters the PMU
+registers state.</p>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="lto.html" title="previous chapter"><span class="section-number">70. </span>Link Time Optimization</a></li>
+      <li>Next: <a href="asan.html" title="next chapter"><span class="section-number">72. </span>Running AddressSanitizer</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/profile_app.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

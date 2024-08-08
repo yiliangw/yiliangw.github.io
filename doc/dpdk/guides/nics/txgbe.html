@@ -1,0 +1,294 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>56. TXGBE Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="57. VDEV_NETVSC driver" href="vdev_netvsc.html" />
+    <link rel="prev" title="55. ThunderX NICVF Poll Mode Driver" href="thunderx.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="txgbe-poll-mode-driver">
+<h1><span class="section-number">56. </span>TXGBE Poll Mode Driver</h1>
+<p>The TXGBE PMD (librte_pmd_txgbe) provides poll mode driver support
+for Wangxun 10 Gigabit Ethernet NICs.</p>
+<section id="features">
+<h2><span class="section-number">56.1. </span>Features</h2>
+<ul class="simple">
+<li><p>Multiple queues for TX and RX</p></li>
+<li><p>Receiver Side Scaling (RSS)</p></li>
+<li><p>MAC/VLAN filtering</p></li>
+<li><p>Packet type information</p></li>
+<li><p>Checksum offload</p></li>
+<li><p>VLAN/QinQ stripping and inserting</p></li>
+<li><p>TSO offload</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Multicast mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Jumbo frames</p></li>
+<li><p>Link state information</p></li>
+<li><p>Link flow control</p></li>
+<li><p>Interrupt mode for RX</p></li>
+<li><p>Scattered and gather for TX and RX</p></li>
+<li><p>DCB</p></li>
+<li><p>IEEE 1588</p></li>
+<li><p>FW version</p></li>
+<li><p>LRO</p></li>
+<li><p>Generic flow API</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">56.2. </span>Prerequisites</h2>
+<ul class="simple">
+<li><p>Learning about Wangxun 10 Gigabit Ethernet NICs using
+<a class="reference external" href="https://www.net-swift.com/a/383.html">https://www.net-swift.com/a/383.html</a>.</p></li>
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+</section>
+<section id="configuration">
+<h2><span class="section-number">56.3. </span>Configuration</h2>
+<section id="compilation-options">
+<h3><span class="section-number">56.3.1. </span>Compilation Options</h3>
+<p>The following build-time options may be enabled on build time using.</p>
+<p><code class="docutils literal notranslate"><span class="pre">-Dc_args=</span></code> meson argument (e.g. <code class="docutils literal notranslate"><span class="pre">-Dc_args=-DRTE_LIBRTE_TXGBE_DEBUG_RX</span></code>).</p>
+<p>Please note that enabling debugging options may affect system performance.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_TXGBE_DEBUG_RX</span></code> (undefined by default)</p>
+<p>Toggle display of receive fast path run-time messages.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_TXGBE_DEBUG_TX</span></code> (undefined by default)</p>
+<p>Toggle display of transmit fast path run-time messages.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_TXGBE_DEBUG_TX_FREE</span></code> (undefined by default)</p>
+<p>Toggle display of transmit descriptor clean messages.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_TXGBE_PF_DISABLE_STRIP_CRC</span></code> (undefined by default)</p>
+<p>Decide to enable or disable HW CRC in VF PMD.</p>
+</li>
+</ul>
+</section>
+<section id="dynamic-logging-parameters">
+<h3><span class="section-number">56.3.2. </span>Dynamic Logging Parameters</h3>
+<p>One may leverage EAL option “–log-level” to change default levels
+for the log types supported by the driver. The option is used with
+an argument typically consisting of two parts separated by a colon.</p>
+<p>TXGBE PMD provides the following log types available for control:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.txgbe.driver</span></code> (default level is <strong>notice</strong>)</p>
+<p>Affects driver-wide messages unrelated to any particular devices.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.txgbe.init</span></code> (default level is <strong>notice</strong>)</p>
+<p>Extra logging of the messages during PMD initialization.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">pmd.net.txgbe.bp</span></code> (default level is <strong>notice</strong>)</p>
+<p>Extra logging of auto-negotiation process for backplane NICs.
+Supply <code class="docutils literal notranslate"><span class="pre">--log-level=pmd.net.txgbe.bp:debug</span></code> to view messages.</p>
+</li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h3><span class="section-number">56.3.3. </span>Runtime Configuration</h3>
+<p>The following <code class="docutils literal notranslate"><span class="pre">devargs</span></code> options can be enabled at runtime. They must
+be passed as part of EAL arguments. For example,</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-testpmd -a 01:00.0,auto_neg=1 -- -i</span>
+</pre></div>
+</div>
+<p>Please note that following <code class="docutils literal notranslate"><span class="pre">devargs</span></code> are only set for backplane NICs.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">auto_neg</span></code> (default <strong>1</strong>)</p>
+<p>Toggle behavior to use auto-negotiation mode or force mode to
+link up backplane NICs.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">poll</span></code> (default <strong>0</strong>)</p>
+<p>Toggle behavior to enable/disable polling mode to receive AN interrupt.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">present</span></code> (default <strong>0</strong>)</p>
+<p>Toggle behavior to use present mode or init mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sgmii</span></code> (default <strong>0</strong>)</p>
+<p>Special treatment for KX SGMII cards.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ffe_set</span></code> (default <strong>0</strong>)</p>
+<p>Use to set PHY link mode and enable FFE parameters for user debugging.
+If disabled, the FFE parameters will not take effect. Otherwise, set 1
+for SFI mode, set 2 for KR mode, set 3 for KX4 mode, set 4 for KX mode.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ffe_main</span></code> (default <strong>27</strong>)</p>
+<p>PHY parameter used for user debugging. Setting other values to
+take effect requires setting the <code class="docutils literal notranslate"><span class="pre">ffe_set</span></code>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ffe_pre</span></code> (default <strong>8</strong>)</p>
+<p>PHY parameter used for user debugging. Setting other values to
+take effect requires setting the <code class="docutils literal notranslate"><span class="pre">ffe_set</span></code>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ffe_post</span></code> (default <strong>44</strong>)</p>
+<p>PHY parameter used for user debugging. Setting other values to
+take effect requires setting the <code class="docutils literal notranslate"><span class="pre">ffe_set</span></code>.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">56.4. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="sample-application-notes">
+<h2><span class="section-number">56.5. </span>Sample Application Notes</h2>
+<section id="generic-flow-api">
+<h3><span class="section-number">56.5.1. </span>Generic flow API</h3>
+<p>TXGBE PMD supports generic flow API which configures hardware to match specific
+ingress or egress traffic, alter its fate and query related counters according
+to any number of user-defined rules.</p>
+<p>A flow rule is the combination of attributes with a matching pattern and a list of
+actions. Theoretically one rule can match more than one filters, which named for
+different patterns and actions. Like ethertype filter defines a rule in pattern:
+the first not void item can be ETH, and the next not void item must be END.</p>
+<p>For example, create a flow rule:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth type is 0x0806 / end actions queue index 2 / end</span>
+</pre></div>
+</div>
+<p>For a detailed usage description please refer to “Flow rules management” section in DPDK <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html"><span class="doc">Testpmd Runtime Functions</span></a>.</p>
+</section>
+<section id="traffic-management-api">
+<h3><span class="section-number">56.5.2. </span>Traffic Management API</h3>
+<p>TXGBE PMD supports generic DPDK Traffic Management API which allows to
+configure the following features: hierarchical scheduling, traffic shaping,
+congestion management, packet marking.</p>
+<p>For example, add shaper profile</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm node shaper profile 0 0 0 0 25000000 0 0</span>
+</pre></div>
+</div>
+<p>For a detailed usage description please refer to “Traffic Management” section in DPDK <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html"><span class="doc">Testpmd Runtime Functions</span></a>.</p>
+</section>
+</section>
+<section id="limitations-or-known-issues">
+<h2><span class="section-number">56.6. </span>Limitations or Known issues</h2>
+<p>Build with ICC is not supported yet.
+Power8, ARMv7 and BSD are not supported yet.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="thunderx.html" title="previous chapter"><span class="section-number">55. </span>ThunderX NICVF Poll Mode Driver</a></li>
+      <li>Next: <a href="vdev_netvsc.html" title="next chapter"><span class="section-number">57. </span>VDEV_NETVSC driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/txgbe.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

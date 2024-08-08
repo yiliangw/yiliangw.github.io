@@ -1,0 +1,303 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>10. NXP DPAA2 CAAM (DPAA2_SEC) &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="11. NXP DPAA CAAM (DPAA_SEC)" href="dpaa_sec.html" />
+    <link rel="prev" title="9. Marvell cnxk Crypto Poll Mode Driver" href="cnxk.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nxp-dpaa2-caam-dpaa2-sec">
+<h1><span class="section-number">10. </span>NXP DPAA2 CAAM (DPAA2_SEC)</h1>
+<p>The DPAA2_SEC PMD provides poll mode crypto driver support for NXP DPAA2 CAAM
+hardware accelerator.</p>
+<section id="architecture">
+<h2><span class="section-number">10.1. </span>Architecture</h2>
+<p>SEC is the SOC’s security engine, which serves as NXP’s latest cryptographic
+acceleration and offloading hardware. It combines functions previously
+implemented in separate modules to create a modular and scalable acceleration
+and assurance engine. It also implements block encryption algorithms, stream
+cipher algorithms, hashing algorithms, public key algorithms, run-time
+integrity checking, and a hardware random number generator. SEC performs
+higher-level cryptographic operations than previous NXP cryptographic
+accelerators. This provides significant improvement to system level performance.</p>
+<p>DPAA2_SEC is one of the hardware resource in DPAA2 Architecture. More information
+on DPAA2 Architecture is described in <a class="reference internal" href="../nics/dpaa2.html#dpaa2-overview"><span class="std std-ref">DPAA2 Overview</span></a>.</p>
+<p>DPAA2_SEC PMD is one of DPAA2 drivers which interacts with Management Complex (MC)
+portal to access the hardware object - DPSECI. The MC provides access to create,
+discover, connect, configure and destroy dpseci objects in DPAA2_SEC PMD.</p>
+<p>DPAA2_SEC PMD also uses some of the other hardware resources like buffer pools,
+queues, queue portals to store and to enqueue/dequeue data to the hardware SEC.</p>
+<p>DPSECI objects are detected by PMD using a resource container called DPRC (like
+in <a class="reference internal" href="../nics/dpaa2.html#dpaa2-overview"><span class="std std-ref">DPAA2 Overview</span></a>).</p>
+<p>For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">DPRC.1 (bus)</span>
+<span class="go">  |</span>
+<span class="go">  +--+--------+-------+-------+-------+---------+</span>
+<span class="go">     |        |       |       |       |         |</span>
+<span class="go">   DPMCP.1  DPIO.1  DPBP.1  DPNI.1  DPMAC.1  DPSECI.1</span>
+<span class="go">   DPMCP.2  DPIO.2          DPNI.2  DPMAC.2  DPSECI.2</span>
+<span class="go">   DPMCP.3</span>
+</pre></div>
+</div>
+</section>
+<section id="implementation">
+<h2><span class="section-number">10.2. </span>Implementation</h2>
+<p>SEC provides platform assurance by working with SecMon, which is a companion
+logic block that tracks the security state of the SOC. SEC is programmed by
+means of descriptors (not to be confused with frame descriptors (FDs)) that
+indicate the operations to be performed and link to the message and
+associated data. SEC incorporates two DMA engines to fetch the descriptors,
+read the message data, and write the results of the operations. The DMA
+engine provides a scatter/gather capability so that SEC can read and write
+data scattered in memory. SEC may be configured by means of software for
+dynamic changes in byte ordering. The default configuration for this version
+of SEC is little-endian mode.</p>
+<p>A block diagram similar to dpaa2 NIC is shown below to show where DPAA2_SEC
+fits in the DPAA2 Bus model</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">                                   +----------------+</span>
+<span class="go">                                   | DPDK DPAA2_SEC |</span>
+<span class="go">                                   |     PMD        |</span>
+<span class="go">                                   +----------------+       +------------+</span>
+<span class="go">                                   |  MC SEC object |.......|  Mempool   |</span>
+<span class="go">                . . . . . . . . .  |   (DPSECI)     |       |  (DPBP)    |</span>
+<span class="go">               .                   +---+---+--------+       +-----+------+</span>
+<span class="go">              .                        ^   |                      .</span>
+<span class="go">             .                         |   |&lt;enqueue,             .</span>
+<span class="go">            .                          |   | dequeue&gt;             .</span>
+<span class="go">           .                           |   |                      .</span>
+<span class="go">          .                        +---+---V----+                 .</span>
+<span class="go">         .      . . . . . . . . . .| DPIO driver|                 .</span>
+<span class="go">        .      .                   |  (DPIO)    |                 .</span>
+<span class="go">       .      .                    +-----+------+                 .</span>
+<span class="go">      .      .                     |  QBMAN     |                 .</span>
+<span class="go">     .      .                      |  Driver    |                 .</span>
+<span class="go">+----+------+-------+              +-----+----- |                 .</span>
+<span class="go">|   dpaa2 bus       |                    |                        .</span>
+<span class="go">|   VFIO fslmc-bus  |....................|.........................</span>
+<span class="go">|                   |                    |</span>
+<span class="go">|     /bus/fslmc    |                    |</span>
+<span class="go">+-------------------+                    |</span>
+<span class="go">                                         |</span>
+<span class="go">========================== HARDWARE =====|=======================</span>
+<span class="go">                                       DPIO</span>
+<span class="go">                                         |</span>
+<span class="go">                                       DPSECI---DPBP</span>
+<span class="go">=========================================|========================</span>
+</pre></div>
+</div>
+</section>
+<section id="features">
+<h2><span class="section-number">10.3. </span>Features</h2>
+<p>The DPAA2_SEC PMD has support for:</p>
+<p>Cipher algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_3DES_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CBC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES128_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES192_CTR</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_CIPHER_AES256_CTR</span></code></p></li>
+</ul>
+<p>Hash algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA1_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA224_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA256_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA384_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_SHA512_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_MD5_HMAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_XCBC_MAC</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AUTH_AES_CMAC</span></code></p></li>
+</ul>
+<p>AEAD algorithms:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_CRYPTO_AEAD_AES_GCM</span></code></p></li>
+</ul>
+</section>
+<section id="supported-dpaa2-socs">
+<h2><span class="section-number">10.4. </span>Supported DPAA2 SoCs</h2>
+<ul class="simple">
+<li><p>LS2160A</p></li>
+<li><p>LS2084A/LS2044A</p></li>
+<li><p>LS2088A/LS2048A</p></li>
+<li><p>LS1088A/LS1048A</p></li>
+</ul>
+</section>
+<section id="allowing-blocking">
+<h2><span class="section-number">10.5. </span>Allowing &amp; Blocking</h2>
+<p>The DPAA2 SEC device can be blocked with the following:</p>
+<blockquote>
+<div><div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">&lt;dpdk app&gt; &lt;EAL args&gt; -b &quot;fslmc:dpseci.x&quot; -- ...</span>
+</pre></div>
+</div>
+</div></blockquote>
+<p>Where x is the device object id as configured in resource container.</p>
+</section>
+<section id="limitations">
+<h2><span class="section-number">10.6. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Hash followed by Cipher mode is not supported</p></li>
+<li><p>Only supports the session-oriented API implementation (session-less APIs are not supported).</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">10.7. </span>Prerequisites</h2>
+<p>DPAA2_SEC driver has similar pre-requisites as described in <a class="reference internal" href="../nics/dpaa2.html#dpaa2-overview"><span class="std std-ref">DPAA2 Overview</span></a>.
+The following dependencies are not part of DPDK and must be installed separately:</p>
+<p>See <a class="reference internal" href="../platform/dpaa2.html"><span class="doc">NXP QorIQ DPAA2 Board Support Package</span></a> for setup information</p>
+<ul class="simple">
+<li><p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p></li>
+</ul>
+</section>
+<section id="enabling-logs">
+<h2><span class="section-number">10.8. </span>Enabling logs</h2>
+<p>For enabling logs, use the following EAL parameter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./your_crypto_application &lt;EAL args&gt; --log-level=pmd.crypto.dpaa2:&lt;level&gt;</span>
+</pre></div>
+</div>
+<p>Using <code class="docutils literal notranslate"><span class="pre">crypto.dpaa2</span></code> as log matching criteria, all Crypto PMD logs can be
+enabled which are lower than logging <code class="docutils literal notranslate"><span class="pre">level</span></code>.</p>
+</section>
+<section id="enabling-debug-prints">
+<h2><span class="section-number">10.9. </span>Enabling debug prints</h2>
+<p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">drv_dump_mode=x</span></code> to dump useful debug prints on HW sec
+error. There are 3 dump modes available 0, 1 and 2. Mode 0 means no dump print
+on error, mode 1 means dump HW error code and mode 2 means dump HW error code
+along with other useful debugging information like session, queue, descriptor
+data.
+e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpseci.1,drv_dump_mode=1</span></code></p>
+</section>
+<section id="enable-strict-ordering">
+<h2><span class="section-number">10.10. </span>Enable strict ordering</h2>
+<p>Use dev arg option <code class="docutils literal notranslate"><span class="pre">drv_strict_order=1</span></code> to enable strict ordering.
+By default, loose ordering is set for ordered schedule type event.
+e.g. <code class="docutils literal notranslate"><span class="pre">fslmc:dpseci.1,drv_strict_order=1</span></code></p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Crypto Device Drivers</a><ul>
+      <li>Previous: <a href="cnxk.html" title="previous chapter"><span class="section-number">9. </span>Marvell cnxk Crypto Poll Mode Driver</a></li>
+      <li>Next: <a href="dpaa_sec.html" title="next chapter"><span class="section-number">11. </span>NXP DPAA CAAM (DPAA_SEC)</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/cryptodevs/dpaa2_sec.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

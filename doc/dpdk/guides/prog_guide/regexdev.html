@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>22. RegEx Device Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="23. Machine Learning Device Library" href="mldev.html" />
+    <link rel="prev" title="21. Compression Device Library" href="compressdev.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="regex-device-library">
+<h1><span class="section-number">22. </span>RegEx Device Library</h1>
+<p>The RegEx library provides a RegEx device framework for management and
+provisioning of hardware and software RegEx poll mode drivers, defining generic
+APIs which support a number of different RegEx operations.</p>
+<section id="design-principles">
+<h2><span class="section-number">22.1. </span>Design Principles</h2>
+<p>The RegEx library follows the same basic principles as those used in DPDK’s
+Ethernet Device framework and the Crypto framework. The RegEx framework provides
+a generic Crypto device framework which supports both physical (hardware)
+and virtual (software) RegEx devices as well as a generic RegEx API which allows
+RegEx devices to be managed and configured and supports RegEx operations to be
+provisioned on RegEx poll mode driver.</p>
+</section>
+<section id="device-management">
+<h2><span class="section-number">22.2. </span>Device Management</h2>
+<section id="device-creation">
+<h3><span class="section-number">22.2.1. </span>Device Creation</h3>
+<p>Physical RegEx devices are discovered during the PCI probe/enumeration of the
+EAL function which is executed at DPDK initialization, based on
+their PCI device identifier, each unique PCI BDF (bus/bridge, device,
+function). Specific physical ReEx devices, like other physical devices in DPDK
+can be listed using the EAL command line options.</p>
+</section>
+<section id="device-identification">
+<h3><span class="section-number">22.2.2. </span>Device Identification</h3>
+<p>Each device, whether virtual or physical is uniquely designated by two
+identifiers:</p>
+<ul class="simple">
+<li><p>A unique device index used to designate the RegEx device in all functions
+exported by the regexdev API.</p></li>
+<li><p>A device name used to designate the RegEx device in console messages, for
+administration or debugging purposes.</p></li>
+</ul>
+</section>
+<section id="device-configuration">
+<h3><span class="section-number">22.2.3. </span>Device Configuration</h3>
+<p>The configuration of each RegEx device includes the following operations:</p>
+<ul class="simple">
+<li><p>Allocation of resources, including hardware resources if a physical device.</p></li>
+<li><p>Resetting the device into a well-known default state.</p></li>
+<li><p>Initialization of statistics counters.</p></li>
+</ul>
+<p>The rte_regexdev_configure API is used to configure a RegEx device.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">rte_regexdev_configure</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">dev_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                           </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_regexdev_config</span><span class="w"> </span><span class="o">*</span><span class="n">cfg</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_regexdev_config</span></code> structure is used to pass the configuration
+parameters for the RegEx device for example  number of queue pairs, number of
+groups, max number of matches and so on.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_regexdev_config</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_max_matches</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Maximum matches per scan configured on this device.</span>
+<span class="cm">      * This value cannot exceed the *max_matches*</span>
+<span class="cm">      * which previously provided in rte_regexdev_info_get().</span>
+<span class="cm">      * The value 0 is allowed, in which case, value 1 used.</span>
+<span class="cm">      * @see struct rte_regexdev_info::max_matches</span>
+<span class="cm">      */</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_queue_pairs</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Number of RegEx queue pairs to configure on this device.</span>
+<span class="cm">      * This value cannot exceed the *max_queue_pairs* which previously</span>
+<span class="cm">      * provided in rte_regexdev_info_get().</span>
+<span class="cm">      * @see struct rte_regexdev_info::max_queue_pairs</span>
+<span class="cm">      */</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">nb_rules_per_group</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Number of rules per group to configure on this device.</span>
+<span class="cm">      * This value cannot exceed the *max_rules_per_group*</span>
+<span class="cm">      * which previously provided in rte_regexdev_info_get().</span>
+<span class="cm">      * The value 0 is allowed, in which case,</span>
+<span class="cm">      * struct rte_regexdev_info::max_rules_per_group used.</span>
+<span class="cm">      * @see struct rte_regexdev_info::max_rules_per_group</span>
+<span class="cm">      */</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">nb_groups</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Number of groups to configure on this device.</span>
+<span class="cm">      * This value cannot exceed the *max_groups*</span>
+<span class="cm">      * which previously provided in rte_regexdev_info_get().</span>
+<span class="cm">      * @see struct rte_regexdev_info::max_groups</span>
+<span class="cm">      */</span><span class="w"></span>
+<span class="w">     </span><span class="k">const</span><span class="w"> </span><span class="kt">char</span><span class="w"> </span><span class="o">*</span><span class="n">rule_db</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Import initial set of prebuilt rule database on this device.</span>
+<span class="cm">      * The value NULL is allowed, in which case, the device will not</span>
+<span class="cm">      * be configured prebuilt rule database. Application may use</span>
+<span class="cm">      * rte_regexdev_rule_db_update() or rte_regexdev_rule_db_import() API</span>
+<span class="cm">      * to update or import rule database after the</span>
+<span class="cm">      * rte_regexdev_configure().</span>
+<span class="cm">      * @see rte_regexdev_rule_db_update(), rte_regexdev_rule_db_import()</span>
+<span class="cm">      */</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">rule_db_len</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; Length of *rule_db* buffer. */</span><span class="w"></span>
+<span class="w">     </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">dev_cfg_flags</span><span class="p">;</span><span class="w"></span>
+<span class="w">     </span><span class="cm">/**&lt; RegEx device configuration flags, See RTE_REGEXDEV_CFG_*  */</span><span class="w"></span>
+<span class="w"> </span><span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="configuration-of-rules-database">
+<h3><span class="section-number">22.2.4. </span>Configuration of Rules Database</h3>
+<p>Each Regex device should be configured with the rule database.
+There are two modes of setting the rule database, online or offline.
+The online mode means, that the rule database in being compiled by the
+RegEx PMD while in the offline mode the rule database is compiled by external
+compiler, and is being loaded to the PMD as a buffer.
+The configuration mode is depended on the PMD capabilities.</p>
+<p>Online rule configuration is done using the following API functions:
+<code class="docutils literal notranslate"><span class="pre">rte_regexdev_rule_db_update</span></code> which add / remove rules from the rules
+precompiled list.</p>
+<p>Offline rule configuration can be done by adding a pointer to the compiled
+rule database in the configuration step, or by using
+<code class="docutils literal notranslate"><span class="pre">rte_regexdev_rule_db_import</span></code> API.</p>
+</section>
+<section id="configuration-of-queue-pairs">
+<h3><span class="section-number">22.2.5. </span>Configuration of Queue Pairs</h3>
+<p>Each RegEx device can be configured with number of queue pairs.
+Each queue pair is configured using <code class="docutils literal notranslate"><span class="pre">rte_regexdev_queue_pair_setup</span></code></p>
+</section>
+<section id="logical-cores-memory-and-queues-pair-relationships">
+<h3><span class="section-number">22.2.6. </span>Logical Cores, Memory and Queues Pair Relationships</h3>
+<p>Multiple logical cores should never share the same queue pair for enqueuing
+operations or dequeuing operations on the same RegEx device since this would
+require global locks and hinder performance.</p>
+</section>
+</section>
+<section id="device-features-and-capabilities">
+<h2><span class="section-number">22.3. </span>Device Features and Capabilities</h2>
+<p>RegEx devices may support different feature set.
+In order to get the supported PMD feature <code class="docutils literal notranslate"><span class="pre">rte_regexdev_info_get</span></code>
+API which return the info of the device and it’s supported features.</p>
+<section id="enqueue-dequeue-burst-apis">
+<h3><span class="section-number">22.3.1. </span>Enqueue / Dequeue Burst APIs</h3>
+<p>The burst enqueue API uses a RegEx device identifier and a queue pair
+identifier to specify the device queue pair to schedule the processing on.
+The <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> parameter is the number of operations to process which are
+supplied in the <code class="docutils literal notranslate"><span class="pre">ops</span></code> array of <code class="docutils literal notranslate"><span class="pre">rte_regex_ops</span></code> structures.
+The enqueue function returns the number of operations it actually enqueued for
+processing, a return value equal to <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> means that all packets have been
+enqueued.</p>
+<p>Data pointed in each op, should not be released until the dequeue of for that
+op.</p>
+<p>The dequeue API uses the same format as the enqueue API of processed but
+the <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code> and <code class="docutils literal notranslate"><span class="pre">ops</span></code> parameters are now used to specify the max processed
+operations the user wishes to retrieve and the location in which to store them.
+The API call returns the actual number of processed operations returned, this
+can never be larger than <code class="docutils literal notranslate"><span class="pre">nb_ops</span></code>.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="compressdev.html" title="previous chapter"><span class="section-number">21. </span>Compression Device Library</a></li>
+      <li>Next: <a href="mldev.html" title="next chapter"><span class="section-number">23. </span>Machine Learning Device Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/regexdev.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

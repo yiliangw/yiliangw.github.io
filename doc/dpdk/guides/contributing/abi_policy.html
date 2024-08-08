@@ -1,0 +1,470 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. ABI Policy &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. ABI Versioning" href="abi_versioning.html" />
+    <link rel="prev" title="2. Design" href="design.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="abi-policy">
+<h1><span class="section-number">3. </span>ABI Policy</h1>
+<section id="description">
+<h2><span class="section-number">3.1. </span>Description</h2>
+<p>This document details the management policy that ensures the long-term stability
+of the DPDK ABI and API.</p>
+</section>
+<section id="general-guidelines">
+<h2><span class="section-number">3.2. </span>General Guidelines</h2>
+<ol class="arabic simple">
+<li><p>Major ABI versions are declared no more frequently than yearly. Compatibility
+with the major ABI version is mandatory in subsequent releases until a
+<a class="reference internal" href="#new-abi-version"><span class="std std-ref">new major ABI version</span></a> is declared.</p></li>
+<li><p>Major ABI versions are usually but not always declared aligned with a
+<a class="reference internal" href="stable.html#stable-lts-releases"><span class="std std-ref">LTS release</span></a>.</p></li>
+<li><p>The ABI version is managed at a project level in DPDK, and is reflected in
+all non-experimental <a class="reference internal" href="abi_versioning.html#what-is-soname"><span class="std std-ref">library’s soname</span></a>.</p></li>
+<li><p>The ABI should be preserved and not changed lightly. ABI changes must follow
+the outlined <a class="reference internal" href="#abi-changes"><span class="std std-ref">deprecation process</span></a>.</p></li>
+<li><p>The addition of symbols is generally not problematic. The modification of
+symbols is managed with <a class="reference internal" href="abi_versioning.html#abi-versioning"><span class="std std-ref">ABI Versioning</span></a>.</p></li>
+<li><p>The removal of symbols is considered an <a class="reference internal" href="#abi-breakages"><span class="std std-ref">ABI breakage</span></a>,
+once approved these will form part of the next ABI version.</p></li>
+<li><p>Libraries or APIs marked as <a class="reference internal" href="#experimental-apis"><span class="std std-ref">experimental</span></a>
+may be changed or removed without prior notice,
+as they are not considered part of an ABI version.
+The <a class="reference internal" href="#experimental-apis"><span class="std std-ref">experimental</span></a> status of an API
+is not an indefinite state.</p></li>
+<li><p>Updates to the <a class="reference internal" href="#hw-rqmts"><span class="std std-ref">minimum hardware requirements</span></a>, which drop
+support for hardware which was previously supported, should be treated as an
+ABI change.</p></li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Please note that this policy does not currently apply to the
+<a class="reference internal" href="../windows_gsg/intro.html"><span class="doc">Windows build</span></a>.</p>
+</div>
+<section id="what-is-an-abi">
+<h3><span class="section-number">3.2.1. </span>What is an ABI?</h3>
+<p>An ABI (Application Binary Interface) is the set of runtime interfaces exposed
+by a library. It is similar to an API (Application Programming Interface) but
+is the result of compilation.  It is also effectively cloned when applications
+link to dynamic libraries.  That is to say when an application is compiled to
+link against dynamic libraries, it is assumed that the ABI remains constant
+between the time the application is compiled/linked, and the time that it runs.
+Therefore, in the case of dynamic linking, it is critical that an ABI is
+preserved, or (when modified), done in such a way that the application is unable
+to behave improperly or in an unexpected fashion.</p>
+<figure class="align-default" id="id3">
+<span id="figure-what-is-an-abi"></span><img alt="../_images/what_is_an_abi.svg" src="../_images/what_is_an_abi.svg" /><figcaption>
+<p><span class="caption-number">Fig. 3.1 </span><span class="caption-text">Illustration of DPDK API and ABI.</span></p>
+</figcaption>
+</figure>
+</section>
+<section id="what-is-an-abi-version">
+<h3><span class="section-number">3.2.2. </span>What is an ABI version?</h3>
+<p>An ABI version is an instance of a library’s ABI at a specific release. Certain
+releases are considered to be milestone releases, the yearly LTS release for
+example. The ABI of a milestone release may be declared as a ‘major ABI
+version’, where this ABI version is then supported for some number of subsequent
+releases and is annotated in the library’s <a class="reference internal" href="abi_versioning.html#what-is-soname"><span class="std std-ref">soname</span></a>.</p>
+<p>ABI version support in subsequent releases facilitates application upgrades, by
+enabling applications built against the milestone release to upgrade to
+subsequent releases of a library without a rebuild.</p>
+<p>More details on major ABI version can be found in the <a class="reference internal" href="abi_versioning.html#major-abi-versions"><span class="std std-ref">ABI versioning</span></a> guide.</p>
+</section>
+</section>
+<section id="the-dpdk-abi-policy">
+<h2><span class="section-number">3.3. </span>The DPDK ABI policy</h2>
+<p>A new major ABI version is declared no more frequently than yearly, with
+declarations usually aligning with a LTS release, e.g. ABI 21 for DPDK 20.11.
+Compatibility with the major ABI version is then mandatory in subsequent
+releases until the next major ABI version is declared, e.g. ABI 22 for DPDK
+21.11.</p>
+<p>At the declaration of a major ABI version, major version numbers encoded in
+libraries’ sonames are bumped to indicate the new version, with the minor
+version reset to <code class="docutils literal notranslate"><span class="pre">0</span></code>. An example would be <code class="docutils literal notranslate"><span class="pre">librte_eal.so.21.3</span></code> would become
+<code class="docutils literal notranslate"><span class="pre">librte_eal.so.22.0</span></code>.</p>
+<p>The ABI may then change multiple times, without warning, between the last major
+ABI version increment and the HEAD label of the git tree, with the condition
+that ABI compatibility with the major ABI version is preserved and therefore
+sonames do not change.</p>
+<p>Minor versions are incremented to indicate the release of a new ABI compatible
+DPDK release, typically the DPDK quarterly releases. An example of this, might
+be that <code class="docutils literal notranslate"><span class="pre">librte_eal.so.21.1</span></code> would indicate the first ABI compatible DPDK
+release, following the declaration of the new major ABI version <code class="docutils literal notranslate"><span class="pre">21</span></code>.</p>
+<p>An ABI version is supported in all new releases until the next major ABI version
+is declared. When changing the major ABI version, the release notes will detail
+all ABI changes.</p>
+<figure class="align-default" id="id4">
+<span id="figure-abi-stability-policy"></span><img alt="../_images/abi_stability_policy.svg" src="../_images/abi_stability_policy.svg" /><figcaption>
+<p><span class="caption-number">Fig. 3.2 </span><span class="caption-text">Mapping of new ABI versions and ABI version compatibility to DPDK
+releases.</span></p>
+</figcaption>
+</figure>
+<section id="abi-changes">
+<span id="id1"></span><h3><span class="section-number">3.3.1. </span>ABI Changes</h3>
+<p>The ABI may still change after the declaration of a major ABI version, that is
+new APIs may be still added or existing APIs may be modified.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Note that, this policy details the method by which the ABI may be changed,
+with due regard to preserving compatibility and observing deprecation
+notices. This process however should not be undertaken lightly, as a general
+rule ABI stability is extremely important for downstream consumers of DPDK.
+The API should only be changed for significant reasons, such as performance
+enhancements. API breakages due to changes such as reorganizing public
+structure fields for aesthetic or readability purposes should be avoided.</p>
+</div>
+<p>The requirements for changing the ABI are:</p>
+<ol class="arabic">
+<li><p>At least 3 acknowledgments of the need to do so must be made on the
+dpdk.org mailing list.</p>
+<ul class="simple">
+<li><p>The acknowledgment of the maintainer of the component is mandatory, or if
+no maintainer is available for the component, the tree/sub-tree maintainer
+for that component must acknowledge the ABI change instead.</p></li>
+<li><p>The acknowledgment of three members of the technical board, as delegates
+of the <a class="reference external" href="https://core.dpdk.org/techboard/">technical board</a> acknowledging
+the need for the ABI change, is also mandatory.</p></li>
+<li><p>It is also recommended that acknowledgments from different “areas of
+interest” be sought for each deprecation, for example: from NIC vendors,
+CPU vendors, end-users, etc.</p></li>
+</ul>
+</li>
+<li><p>Backward compatibility with the major ABI version must be maintained through
+<a class="reference internal" href="abi_versioning.html#abi-versioning"><span class="std std-ref">ABI Versioning</span></a>, with <a class="reference internal" href="#forward-only"><span class="std std-ref">forward-only</span></a> compatibility
+offered for any ABI changes that are indicated to be part of the next ABI
+version.</p>
+<ul class="simple">
+<li><p>In situations where backward compatibility is not possible, read the
+section on <a class="reference internal" href="#abi-breakages"><span class="std std-ref">ABI Breakages</span></a>.</p></li>
+<li><p>No backward or forward compatibility is offered for API changes marked as
+<code class="docutils literal notranslate"><span class="pre">experimental</span></code>, as described in the section on <a class="reference internal" href="#experimental-apis"><span class="std std-ref">Experimental APIs
+and Libraries</span></a>.</p></li>
+<li><p>In situations in which an <code class="docutils literal notranslate"><span class="pre">experimental</span></code> symbol has been stable for some
+time. When promoting the symbol to become part of the next ABI version, the
+maintainer may choose to provide an alias to the <code class="docutils literal notranslate"><span class="pre">experimental</span></code> tag, so
+as not to break consuming applications.</p></li>
+</ul>
+</li>
+<li><p>If a newly proposed API functionally replaces an existing one, when the new
+API becomes non-experimental, then the old one is marked with
+<code class="docutils literal notranslate"><span class="pre">__rte_deprecated</span></code>.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The deprecated API should follow the notification process to be removed,
+see  <a class="reference internal" href="#deprecation-notices"><span class="std std-ref">Examples of Deprecation Notices</span></a>.</p></li>
+<li><p>At the declaration of the next major ABI version, those ABI changes then
+become a formal part of the new ABI and the requirement to preserve ABI
+compatibility with the last major ABI version is then dropped.</p></li>
+<li><p>The responsibility for removing redundant ABI compatibility code rests
+with the original contributor of the ABI changes, failing that, then with
+the contributor’s company and then finally with the maintainer.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ol>
+<div class="admonition note" id="forward-only">
+<p class="admonition-title">Note</p>
+<p>Note that forward-only compatibility is offered for those changes made
+between major ABI versions. As a library’s soname can only describe
+compatibility with the last major ABI version, until the next major ABI
+version is declared, these changes therefore cannot be resolved as a runtime
+dependency through the soname. Therefore any application wishing to make use
+of these ABI changes can only ensure that its runtime dependencies are met
+through Operating System package versioning.</p>
+</div>
+<div class="admonition note" id="hw-rqmts">
+<p class="admonition-title">Note</p>
+<p>Updates to the minimum hardware requirements, which drop support for hardware
+which was previously supported, should be treated as an ABI change, and
+follow the relevant deprecation policy procedures as above: 3 acks, technical
+board approval and announcement at least one release in advance.</p>
+</div>
+</section>
+<section id="abi-breakages">
+<span id="id2"></span><h3><span class="section-number">3.3.2. </span>ABI Breakages</h3>
+<p>For those ABI changes that are too significant to reasonably maintain multiple
+symbol versions, there is an amended process. In these cases, ABIs may be
+updated without the requirement of backward compatibility being provided. These
+changes must follow the same process <a class="reference internal" href="#abi-changes"><span class="std std-ref">described above</span></a> as non-breaking
+changes, however with the following additional requirements:</p>
+<ol class="arabic simple">
+<li><p>ABI breaking changes (including an alternative map file) can be included with
+deprecation notice, in wrapped way by the <code class="docutils literal notranslate"><span class="pre">RTE_NEXT_ABI</span></code> option, to provide
+more details about oncoming changes. <code class="docutils literal notranslate"><span class="pre">RTE_NEXT_ABI</span></code> wrapper will be removed
+at the declaration of the next major ABI version.</p></li>
+<li><p>Once approved, and after the deprecation notice has been observed these
+changes will form part of the next declared major ABI version.</p></li>
+</ol>
+</section>
+<section id="examples-of-abi-changes">
+<h3><span class="section-number">3.3.3. </span>Examples of ABI Changes</h3>
+<p>The following are examples of allowable ABI changes occurring between
+declarations of major ABI versions.</p>
+<ul class="simple">
+<li><p>DPDK 20.11 release defines the function <code class="docutils literal notranslate"><span class="pre">rte_foo()</span></code> ; <code class="docutils literal notranslate"><span class="pre">rte_foo()</span></code>
+is part of the major ABI version <code class="docutils literal notranslate"><span class="pre">21</span></code>.</p></li>
+<li><p>DPDK 21.02 release defines a new function <code class="docutils literal notranslate"><span class="pre">rte_foo(uint8_t</span> <span class="pre">bar)</span></code>.
+This is not a problem as long as the symbol <code class="docutils literal notranslate"><span class="pre">rte_foo&#64;DPDK_21</span></code> is
+preserved through <a class="reference internal" href="abi_versioning.html#abi-versioning"><span class="std std-ref">ABI Versioning</span></a>.</p>
+<ul>
+<li><p>The new function may be marked with the <code class="docutils literal notranslate"><span class="pre">__rte_experimental</span></code> tag for a
+number of releases, as described in the section <a class="reference internal" href="#experimental-apis"><span class="std std-ref">Experimental</span></a>.</p></li>
+<li><p>Once <code class="docutils literal notranslate"><span class="pre">rte_foo(uint8_t</span> <span class="pre">bar)</span></code> becomes non-experimental, <code class="docutils literal notranslate"><span class="pre">rte_foo()</span></code> is
+declared as <code class="docutils literal notranslate"><span class="pre">__rte_deprecated</span></code> and an deprecation notice is provided.</p></li>
+</ul>
+</li>
+<li><p>DPDK 20.11 is not re-released to include <code class="docutils literal notranslate"><span class="pre">rte_foo(uint8_t</span> <span class="pre">bar)</span></code>, the new
+version of <code class="docutils literal notranslate"><span class="pre">rte_foo</span></code> only exists from DPDK 21.02 onwards as described in the
+<a class="reference internal" href="#forward-only"><span class="std std-ref">note on forward-only compatibility</span></a>.</p></li>
+<li><p>DPDK 21.02 release defines the experimental function <code class="docutils literal notranslate"><span class="pre">__rte_experimental</span>
+<span class="pre">rte_baz()</span></code>. This function may or may not exist in the DPDK 21.05 release.</p></li>
+<li><p>An application <code class="docutils literal notranslate"><span class="pre">dPacket</span></code> wishes to use <code class="docutils literal notranslate"><span class="pre">rte_foo(uint8_t</span> <span class="pre">bar)</span></code>, before the
+declaration of the DPDK <code class="docutils literal notranslate"><span class="pre">22</span></code> major ABI version. The application can only
+ensure its runtime dependencies are met by specifying <code class="docutils literal notranslate"><span class="pre">DPDK</span> <span class="pre">(&gt;=</span> <span class="pre">21.2)</span></code> as
+an explicit package dependency, as the soname can only indicate the
+supported major ABI version.</p></li>
+<li><p>At the release of DPDK 21.11, the function <code class="docutils literal notranslate"><span class="pre">rte_foo(uint8_t</span> <span class="pre">bar)</span></code> becomes
+formally part of then new major ABI version DPDK <code class="docutils literal notranslate"><span class="pre">22</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_foo()</span></code> may be
+removed.</p></li>
+</ul>
+</section>
+<section id="examples-of-deprecation-notices">
+<span id="deprecation-notices"></span><h3><span class="section-number">3.3.4. </span>Examples of Deprecation Notices</h3>
+<p>The following are some examples of ABI deprecation notices which would be
+added to the Release Notes:</p>
+<ul class="simple">
+<li><p>The Macro <code class="docutils literal notranslate"><span class="pre">#RTE_FOO</span></code> is deprecated and will be removed with ABI version
+22, to be replaced with the inline function <code class="docutils literal notranslate"><span class="pre">rte_foo()</span></code>.</p></li>
+<li><p>The function <code class="docutils literal notranslate"><span class="pre">rte_mbuf_grok()</span></code> has been updated to include a new parameter
+in version 21.2. Backwards compatibility will be maintained for this function
+until the release of the new DPDK major ABI version 22, in DPDK version
+21.11.</p></li>
+<li><p>The members of <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_foo</span></code> have been reorganized in DPDK 21.02 for
+performance reasons. Existing binary applications will have backwards
+compatibility in release 21.02, while newly built binaries will need to
+reference the new structure variant <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_foo2</span></code>. Compatibility will be
+removed in release 21.11, and all applications will require updating and
+rebuilding to the new structure at that time, which will be renamed to the
+original <code class="docutils literal notranslate"><span class="pre">struct</span> <span class="pre">rte_foo</span></code>.</p></li>
+<li><p>Significant ABI changes are planned for the <code class="docutils literal notranslate"><span class="pre">librte_dostuff</span></code> library. The
+upcoming release 21.02 will not contain these changes, but release 21.11 will,
+and no backwards compatibility is planned due to the extensive nature of
+these changes. Binaries using this library built prior to ABI version 22 will
+require updating and recompilation.</p></li>
+</ul>
+</section>
+</section>
+<section id="new-abi-versions">
+<span id="new-abi-version"></span><h2><span class="section-number">3.4. </span>New ABI versions</h2>
+<p>A new ABI version may be declared aligned with a given release.
+The requirement to preserve compatibility with the previous major ABI version
+is then dropped for the duration of this release cycle.
+This is commonly known as the <em>ABI breakage window</em>,
+and some amended rules apply during this cycle:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>The requirement to preserve compatibility with the previous major ABI
+version, as described in the section <a class="reference internal" href="#abi-changes"><span class="std std-ref">ABI Changes</span></a> does not apply.</p></li>
+<li><p>Contributors of compatibility preserving code in previous releases,
+are now required to remove this compatibility code,
+as described in the section <a class="reference internal" href="#abi-changes"><span class="std std-ref">ABI Changes</span></a>.</p></li>
+<li><p>Symbol versioning references to the old ABI version are updated
+to reference the new ABI version,
+as described in the section <a class="reference internal" href="abi_versioning.html#deprecating-entire-abi"><span class="std std-ref">Deprecating an entire ABI version</span></a>.</p></li>
+<li><p>Contributors of aliases to experimental in previous releases,
+as described in section <a class="reference internal" href="abi_versioning.html#aliasing-experimental-symbols"><span class="std std-ref">Aliasing experimental symbols</span></a>,
+are now required to remove these aliases.</p></li>
+<li><p>Finally, the <em>ABI breakage window</em> is <em>not</em> permission to circumvent
+the other aspects of the procedures to make ABI changes
+described in <a class="reference internal" href="#abi-changes"><span class="std std-ref">ABI Changes</span></a>, that is, 3 ACKs of the requirement
+to break the ABI and the observance of a deprecation notice
+are still considered mandatory.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="experimental">
+<span id="experimental-apis"></span><h2><span class="section-number">3.5. </span>Experimental</h2>
+<section id="apis">
+<h3><span class="section-number">3.5.1. </span>APIs</h3>
+<p>APIs marked as <code class="docutils literal notranslate"><span class="pre">experimental</span></code> are not considered part of an ABI version and
+may be changed or removed without prior notice. Since changes to APIs are most likely
+immediately after their introduction, as users begin to take advantage of those
+new APIs and start finding issues with them, new DPDK APIs will be automatically
+marked as <code class="docutils literal notranslate"><span class="pre">experimental</span></code> to allow for a period of stabilization before they
+become part of a tracked ABI version.</p>
+<p>Note that marking an API as experimental is a multi step process.
+To mark an API as experimental, the symbols which are desired to be exported
+must be placed in an EXPERIMENTAL version block in the corresponding libraries’
+version map script.
+Secondly, the corresponding prototypes of those exported functions (in the
+development header files), must be marked with the <code class="docutils literal notranslate"><span class="pre">__rte_experimental</span></code> tag
+(see <code class="docutils literal notranslate"><span class="pre">rte_compat.h</span></code>).
+The DPDK build makefiles perform a check to ensure that the map file and the
+C code reflect the same list of symbols.
+This check can be circumvented by defining <code class="docutils literal notranslate"><span class="pre">ALLOW_EXPERIMENTAL_API</span></code>
+during compilation in the corresponding library Makefile.</p>
+<p>In addition to tagging the code with <code class="docutils literal notranslate"><span class="pre">__rte_experimental</span></code>,
+the doxygen markup must also contain the EXPERIMENTAL string,
+and the MAINTAINERS file should note the EXPERIMENTAL libraries.</p>
+<p>For removing the experimental tag associated with an API, deprecation notice is
+not required. Though, an API should remain in experimental state for at least
+one release. Thereafter, the normal process of posting patch for review to
+mailing list can be followed.</p>
+<p>After the experimental tag has been formally removed, a tree/sub-tree maintainer
+may choose to offer an alias to the experimental tag so as not to break
+applications using the symbol. The alias is then dropped at the declaration of
+next major ABI version.</p>
+</section>
+<section id="libraries">
+<h3><span class="section-number">3.5.2. </span>Libraries</h3>
+<p>Libraries marked as <code class="docutils literal notranslate"><span class="pre">experimental</span></code> are entirely not considered part of an ABI
+version.
+All functions in such libraries may be changed or removed without prior notice.</p>
+</section>
+<section id="promotion-to-stable">
+<h3><span class="section-number">3.5.3. </span>Promotion to stable</h3>
+<p>An API’s <code class="docutils literal notranslate"><span class="pre">experimental</span></code> status should be reviewed annually,
+by both the maintainer and/or the original contributor.
+Ordinarily APIs marked as <code class="docutils literal notranslate"><span class="pre">experimental</span></code> will be promoted to the stable ABI
+once a maintainer has become satisfied that the API is mature
+and is unlikely to change.</p>
+<p>In exceptional circumstances, should an API still be classified
+as <code class="docutils literal notranslate"><span class="pre">experimental</span></code> after two years
+and is without any prospect of becoming part of the stable API.
+The API will then become a candidate for removal,
+to avoid the accumulation of abandoned symbols.</p>
+<p>Should an ABI change, usually due to a direct change to the API’s signature,
+it is reasonable for the review and expiry clocks to reset.
+The promotion or removal of symbols will typically form part of a conversation
+between the maintainer and the original contributor.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Contributor’s Guidelines</a><ul>
+      <li>Previous: <a href="design.html" title="previous chapter"><span class="section-number">2. </span>Design</a></li>
+      <li>Next: <a href="abi_versioning.html" title="next chapter"><span class="section-number">4. </span>ABI Versioning</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/contributing/abi_policy.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

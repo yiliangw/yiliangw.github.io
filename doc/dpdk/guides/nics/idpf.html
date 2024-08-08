@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>29. IDPF Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="30. IGB Poll Mode Driver" href="igb.html" />
+    <link rel="prev" title="28. ICE Poll Mode Driver" href="ice.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="idpf-poll-mode-driver">
+<h1><span class="section-number">29. </span>IDPF Poll Mode Driver</h1>
+<p>The idpf PMD (<strong>librte_net_idpf</strong>) provides poll mode driver support for
+Intel® Infrastructure Processing Unit (Intel® IPU) E2100.</p>
+<section id="linux-prerequisites">
+<h2><span class="section-number">29.1. </span>Linux Prerequisites</h2>
+<p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html"><span class="doc">Getting Started Guide for Linux</span></a> to setup the basic DPDK environment.</p>
+<p>To get better performance on Intel platforms,
+please follow the <a class="reference internal" href="../linux_gsg/nic_perf_intel_platform.html"><span class="doc">How to get best performance with NICs on Intel platforms</span></a>.</p>
+</section>
+<section id="recommended-matching-list">
+<h2><span class="section-number">29.2. </span>Recommended Matching List</h2>
+<p>It is highly recommended to upgrade the idpf kernel driver, MEV-ts release
+to avoid compatibility issues with the idpf PMD.
+Here is the suggested matching list which has been tested and verified.</p>
+<blockquote>
+<div><table class="docutils align-default">
+<colgroup>
+<col style="width: 27%" />
+<col style="width: 33%" />
+<col style="width: 40%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>DPDK</p></th>
+<th class="head"><p>Kernel Driver</p></th>
+<th class="head"><p>MEV-ts release</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>23.07</p></td>
+<td><p>0.0.710</p></td>
+<td><p>0.9.1</p></td>
+</tr>
+<tr class="row-odd"><td><p>23.11</p></td>
+<td><p>0.0.720</p></td>
+<td><p>1.0</p></td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+</section>
+<section id="configuration">
+<h2><span class="section-number">29.3. </span>Configuration</h2>
+<section id="runtime-configuration">
+<h3><span class="section-number">29.3.1. </span>Runtime Configuration</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">vport</span></code> (default <code class="docutils literal notranslate"><span class="pre">0</span></code>)</p>
+<p>The PMD supports creation of multiple vports for one PCI device,
+each vport corresponds to a single ethdev.
+The user can specify the vports with specific ID to be created, for example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a ca:00.0,vport=[0,2,3]
+</pre></div>
+</div>
+<p>Then the PMD will create 3 vports (ethdevs) for device <code class="docutils literal notranslate"><span class="pre">ca:00.0</span></code>.</p>
+<p>If the parameter is not provided, the vport 0 will be created by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_single</span></code> (default <code class="docutils literal notranslate"><span class="pre">0</span></code>)</p>
+<p>There are two queue modes supported by Intel® IPU Ethernet ES2000 Series,
+single queue mode and split queue mode for Rx queue.
+User can choose Rx queue mode, example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a ca:00.0,rx_single=1
+</pre></div>
+</div>
+<p>Then the PMD will configure Rx queue with single queue mode.
+Otherwise, split queue mode is chosen by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_single</span></code> (default <code class="docutils literal notranslate"><span class="pre">0</span></code>)</p>
+<p>There are two queue modes supported by Intel® IPU Ethernet ES2000 Series,
+single queue mode and split queue mode for Tx queue.
+User can choose Tx queue mode, example:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a ca:00.0,tx_single=1
+</pre></div>
+</div>
+<p>Then the PMD will configure Tx queue with single queue mode.
+Otherwise, split queue mode is chosen by default.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<h2><span class="section-number">29.4. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html"><span class="doc">Compiling and testing a PMD for a NIC</span></a> for details.</p>
+</section>
+<section id="features">
+<h2><span class="section-number">29.5. </span>Features</h2>
+<section id="vector-pmd">
+<h3><span class="section-number">29.5.1. </span>Vector PMD</h3>
+<p>Vector path for Rx and Tx path are selected automatically.
+The paths are chosen based on 2 conditions:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">CPU</span></code></p>
+<p>On the x86 platform, the driver checks if the CPU supports AVX512.
+If the CPU supports AVX512 and EAL argument <code class="docutils literal notranslate"><span class="pre">--force-max-simd-bitwidth</span></code>
+is set to 512, AVX512 paths will be chosen.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Offload</span> <span class="pre">features</span></code></p>
+<p>The supported HW offload features are described in the document idpf.ini,
+A value “P” means the offload feature is not supported by vector path.
+If any not supported features are used, idpf vector PMD is disabled
+and the scalar paths are chosen.</p>
+</li>
+</ul>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="ice.html" title="previous chapter"><span class="section-number">28. </span>ICE Poll Mode Driver</a></li>
+      <li>Next: <a href="igb.html" title="next chapter"><span class="section-number">30. </span>IGB Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/idpf.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

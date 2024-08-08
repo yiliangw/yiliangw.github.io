@@ -1,0 +1,257 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>12. Mempool Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="13. Mbuf Library" href="mbuf_lib.html" />
+    <link rel="prev" title="11. Stack Library" href="stack_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="mempool-library">
+<span id="id1"></span><h1><span class="section-number">12. </span>Mempool Library</h1>
+<p>A memory pool is an allocator of a fixed-sized object.
+In the DPDK, it is identified by name and uses a mempool handler to store free objects.
+The default mempool handler is ring based.
+It provides some other optional services such as a per-core object cache and
+an alignment helper to ensure that objects are padded to spread them equally on all DRAM or DDR3 channels.</p>
+<p>This library is used by the <a class="reference internal" href="mbuf_lib.html#mbuf-library"><span class="std std-ref">Mbuf Library</span></a>.</p>
+<section id="cookies">
+<h2><span class="section-number">12.1. </span>Cookies</h2>
+<p>In debug mode, cookies are added at the beginning and end of allocated blocks.
+The allocated objects then contain overwrite protection fields to help debugging buffer overflows.</p>
+<p>Debug mode is disabled by default,
+but can be enabled by setting <code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_MEMPOOL_DEBUG</span></code> in <code class="docutils literal notranslate"><span class="pre">config/rte_config.h</span></code>.</p>
+</section>
+<section id="stats">
+<h2><span class="section-number">12.2. </span>Stats</h2>
+<p>In stats mode, statistics about get from/put in the pool are stored in the mempool structure.
+Statistics are per-lcore to avoid concurrent access to statistics counters.</p>
+<p>Stats mode is disabled by default,
+but can be enabled by setting <code class="docutils literal notranslate"><span class="pre">RTE_LIBRTE_MEMPOOL_STATS</span></code> in <code class="docutils literal notranslate"><span class="pre">config/rte_config.h</span></code>.</p>
+</section>
+<section id="memory-alignment-constraints-on-x86-architecture">
+<h2><span class="section-number">12.3. </span>Memory Alignment Constraints on x86 architecture</h2>
+<p>Depending on hardware memory configuration on X86 architecture, performance can be greatly improved by adding a specific padding between objects.
+The objective is to ensure that the beginning of each object starts on a different channel and rank in memory so that all channels are equally loaded.</p>
+<p>This is particularly true for packet buffers when doing L3 forwarding or flow classification.
+Only the first 64 bytes are accessed, so performance can be increased by spreading the start addresses of objects among the different channels.</p>
+<p>The number of ranks on any DIMM is the number of independent sets of DRAMs that can be accessed for the full data bit-width of the DIMM.
+The ranks cannot be accessed simultaneously since they share the same data path.
+The physical layout of the DRAM chips on the DIMM itself does not necessarily relate to the number of ranks.</p>
+<p>When running an application, the EAL command line options provide the ability to add the number of memory channels and ranks.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The command line must always have the number of memory channels specified for the processor.</p>
+</div>
+<p>Examples of alignment for different DIMM architectures are shown in
+<a class="reference internal" href="#figure-memory-management"><span class="std std-numref">Fig. 12.1</span></a> and <a class="reference internal" href="#figure-memory-management2"><span class="std std-numref">Fig. 12.2</span></a>.</p>
+<figure class="align-default" id="id3">
+<span id="figure-memory-management"></span><img alt="../_images/memory-management.svg" src="../_images/memory-management.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.1 </span><span class="caption-text">Two Channels and Quad-ranked DIMM Example</span></p>
+</figcaption>
+</figure>
+<p>In this case, the assumption is that a packet is 16 blocks of 64 bytes, which is not true.</p>
+<p>The Intel® 5520 chipset has three channels, so in most cases,
+no padding is required between objects (except for objects whose size are n x 3 x 64 bytes blocks).</p>
+<figure class="align-default" id="id4">
+<span id="figure-memory-management2"></span><img alt="../_images/memory-management2.svg" src="../_images/memory-management2.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.2 </span><span class="caption-text">Three Channels and Two Dual-ranked DIMM Example</span></p>
+</figcaption>
+</figure>
+<p>When creating a new pool, the user can specify to use this feature or not.</p>
+</section>
+<section id="local-cache">
+<span id="mempool-local-cache"></span><h2><span class="section-number">12.4. </span>Local Cache</h2>
+<p>In terms of CPU usage, the cost of multiple cores accessing a memory pool’s ring of free buffers may be high
+since each access requires a compare-and-set (CAS) operation.
+To avoid having too many access requests to the memory pool’s ring,
+the memory pool allocator can maintain a per-core cache and do bulk requests to the memory pool’s ring,
+via the cache with many fewer locks on the actual memory pool structure.
+In this way, each core has full access to its own cache (with locks) of free objects and
+only when the cache fills does the core need to shuffle some of the free objects back to the pools ring or
+obtain more objects when the cache is empty.</p>
+<p>While this may mean a number of buffers may sit idle on some core’s cache,
+the speed at which a core can access its own cache for a specific memory pool without locks provides performance gains.</p>
+<p>The cache is composed of a small, per-core table of pointers and its length (used as a stack).
+This internal cache can be enabled or disabled at creation of the pool.</p>
+<p>The maximum size of the cache is static and is defined at compilation time (RTE_MEMPOOL_CACHE_MAX_SIZE).</p>
+<p><a class="reference internal" href="#figure-mempool"><span class="std std-numref">Fig. 12.3</span></a> shows a cache in operation.</p>
+<figure class="align-default" id="id5">
+<span id="figure-mempool"></span><img alt="../_images/mempool.svg" src="../_images/mempool.svg" /><figcaption>
+<p><span class="caption-number">Fig. 12.3 </span><span class="caption-text">A mempool in Memory with its Associated Ring</span></p>
+</figcaption>
+</figure>
+<p>Alternatively to the internal default per-lcore local cache, an application can create and manage external caches through the <code class="docutils literal notranslate"><span class="pre">rte_mempool_cache_create()</span></code>, <code class="docutils literal notranslate"><span class="pre">rte_mempool_cache_free()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_mempool_cache_flush()</span></code> calls.
+These user-owned caches can be explicitly passed to <code class="docutils literal notranslate"><span class="pre">rte_mempool_generic_put()</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_mempool_generic_get()</span></code>.
+The <code class="docutils literal notranslate"><span class="pre">rte_mempool_default_cache()</span></code> call returns the default internal cache if any.
+In contrast to the default caches, user-owned caches can be used by unregistered non-EAL threads too.</p>
+</section>
+<section id="mempool-handlers">
+<span id="id2"></span><h2><span class="section-number">12.5. </span>Mempool Handlers</h2>
+<p>This allows external memory subsystems, such as external hardware memory
+management systems and software based memory allocators, to be used with DPDK.</p>
+<p>There are two aspects to a mempool handler.</p>
+<ul class="simple">
+<li><p>Adding the code for your new mempool operations (ops). This is achieved by
+adding a new mempool ops code, and using the <code class="docutils literal notranslate"><span class="pre">RTE_MEMPOOL_REGISTER_OPS</span></code> macro.</p></li>
+<li><p>Using the new API to call <code class="docutils literal notranslate"><span class="pre">rte_mempool_create_empty()</span></code> and
+<code class="docutils literal notranslate"><span class="pre">rte_mempool_set_ops_byname()</span></code> to create a new mempool and specifying which
+ops to use.</p></li>
+</ul>
+<p>Several different mempool handlers may be used in the same application. A new
+mempool can be created by using the <code class="docutils literal notranslate"><span class="pre">rte_mempool_create_empty()</span></code> function,
+then using <code class="docutils literal notranslate"><span class="pre">rte_mempool_set_ops_byname()</span></code> to point the mempool to the
+relevant mempool handler callback (ops) structure.</p>
+<p>Legacy applications may continue to use the old <code class="docutils literal notranslate"><span class="pre">rte_mempool_create()</span></code> API
+call, which uses a ring based mempool handler by default. These applications
+will need to be modified to use a new mempool handler.</p>
+<p>For applications that use <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_create()</span></code>, there is a config setting
+(<code class="docutils literal notranslate"><span class="pre">RTE_MBUF_DEFAULT_MEMPOOL_OPS</span></code>) that allows the application to make use of
+an alternative mempool handler.</p>
+<blockquote>
+<div><div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When running a DPDK application with shared libraries, mempool handler
+shared objects specified with the ‘-d’ EAL command-line parameter are
+dynamically loaded. When running a multi-process application with shared
+libraries, the -d arguments for mempool handlers <em>must be specified in the
+same order for all processes</em> to ensure correct operation.</p>
+</div>
+</div></blockquote>
+</section>
+<section id="use-cases">
+<h2><span class="section-number">12.6. </span>Use Cases</h2>
+<p>All allocations that require a high level of performance should use a pool-based memory allocator.
+Below are some examples:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="mbuf_lib.html#mbuf-library"><span class="std std-ref">Mbuf Library</span></a></p></li>
+<li><p><a class="reference internal" href="env_abstraction_layer.html#environment-abstraction-layer"><span class="std std-ref">Environment Abstraction Layer</span></a> , for logging service</p></li>
+<li><p>Any application that needs to allocate fixed-sized objects in the data plane and that will be continuously utilized by the system.</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="stack_lib.html" title="previous chapter"><span class="section-number">11. </span>Stack Library</a></li>
+      <li>Next: <a href="mbuf_lib.html" title="next chapter"><span class="section-number">13. </span>Mbuf Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/mempool_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

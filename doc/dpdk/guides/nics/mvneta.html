@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>40. MVNETA Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="41. MVPP2 Poll Mode Driver" href="mvpp2.html" />
+    <link rel="prev" title="39. NVIDIA MLX5 Ethernet Driver" href="mlx5.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="mvneta-poll-mode-driver">
+<h1><span class="section-number">40. </span>MVNETA Poll Mode Driver</h1>
+<p>The MVNETA PMD (<strong>librte_net_mvneta</strong>) provides poll mode driver support
+for the Marvell NETA 1/2.5 Gbps adapter.</p>
+<p>Detailed information about SoCs that use PPv2 can be obtained here:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-3700/">https://www.marvell.com/embedded-processors/armada-3700/</a></p></li>
+</ul>
+<section id="features">
+<h2><span class="section-number">40.1. </span>Features</h2>
+<p>Features of the MVNETA PMD are:</p>
+<ul class="simple">
+<li><p>Start/stop</p></li>
+<li><p>tx/rx_queue_setup</p></li>
+<li><p>tx/rx_burst</p></li>
+<li><p>Speed capabilities</p></li>
+<li><p>Jumbo frame</p></li>
+<li><p>MTU update</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Unicast MAC filter</p></li>
+<li><p>Link status</p></li>
+<li><p>CRC offload</p></li>
+<li><p>L3 checksum offload</p></li>
+<li><p>L4 checksum offload</p></li>
+<li><p>Packet type parsing</p></li>
+<li><p>Basic stats</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">40.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Flushing vlans added for filtering is not possible due to MUSDK missing
+functionality. Current workaround is to reset board so that NETA has a
+chance to start in a sane state.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">40.3. </span>Prerequisites</h2>
+<ul>
+<li><p>Custom Linux Kernel sources</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git -b linux-4.4.120-armada-18.09</span>
+</pre></div>
+</div>
+</li>
+<li><p>MUSDK (Marvell User-Space SDK) sources</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/MarvellEmbeddedProcessors/musdk-marvell.git -b musdk-release-SDK-10.3.5.0-PR2</span>
+</pre></div>
+</div>
+<p>MUSDK is a light-weight library that provides direct access to Marvell’s
+NETA. Alternatively prebuilt MUSDK library can be
+requested from <a class="reference external" href="https://extranet.marvell.com">Marvell Extranet</a>. Once
+approval has been granted, library can be found by typing <code class="docutils literal notranslate"><span class="pre">musdk</span></code> in
+the search box.</p>
+<p>MUSDK must be configured with the following features:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">--enable-pp2=no --enable-neta</span>
+</pre></div>
+</div>
+</li>
+<li><p>DPDK environment</p>
+<p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup
+DPDK environment.</p>
+</li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h2><span class="section-number">40.4. </span>Runtime Configuration</h2>
+<p>The following <code class="docutils literal notranslate"><span class="pre">devargs</span></code> options can be enabled at runtime. They must
+be passed as part of EAL arguments.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">iface</span></code> (mandatory, with no default value)</p>
+<p>The name of port (owned by MUSDK) that should be enabled in DPDK.
+This options can be repeated resulting in a list of ports to be
+enabled.  For instance below will enable <code class="docutils literal notranslate"><span class="pre">eth0</span></code> and <code class="docutils literal notranslate"><span class="pre">eth1</span></code> ports.</p>
+</li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=net_mvneta,iface=eth0,iface=eth1 \</span>
+<span class="go"> -c 3 -- -i --p 3 -a</span>
+</pre></div>
+</div>
+</section>
+<section id="building-musdk">
+<h2><span class="section-number">40.5. </span>Building MUSDK</h2>
+<p>Driver needs precompiled MUSDK library during compilation.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export CROSS_COMPILE=&lt;toolchain&gt;/bin/aarch64-linux-gnu-</span>
+<span class="go">./bootstrap</span>
+<span class="go">./configure --host=aarch64-linux-gnu --enable-pp2=no --enable-neta</span>
+<span class="go">make install</span>
+</pre></div>
+</div>
+<p>MUSDK will be installed to <cite>usr/local</cite> under current directory.
+For the detailed build instructions please consult <code class="docutils literal notranslate"><span class="pre">doc/musdk_get_started.txt</span></code>.</p>
+</section>
+<section id="building-dpdk">
+<h2><span class="section-number">40.6. </span>Building DPDK</h2>
+<p>Add path to libmusdk.pc in PKG_CONFIG_PATH environment variable.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export PKG_CONFIG_PATH=$&lt;musdk_install_dir&gt;/lib/pkgconfig/:$PKG_CONFIG_PATH</span>
+<span class="go">meson setup build --cross-file config/arm/arm64_armada_linux_gcc</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">40.7. </span>Usage Example</h2>
+<p>MVNETA PMD requires extra out of tree kernel modules to function properly.
+<cite>musdk_uio</cite> and <cite>mv_neta_uio</cite> sources are part of the MUSDK. Please consult
+<code class="docutils literal notranslate"><span class="pre">doc/musdk_get_started.txt</span></code> for the detailed build instructions.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">insmod musdk_uio.ko</span>
+<span class="go">insmod mv_neta_uio.ko</span>
+</pre></div>
+</div>
+<p>Additionally interfaces used by DPDK application need to be put up:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ip link set eth0 up</span>
+<span class="go">ip link set eth1 up</span>
+</pre></div>
+</div>
+<p>In order to run testpmd example application following command can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=net_mvneta,iface=eth0,iface=eth1 -c 3 -- \</span>
+<span class="go">  -i --p 3 -a --txd 256 --rxd 128 --rxq=1 --txq=1  --nb-cores=1</span>
+</pre></div>
+</div>
+<p>In order to run l2fwd example application following command can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-l2fwd --vdev=net_mvneta,iface=eth0,iface=eth1 -c 3 -- -T 1 -p 3</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="mlx5.html" title="previous chapter"><span class="section-number">39. </span>NVIDIA MLX5 Ethernet Driver</a></li>
+      <li>Next: <a href="mvpp2.html" title="next chapter"><span class="section-number">41. </span>MVPP2 Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/mvneta.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

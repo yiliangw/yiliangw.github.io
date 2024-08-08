@@ -1,0 +1,489 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. ARK Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="7. Aquantia Atlantic DPDK Driver" href="atlantic.html" />
+    <link rel="prev" title="5. AF_XDP Poll Mode Driver" href="af_xdp.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="ark-poll-mode-driver">
+<h1><span class="section-number">6. </span>ARK Poll Mode Driver</h1>
+<p>The ARK PMD is a DPDK poll-mode driver for the Atomic Rules Arkville
+(ARK) family of devices.</p>
+<p>More information can be found at the <a class="reference external" href="http://atomicrules.com">Atomic Rules website</a>.</p>
+<section id="overview">
+<h2><span class="section-number">6.1. </span>Overview</h2>
+<p>The Atomic Rules Arkville product is DPDK and AXI compliant product
+that marshals packets across a PCIe conduit between host DPDK mbufs and
+FPGA AXI streams.</p>
+<p>The ARK PMD, and the spirit of the overall Arkville product,
+has been to take the DPDK API/ABI as a fixed specification;
+then implement much of the business logic in FPGA RTL circuits.
+The approach of <em>working backwards</em> from the DPDK API/ABI and having
+the GPP host software <em>dictate</em>, while the FPGA hardware <em>copes</em>,
+results in significant performance gains over a naive implementation.</p>
+<p>While this document describes the ARK PMD software, it is helpful to
+understand what the FPGA hardware is and is not. The Arkville RTL
+component provides a single PCIe Physical Function (PF) supporting
+some number of RX/Ingress and TX/Egress Queues. The ARK PMD controls
+the Arkville core through a dedicated opaque Core BAR (CBAR).
+To allow users full freedom for their own FPGA application IP,
+an independent FPGA Application BAR (ABAR) is provided.</p>
+<p>One popular way to imagine Arkville’s FPGA hardware aspect is as the
+FPGA PCIe-facing side of a so-called Smart NIC. The Arkville core does
+not contain any MACs, and is link-speed independent, as well as
+agnostic to the number of physical ports the application chooses to
+use. The ARK driver exposes the familiar PMD interface to allow packet
+movement to and from mbufs across multiple queues.</p>
+<p>However FPGA RTL applications could contain a universe of added
+functionality that an Arkville RTL core does not provide or can
+not anticipate. To allow for this expectation of user-defined
+innovation, the ARK PMD provides a dynamic mechanism of adding
+capabilities without having to modify the ARK PMD.</p>
+<p>The ARK PMD is intended to support all instances of the Arkville
+RTL Core, regardless of configuration, FPGA vendor, or target
+board. While specific capabilities such as number of physical
+hardware queue-pairs are negotiated; the driver is designed to
+remain constant over a broad and extendable feature set.</p>
+<ul class="simple">
+<li><p>FPGA Vendors Supported: AMD/Xilinx and Intel</p></li>
+<li><p>Number of RX/TX Queue-Pairs: up to 128</p></li>
+<li><p>PCIe Endpoint Technology: Gen3, Gen4, Gen5</p></li>
+</ul>
+<p>Intentionally, Arkville by itself DOES NOT provide common NIC
+capabilities such as offload or receive-side scaling (RSS).
+These capabilities would be viewed as a gate-level “tax” on
+Green-box FPGA applications that do not require such function.
+Instead, they can be added as needed with essentially no
+overhead to the FPGA Application.</p>
+<p>The ARK PMD also supports optional user extensions, through dynamic linking.
+The ARK PMD user extensions are a feature of Arkville’s DPDK
+net/ark poll mode driver, allowing users to add their
+own code to extend the net/ark functionality without
+having to make source code changes to the driver. One motivation for
+this capability is that while DPDK provides a rich set of functions
+to interact with NIC-like capabilities (e.g. MAC addresses and statistics),
+the Arkville RTL IP does not include a MAC.  Users can supply their
+own MAC or custom FPGA applications, which may require control from
+the PMD.  The user extension is the means providing the control
+between the user’s FPGA application and the existing DPDK features via
+the PMD.</p>
+</section>
+<section id="device-parameters">
+<h2><span class="section-number">6.2. </span>Device Parameters</h2>
+<p>The ARK PMD supports device parameters that are used for packet
+routing and for internal packet generation and packet checking.  This
+section describes the supported parameters.  These features are
+primarily used for diagnostics, testing, and performance verification
+under the guidance of an Arkville specialist.  The nominal use of
+Arkville does not require any configuration using these parameters.</p>
+<p>“Pkt_dir”</p>
+<p>The Packet Director controls connectivity between Arkville’s internal
+hardware components. The features of the Pkt_dir are only used for
+diagnostics and testing; it is not intended for nominal use.  The full
+set of features are not published at this level.</p>
+<p>Format:
+Pkt_dir=0x00110F10</p>
+<p>“Pkt_gen”</p>
+<p>The packet generator parameter takes a file as its argument.  The file
+contains configuration parameters used internally for regression
+testing and are not intended to be published at this level.  The
+packet generator is an internal Arkville hardware component.</p>
+<p>Format:
+Pkt_gen=./config/pg.conf</p>
+<p>“Pkt_chkr”</p>
+<p>The packet checker parameter takes a file as its argument.  The file
+contains configuration parameters used internally for regression
+testing and are not intended to be published at this level.  The
+packet checker is an internal Arkville hardware component.</p>
+<p>Format:
+Pkt_chkr=./config/pc.conf</p>
+</section>
+<section id="data-path-interface">
+<h2><span class="section-number">6.3. </span>Data Path Interface</h2>
+<p>Ingress RX and Egress TX operation is by the nominal DPDK API .
+The driver supports single-port, multi-queue for both RX and TX.</p>
+</section>
+<section id="configuration-information">
+<h2><span class="section-number">6.4. </span>Configuration Information</h2>
+<p><strong>DPDK Configuration Parameter</strong></p>
+<blockquote>
+<div><ul class="simple">
+<li><p><strong>RTE_LIBRTE_ARK_MIN_TX_PKTLEN</strong> (default 0): Sets the minimum
+packet length for tx packets to the FPGA.  Packets less than this
+length are padded to meet the requirement. This allows padding to
+be offloaded or remain in host software.</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="dynamic-pmd-extension">
+<h2><span class="section-number">6.5. </span>Dynamic PMD Extension</h2>
+<p>Dynamic PMD extensions allow users to customize net/ark functionality
+using their own code. Arkville RTL and this PMD support high-throughput data
+movement, and these extensions allow PMD support for users’ FPGA
+features.
+Dynamic PMD extensions operate by having users supply a shared object
+file which is loaded by Arkville PMD during initialization.  The
+object file contains extension (or hook) functions that are registered
+and then called during PMD operations.</p>
+<p>The allowable set of extension functions are defined and documented in
+<code class="docutils literal notranslate"><span class="pre">ark_ext.h</span></code>, only the initialization function,
+<code class="docutils literal notranslate"><span class="pre">rte_pmd_ark_dev_init()</span></code>, is required; all others are optional. The
+following sections give a small extension example along with
+instructions for compiling and using the extension.</p>
+<section id="extension-example">
+<h3><span class="section-number">6.5.1. </span>Extension Example</h3>
+<p>The following example shows an extension which populates mbuf fields
+during RX from user meta data coming from FPGA hardware.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;ark_ext.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_mbuf.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_ethdev.h&gt;</span><span class="cp"></span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;rte_malloc.h&gt;</span><span class="cp"></span>
+
+<span class="cm">/* Global structure passed to extension/hook functions */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">ark_user_extension</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">timestamp_dynfield_offset</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="cm">/* RX tuser field based on user&#39;s hardware */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">user_rx_meta</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="kt">uint64_t</span><span class="w"> </span><span class="n">timestamp</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">rss</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"> </span><span class="n">__rte_packed</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* Create ark_user_extension object for use in other hook functions */</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="nf">rte_pmd_ark_dev_init</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_dev</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">dev</span><span class="p">,</span><span class="w"></span>
+<span class="w">                           </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">abar</span><span class="p">,</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">port_id</span><span class="w"> </span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="n">RTE_SET_USED</span><span class="p">(</span><span class="n">dev</span><span class="p">);</span><span class="w"></span>
+<span class="w">   </span><span class="n">RTE_SET_USED</span><span class="p">(</span><span class="n">abar</span><span class="p">);</span><span class="w"></span>
+<span class="w">   </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Called Arkville user extension for port %u</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">port_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">   </span><span class="k">struct</span><span class="w"> </span><span class="nc">ark_user_extension</span><span class="w"> </span><span class="o">*</span><span class="n">xdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_zmalloc</span><span class="p">(</span><span class="s">&quot;macExtS&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">          </span><span class="k">sizeof</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">ark_user_extension</span><span class="p">),</span><span class="w"> </span><span class="mi">64</span><span class="p">);</span><span class="w"></span>
+<span class="w">   </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">xdata</span><span class="p">)</span><span class="w"></span>
+<span class="w">      </span><span class="k">return</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">   </span><span class="cm">/* register dynfield for rx timestamp */</span><span class="w"></span>
+<span class="w">   </span><span class="n">rte_mbuf_dyn_rx_timestamp_register</span><span class="p">(</span><span class="o">&amp;</span><span class="n">xdata</span><span class="o">-&gt;</span><span class="n">timestamp_dynfield_offset</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                      </span><span class="nb">NULL</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">   </span><span class="n">fprintf</span><span class="p">(</span><span class="n">stderr</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;timestamp fields offset in extension is %d</span><span class="se">\n</span><span class="s">&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">           </span><span class="n">xdata</span><span class="o">-&gt;</span><span class="n">timestamp_dynfield_offset</span><span class="p">);</span><span class="w"></span>
+<span class="w">   </span><span class="k">return</span><span class="w"> </span><span class="n">xdata</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* uninitialization */</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">rte_pmd_ark_dev_uninit</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_eth_dev</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">dev</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">user_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="n">rte_free</span><span class="p">(</span><span class="n">user_data</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* Hook function -- called for each RX packet</span>
+<span class="cm"> * Extract RX timestamp and RSS from meta and place in mbuf</span>
+<span class="cm"> */</span><span class="w"></span>
+<span class="kt">void</span><span class="w"> </span><span class="nf">rte_pmd_ark_rx_user_meta_hook</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_mbuf</span><span class="w"> </span><span class="o">*</span><span class="n">mbuf</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                   </span><span class="k">const</span><span class="w"> </span><span class="kt">uint32_t</span><span class="w"> </span><span class="o">*</span><span class="n">meta</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                   </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">user_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">   </span><span class="k">struct</span><span class="w"> </span><span class="nc">ark_user_extension</span><span class="w"> </span><span class="o">*</span><span class="n">xdata</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">user_data</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="k">struct</span><span class="w"> </span><span class="nc">user_rx_meta</span><span class="w"> </span><span class="o">*</span><span class="n">user_rx</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">user_rx_meta</span><span class="o">*</span><span class="p">)</span><span class="n">meta</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="o">*</span><span class="n">RTE_MBUF_DYNFIELD</span><span class="p">(</span><span class="n">mbuf</span><span class="p">,</span><span class="w"> </span><span class="n">xdata</span><span class="o">-&gt;</span><span class="n">timestamp_dynfield_offset</span><span class="p">,</span><span class="w"> </span><span class="kt">uint64_t</span><span class="o">*</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                      </span><span class="n">user_rx</span><span class="o">-&gt;</span><span class="n">timestamp</span><span class="p">;</span><span class="w"></span>
+<span class="w">   </span><span class="n">mbuf</span><span class="o">-&gt;</span><span class="n">hash</span><span class="p">.</span><span class="n">rss</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">user_rx</span><span class="o">-&gt;</span><span class="n">rss</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="compiling-extension">
+<h3><span class="section-number">6.5.2. </span>Compiling Extension</h3>
+<p>It is recommended to the compile the extension code with
+<code class="docutils literal notranslate"><span class="pre">-Wmissing-prototypes</span></code> flag to insure correct function types. Typical
+DPDK options will also be needed.</p>
+<p>An example command line is give below</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cc `pkg-config --cflags libdpdk` \</span>
+<span class="go">-O3 -DALLOW_EXPERIMENTAL_API -fPIC -Wall -Wmissing-prototypes -c \</span>
+<span class="go">-o pmd_net_ark_ext.o pmd_net_ark_ext.c</span>
+<span class="gp"># </span>Linking
+<span class="go">cc -o libfx1_100g_ext.so.1 -shared \</span>
+<span class="go">`pkg-config --libs libdpdk` \</span>
+<span class="go">-Wl,--unresolved-symbols=ignore-all \</span>
+<span class="go">-Wl,-soname,libpmd_net_ark_ext.so.1 pmd_net_ark_ext.o</span>
+</pre></div>
+</div>
+<p>In a <code class="docutils literal notranslate"><span class="pre">Makefile</span></code> this would be</p>
+<div class="highlight-Makefile notranslate"><div class="highlight"><pre><span></span><span class="nv">CFLAGS</span> <span class="o">+=</span> <span class="k">$(</span>shell pkg-config --cflags libdpdk<span class="k">)</span>
+<span class="nv">CFLAGS</span> <span class="o">+=</span> -O3 -DALLOW_EXPERIMENTAL_API -fPIC -Wall -Wmissing-prototypes
+<span class="c"># Linking</span>
+<span class="nv">LDFLAGS</span> <span class="o">+=</span> <span class="k">$(</span>shell pkg-config --libs libdpdk<span class="k">)</span>
+<span class="nv">LDFLAGS</span> <span class="o">+=</span> -Wl,--unresolved-symbols<span class="o">=</span>ignore-all -Wl,-soname,libpmd_net_ark_ext.so.1
+</pre></div>
+</div>
+<p>The application must be linked with the <code class="docutils literal notranslate"><span class="pre">-export-dynamic</span></code> flags if any
+DPDK or application specific code will called from the extension.</p>
+</section>
+<section id="enabling-extension">
+<h3><span class="section-number">6.5.3. </span>Enabling Extension</h3>
+<p>The extensions are enabled in the application through the use of an
+environment variable <code class="docutils literal notranslate"><span class="pre">ARK_EXT_PATH</span></code> This variable points to the lib
+extension file generated above.  For example:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export ARK_EXT_PATH=$(PWD)/libpmd_net_ark_ext.so.1</span>
+<span class="go">testpmd ...</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="building-dpdk">
+<h2><span class="section-number">6.6. </span>Building DPDK</h2>
+<p>See the <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">DPDK Getting Started Guide for Linux</span></a> for
+instructions on how to build DPDK.</p>
+<p>By default the ARK PMD library will be built into the DPDK library.</p>
+<p>For configuring and using UIO and VFIO frameworks, please also refer <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">the
+documentation that comes with DPDK suite</span></a>.</p>
+<p>To build with a non-zero minimum tx packet length, set the above macro in your
+CFLAGS environment prior to the meson build step. I.e.,</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export CFLAGS=&quot;-DRTE_LIBRTE_ARK_MIN_TX_PKTLEN=60&quot;</span>
+<span class="go">meson setup build</span>
+</pre></div>
+</div>
+</section>
+<section id="supported-ark-rtl-pcie-instances">
+<h2><span class="section-number">6.7. </span>Supported ARK RTL PCIe Instances</h2>
+<p>ARK PMD supports the following Arkville RTL PCIe instances including:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:100d</span></code> - AR-ARKA-FX0 [Arkville 32B DPDK Data Mover]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:100e</span></code> - AR-ARKA-FX1 [Arkville 64B DPDK Data Mover]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:100f</span></code> - AR-ARKA-FX1 [Arkville 64B DPDK Data Mover for Versal]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:1010</span></code> - AR-ARKA-FX1 [Arkville 64B DPDK Data Mover for Agilex]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:1017</span></code> - AR-ARK-FX1 [Arkville 64B Multi-Homed Primary Endpoint]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:1018</span></code> - AR-ARK-FX1 [Arkville 64B Multi-Homed Secondary Endpoint]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:1019</span></code> - AR-ARK-FX1 [Arkville 64B Multi-Homed Tertiary Endpoint]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:101a</span></code> - AR-ARK-SRIOV-FX0 [Arkville 32B Primary Physical Function]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:101b</span></code> - AR-ARK-SRIOV-FX1 [Arkville 64B Primary Physical Function]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:101c</span></code> - AR-ARK-SRIOV-VF [Arkville Virtual Function]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:101e</span></code> - AR-ARKA-FX1 [Arkville 64B DPDK Data Mover for Agilex R-Tile]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:101f</span></code> - AR-TK242 [2x100GbE Packet Capture Device]</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">1d6c:1022</span></code> - AR-ARKA-FX2 [Arkville 128B DPDK Data Mover for Agilex]</p></li>
+</ul>
+</section>
+<section id="arkville-rtl-core-configurations">
+<h2><span class="section-number">6.8. </span>Arkville RTL Core Configurations</h2>
+<p>Arkville’s RTL core may be configured by the user with different
+datapath widths to balance throughput against FPGA logic area.
+The ARK PMD has introspection on the RTL core configuration and acts accordingly.
+All Arkville configurations present identical RTL user-facing AXI
+stream interfaces for both AMD/Xilinx and Intel FPGAs.</p>
+<ul class="simple">
+<li><p>ARK-FX0 - 256-bit 32B datapath (PCIe Gen3, Gen4)</p></li>
+<li><p>ARK-FX1 - 512-bit 64B datapath (PCIe Gen3, Gen4, Gen5)</p></li>
+<li><p>ARK-FX2 - 1024-bit 128B datapath (PCIe Gen5x16 Only)</p></li>
+</ul>
+</section>
+<section id="dpdk-and-arkville-firmware-versioning">
+<h2><span class="section-number">6.9. </span>DPDK and Arkville Firmware Versioning</h2>
+<p>Arkville’s firmware releases and its PMD have version dependencies which
+must be stepped together at certain releases. PMD code ensures the
+versions are compatible. The following lists shows where version
+compatible steps have occurred between DPDK releases and the corresponding
+Arkville releases.  Intermediate releases not listed below remain
+compatible, e.g., DPDK releases 21.05, 21.08, and 21.11 are all compatible
+with Arkville releases 21.05, 21.08 and 21.11. LTS versions of DPDK remain
+compatible with the corresponding Arkville version.  If other combinations
+are required, please contact Atomic Rules support.</p>
+<ul class="simple">
+<li><p>DPDK 23.11 requires Arkville 23.11.</p></li>
+<li><p>DPDK 22.07 requires Arkville 22.07.</p></li>
+<li><p>DPDK 22.03 requires Arkville 22.03.</p></li>
+<li><p>DPDK 21.05 requires Arkville 21.05.</p></li>
+<li><p>DPDK 18.11 requires Arkville 18.11.</p></li>
+<li><p>DPDK 17.05 requires Arkville 17.05 – initial version.</p></li>
+</ul>
+</section>
+<section id="supported-operating-systems">
+<h2><span class="section-number">6.10. </span>Supported Operating Systems</h2>
+<p>Any Linux distribution fulfilling the conditions described in <code class="docutils literal notranslate"><span class="pre">System</span> <span class="pre">Requirements</span></code>
+section of <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">the DPDK documentation</span></a> or refer to <em>DPDK
+Release Notes</em>.  ARM and PowerPC architectures are not supported at this time.</p>
+</section>
+<section id="supported-features">
+<h2><span class="section-number">6.11. </span>Supported Features</h2>
+<ul class="simple">
+<li><p>Dynamic ARK PMD extensions</p></li>
+<li><p>Dynamic per-queue MBUF (re)sizing up to 32KB</p></li>
+<li><p>SR-IOV, VF-based queue-separation</p></li>
+<li><p>Multiple receive and transmit queues</p></li>
+<li><p>Jumbo frames up to 9K</p></li>
+<li><p>Hardware Statistics</p></li>
+</ul>
+</section>
+<section id="unsupported-features">
+<h2><span class="section-number">6.12. </span>Unsupported Features</h2>
+<p>Features that may be part of, or become part of, the Arkville RTL IP that are
+not currently supported or exposed by the ARK PMD include:</p>
+<ul class="simple">
+<li><p>Arkville’s Packet Generator Control and Status</p></li>
+<li><p>Arkville’s Packet Director Control and Status</p></li>
+<li><p>Arkville’s Packet Checker Control and Status</p></li>
+<li><p>Arkville’s Timebase Management</p></li>
+</ul>
+</section>
+<section id="pre-requisites">
+<h2><span class="section-number">6.13. </span>Pre-Requisites</h2>
+<ol class="arabic simple">
+<li><p>Prepare the system as recommended by DPDK suite.  This includes environment
+variables, hugepages configuration, tool-chains and configuration</p></li>
+<li><p>Insert igb_uio kernel module using the command ‘modprobe igb_uio’</p></li>
+<li><p>Bind the intended ARK device to igb_uio module</p></li>
+</ol>
+<p>At this point the system should be ready to run DPDK applications. Once the
+application runs to completion, the ARK PMD can be detached from igb_uio if necessary.</p>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">6.14. </span>Usage Example</h2>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a> to launch
+<strong>testpmd</strong> with Atomic Rules ARK devices managed by librte_net_ark.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:01:00.0 on NUMA socket -1</span>
+<span class="go">EAL:   probe driver: 1d6c:100e rte_ark_pmd</span>
+<span class="go">EAL:   PCI memory mapped at 0x7f9b6c400000</span>
+<span class="go">PMD: eth_ark_dev_init(): Initializing 0:2:0.1</span>
+<span class="go">ARKP PMD CommitID: 378f3a67</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: DC:3C:F6:00:00:01</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Port 0 Link Up - speed 100000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="af_xdp.html" title="previous chapter"><span class="section-number">5. </span>AF_XDP Poll Mode Driver</a></li>
+      <li>Next: <a href="atlantic.html" title="next chapter"><span class="section-number">7. </span>Aquantia Atlantic DPDK Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/ark.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,205 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>Getting Started Guide for Linux &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="1. Introduction" href="intro.html" />
+    <link rel="prev" title="DPDK documentation" href="../index.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="getting-started-guide-for-linux">
+<span id="linux-gsg"></span><h1>Getting Started Guide for Linux</h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="intro.html">1. Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="intro.html#documentation-roadmap">1.1. Documentation Roadmap</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sys_reqs.html">2. System Requirements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="sys_reqs.html#bios-setting-prerequisite-on-x86">2.1. BIOS Setting Prerequisite on x86</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sys_reqs.html#compilation-of-the-dpdk">2.2. Compilation of the DPDK</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sys_reqs.html#running-dpdk-applications">2.3. Running DPDK Applications</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="build_dpdk.html">3. Compiling the DPDK Target from Source</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="build_dpdk.html#uncompress-dpdk-and-browse-sources">3.1. Uncompress DPDK and Browse Sources</a></li>
+<li class="toctree-l2"><a class="reference internal" href="build_dpdk.html#compiling-and-installing-dpdk-system-wide">3.2. Compiling and Installing DPDK System-wide</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cross_build_dpdk_for_arm64.html">4. Cross compiling DPDK for aarch64 and aarch32</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_arm64.html#prerequisites">4.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_arm64.html#gnu-toolchain">4.2. GNU toolchain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_arm64.html#llvm-clang-toolchain">4.3. LLVM/Clang toolchain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_arm64.html#building-for-an-aarch64-soc-on-an-aarch64-build-machine">4.4. Building for an aarch64 SoC on an aarch64 build machine</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_arm64.html#supported-soc-configuration">4.5. Supported SoC configuration</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cross_build_dpdk_for_loongarch.html">5. Cross compiling DPDK for LoongArch</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_loongarch.html#prerequisites">5.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_loongarch.html#gnu-toolchain">5.2. GNU toolchain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_loongarch.html#supported-cross-compilation-targets">5.3. Supported cross-compilation targets</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cross_build_dpdk_for_riscv.html">6. Cross compiling DPDK for RISC-V</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_riscv.html#prerequisites">6.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_riscv.html#gnu-toolchain">6.2. GNU toolchain</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cross_build_dpdk_for_riscv.html#supported-cross-compilation-targets">6.3. Supported cross-compilation targets</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="linux_drivers.html">7. Linux Drivers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="linux_drivers.html#binding-and-unbinding-network-ports-to-from-the-kernel-modules">7.1. Binding and Unbinding Network Ports to/from the Kernel Modules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_drivers.html#vfio">7.2. VFIO</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_drivers.html#vfio-platform">7.3. VFIO Platform</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_drivers.html#bifurcated-driver">7.4. Bifurcated Driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_drivers.html#uio">7.5. UIO</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="build_sample_apps.html">8. Running Sample Applications</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="build_sample_apps.html#compiling-a-sample-application">8.1. Compiling a Sample Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="build_sample_apps.html#running-a-sample-application">8.2. Running a Sample Application</a></li>
+<li class="toctree-l2"><a class="reference internal" href="build_sample_apps.html#additional-sample-applications">8.3. Additional Sample Applications</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="linux_eal_parameters.html">9. EAL parameters</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="linux_eal_parameters.html#common-eal-parameters">9.1. Common EAL parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="linux_eal_parameters.html#linux-specific-eal-parameters">9.2. Linux-specific EAL parameters</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="enable_func.html">10. Enabling Additional Functionality</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="enable_func.html#running-dpdk-applications-without-root-privileges">10.1. Running DPDK Applications Without Root Privileges</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enable_func.html#power-management-and-power-saving-functionality">10.2. Power Management and Power Saving Functionality</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enable_func.html#using-linux-core-isolation-to-reduce-context-switches">10.3. Using Linux Core Isolation to Reduce Context Switches</a></li>
+<li class="toctree-l2"><a class="reference internal" href="enable_func.html#high-precision-event-timer-hpet-functionality">10.4. High Precision Event Timer (HPET) Functionality</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nic_perf_intel_platform.html">11. How to get best performance with NICs on Intel platforms</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nic_perf_intel_platform.html#hardware-and-memory-requirements">11.1. Hardware and Memory Requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nic_perf_intel_platform.html#configurations-before-running-dpdk">11.2. Configurations before running DPDK</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="../index.html" title="previous chapter">DPDK documentation</a></li>
+      <li>Next: <a href="intro.html" title="next chapter"><span class="section-number">1. </span>Introduction</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/linux_gsg/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

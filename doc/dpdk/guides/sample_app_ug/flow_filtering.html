@@ -1,0 +1,222 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>8. Basic RTE Flow Filtering Sample Application &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="9. IP Fragmentation Sample Application" href="ip_frag.html" />
+    <link rel="prev" title="7. RX/TX Callbacks Sample Application" href="rxtx_callbacks.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="basic-rte-flow-filtering-sample-application">
+<h1><span class="section-number">8. </span>Basic RTE Flow Filtering Sample Application</h1>
+<p>The Basic RTE flow filtering sample application is a simple example of a
+creating a RTE flow rule.</p>
+<p>It is intended as a demonstration of the basic components RTE flow rules.</p>
+<section id="compiling-the-application">
+<h2><span class="section-number">8.1. </span>Compiling the Application</h2>
+<p>To compile the sample application see <a class="reference internal" href="compiling.html"><span class="doc">Compiling the Sample Applications</span></a>.</p>
+</section>
+<section id="running-the-application">
+<h2><span class="section-number">8.2. </span>Running the Application</h2>
+<p>To run the example in a <code class="docutils literal notranslate"><span class="pre">linux</span></code> environment:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/examples/dpdk-flow_filtering -l 1 -n 1</span>
+</pre></div>
+</div>
+<p>Refer to <em>DPDK Getting Started Guide</em> for general information on running
+applications and the Environment Abstraction Layer (EAL) options.</p>
+</section>
+<section id="explanation">
+<h2><span class="section-number">8.3. </span>Explanation</h2>
+<p>The example is built from 2 files,
+<code class="docutils literal notranslate"><span class="pre">main.c</span></code> which holds the example logic and <code class="docutils literal notranslate"><span class="pre">flow_blocks.c</span></code> that holds the
+implementation for building the flow rule.</p>
+<p>The following sections provide an explanation of the main components of the
+code.</p>
+<p>All DPDK library functions used in the sample code are prefixed with <code class="docutils literal notranslate"><span class="pre">rte_</span></code>
+and are explained in detail in the <em>DPDK API Documentation</em>.</p>
+<section id="the-main-function">
+<h3><span class="section-number">8.3.1. </span>The Main Function</h3>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> function located in <code class="docutils literal notranslate"><span class="pre">main.c</span></code> file performs the initialization
+and runs the main loop function.</p>
+<p>The first task is to initialize the Environment Abstraction Layer (EAL).  The
+<code class="docutils literal notranslate"><span class="pre">argc</span></code> and <code class="docutils literal notranslate"><span class="pre">argv</span></code> arguments are provided to the <code class="docutils literal notranslate"><span class="pre">rte_eal_init()</span></code>
+function. The value returned is the number of parsed arguments:</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> also allocates a mempool to hold the mbufs (Message Buffers)
+used by the application:</p>
+<p>Mbufs are the packet buffer structure used by DPDK. They are explained in
+detail in the “Mbuf Library” section of the <em>DPDK Programmer’s Guide</em>.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">main()</span></code> function also initializes all the ports using the user defined
+<code class="docutils literal notranslate"><span class="pre">init_port()</span></code> function which is explained in the next section:</p>
+<p>Once the initialization is complete, we set the flow rule using the
+following code:</p>
+<p>In the last part the application is ready to launch the
+<code class="docutils literal notranslate"><span class="pre">main_loop()</span></code> function. Which is explained below.</p>
+</section>
+<section id="the-port-initialization-function">
+<h3><span class="section-number">8.3.2. </span>The Port Initialization  Function</h3>
+<p>The main functional part of the port initialization used in the flow filtering
+application is shown below:</p>
+<p>The Ethernet port is configured with default settings using the
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_configure()</span></code> function and the <code class="docutils literal notranslate"><span class="pre">port_conf_default</span></code> struct:</p>
+<p>For this example we are configuring number of rx and tx queues that are connected
+to a single port.</p>
+<p>In the next step we create and apply the flow rule. which is to send packets
+with destination ip equals to 192.168.1.1 to queue number 1. The detail
+explanation of the <code class="docutils literal notranslate"><span class="pre">generate_ipv4_flow()</span></code> appears later in this document:</p>
+<p>We are setting the RX port to promiscuous mode:</p>
+<p>The last step is to start the port.</p>
+</section>
+<section id="the-main-loop-function">
+<h3><span class="section-number">8.3.3. </span>The main_loop function</h3>
+<p>As we saw above the <code class="docutils literal notranslate"><span class="pre">main()</span></code> function calls an application function to handle
+the main loop. For the flow filtering application the main_loop function
+looks like the following:</p>
+<p>The main work of the application is reading the packets from all
+queues and printing for each packet the destination queue:</p>
+<p>The forwarding loop can be interrupted and the application closed using
+<code class="docutils literal notranslate"><span class="pre">Ctrl-C</span></code>. Which results in closing the port and the device using
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stop</span></code> and <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_close</span></code></p>
+</section>
+<section id="the-generate-ipv4-flow-function">
+<h3><span class="section-number">8.3.4. </span>The generate_ipv4_flow function</h3>
+<p>The generate_ipv4_flow function is responsible for creating the flow rule.
+This function is located in the <code class="docutils literal notranslate"><span class="pre">flow_blocks.c</span></code> file.</p>
+<p>The first part of the function is declaring the structures that will be used.</p>
+<p>The following part create the flow attributes, in our case ingress.</p>
+<p>The third part defines the action to be taken when a packet matches
+the rule. In this case send the packet to queue.</p>
+<p>The fourth part is responsible for creating the pattern and is built from
+number of steps. In each step we build one level of the pattern starting with
+the lowest one.</p>
+<p>Setting the first level of the pattern ETH:</p>
+<p>Setting the second level of the pattern IP:</p>
+<p>Closing the pattern part.</p>
+<p>The last part of the function is to validate the rule and create it.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Sample Applications User Guides</a><ul>
+      <li>Previous: <a href="rxtx_callbacks.html" title="previous chapter"><span class="section-number">7. </span>RX/TX Callbacks Sample Application</a></li>
+      <li>Next: <a href="ip_frag.html" title="next chapter"><span class="section-number">9. </span>IP Fragmentation Sample Application</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/sample_app_ug/flow_filtering.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

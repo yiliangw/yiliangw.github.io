@@ -1,0 +1,1022 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>14. CXGBE Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="15. DPAA Poll Mode Driver" href="dpaa.html" />
+    <link rel="prev" title="13. CPFL Poll Mode Driver" href="cpfl.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="cxgbe-poll-mode-driver">
+<h1><span class="section-number">14. </span>CXGBE Poll Mode Driver</h1>
+<p>The CXGBE PMD (<strong>librte_net_cxgbe</strong>) provides poll mode driver support
+for <strong>Chelsio Terminator</strong> 10/25/40/100 Gbps family of adapters. CXGBE PMD
+has support for the latest Linux and FreeBSD operating systems.</p>
+<p>CXGBEVF PMD provides poll mode driver support for SR-IOV Virtual functions
+and has support for the latest Linux operating systems.</p>
+<p>More information can be found at <a class="reference external" href="http://www.chelsio.com">Chelsio Communications Official Website</a>.</p>
+<section id="supported-chelsio-t5-nics">
+<span id="t5-nics"></span><h2><span class="section-number">14.1. </span>Supported Chelsio T5 NICs</h2>
+<ul class="simple">
+<li><p>1G NICs: T502-BT</p></li>
+<li><p>10G NICs: T520-BT, T520-CR, T520-LL-CR, T520-SO-CR, T540-CR</p></li>
+<li><p>40G NICs: T580-CR, T580-LP-CR, T580-SO-CR</p></li>
+<li><p>Other T5 NICs: T522-CR</p></li>
+</ul>
+</section>
+<section id="supported-chelsio-t6-nics">
+<span id="t6-nics"></span><h2><span class="section-number">14.2. </span>Supported Chelsio T6 NICs</h2>
+<ul class="simple">
+<li><p>25G NICs: T6425-CR, T6225-CR, T6225-LL-CR, T6225-SO-CR</p></li>
+<li><p>100G NICs: T62100-CR, T62100-LP-CR, T62100-SO-CR</p></li>
+</ul>
+</section>
+<section id="supported-sr-iov-chelsio-nics">
+<h2><span class="section-number">14.3. </span>Supported SR-IOV Chelsio NICs</h2>
+<p>SR-IOV virtual functions are supported on all the Chelsio NICs listed
+in <a class="reference internal" href="#t5-nics"><span class="std std-ref">Supported Chelsio T5 NICs</span></a> and <a class="reference internal" href="#t6-nics"><span class="std std-ref">Supported Chelsio T6 NICs</span></a>.</p>
+</section>
+<section id="features">
+<h2><span class="section-number">14.4. </span>Features</h2>
+<p>CXGBE and CXGBEVF PMD has support for:</p>
+<ul class="simple">
+<li><p>Multiple queues for TX and RX</p></li>
+<li><p>Receiver Side Steering (RSS)
+Receiver Side Steering (RSS) on IPv4, IPv6, IPv4-TCP/UDP, IPv6-TCP/UDP.
+For 4-tuple, enabling ‘RSS on TCP’ and ‘RSS on TCP + UDP’ is supported.</p></li>
+<li><p>VLAN filtering</p></li>
+<li><p>Checksum offload</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>All multicast mode</p></li>
+<li><p>Port hardware statistics</p></li>
+<li><p>Jumbo frames</p></li>
+<li><p>Flow API - Support for both Wildcard (LE-TCAM) and Exact (HASH) match filters.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">14.5. </span>Prerequisites</h2>
+<ul>
+<li><p>Requires firmware version <strong>1.25.6.0</strong> and higher. Visit
+<a class="reference external" href="http://service.chelsio.com">Chelsio Download Center</a> to get latest firmware
+bundled with the latest Chelsio Unified Wire package.</p>
+<p>For Linux, installing and loading the latest cxgb4 kernel driver from the
+Chelsio Unified Wire package should get you the latest firmware. More
+information can be obtained from the User Guide that is bundled with the
+Chelsio Unified Wire package.</p>
+<p>For FreeBSD, the latest firmware obtained from the Chelsio Unified Wire
+package must be manually flashed via cxgbetool available in FreeBSD source
+repository.</p>
+<p>Instructions on how to manually flash the firmware are given in section
+<a class="reference internal" href="#linux-installation"><span class="std std-ref">Linux Installation</span></a> for Linux and section <a class="reference internal" href="#freebsd-installation"><span class="std std-ref">FreeBSD Installation</span></a>
+for FreeBSD.</p>
+</li>
+</ul>
+</section>
+<section id="runtime-configuration">
+<h2><span class="section-number">14.6. </span>Runtime Configuration</h2>
+<p>The following <code class="docutils literal notranslate"><span class="pre">devargs</span></code> options can be enabled at runtime. They must
+be passed as part of EAL arguments. For example,</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-testpmd -a 02:00.4,keep_ovlan=1 -- -i</span>
+</pre></div>
+</div>
+<section id="common-runtime-options">
+<h3><span class="section-number">14.6.1. </span>Common Runtime Options</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">keep_ovlan</span></code> (default <strong>0</strong>)</p>
+<p>Toggle behavior to keep/strip outer VLAN in Q-in-Q packets. If
+enabled, the outer VLAN tag is preserved in Q-in-Q packets. Otherwise,
+the outer VLAN tag is stripped in Q-in-Q packets.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_mode_latency</span></code> (default <strong>0</strong>)</p>
+<p>When set to 1, Tx doesn’t wait for max number of packets to get
+coalesced and sends the packets immediately at the end of the
+current Tx burst. When set to 0, Tx waits across multiple Tx bursts
+until the max number of packets have been coalesced. In this case,
+Tx only sends the coalesced packets to hardware once the max
+coalesce limit has been reached.</p>
+</li>
+</ul>
+</section>
+<section id="cxgbe-vf-only-runtime-options">
+<h3><span class="section-number">14.6.2. </span>CXGBE VF Only Runtime Options</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">force_link_up</span></code> (default <strong>0</strong>)</p>
+<p>When set to 1, CXGBEVF PMD always forces link as up for all VFs on
+underlying Chelsio NICs. This enables multiple VFs on the same NIC
+to send traffic to each other even when the physical link is down.</p>
+</li>
+</ul>
+</section>
+<section id="cxgbe-pf-only-runtime-options">
+<h3><span class="section-number">14.6.3. </span>CXGBE PF Only Runtime Options</h3>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">filtermode</span></code> (default <strong>0</strong>)</p>
+<p>Apart from the 4-tuple (IP src/dst addresses and TCP/UDP src/dst port
+addresses), there are only 40-bits available to match other fields in
+packet headers. So, <code class="docutils literal notranslate"><span class="pre">filtermode</span></code> devarg allows user to dynamically
+select a 40-bit supported match field combination for LETCAM (wildcard)
+filters.</p>
+<p>Default value of <strong>0</strong> makes driver pick the combination configured in
+the firmware configuration file on the adapter.</p>
+<p>The supported flags and their corresponding values are shown in table below.
+These flags can be OR’d to create 1 of the multiple supported combinations
+for LETCAM filters.</p>
+<blockquote>
+<div><table class="docutils align-default">
+<colgroup>
+<col style="width: 75%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>FLAG</p></th>
+<th class="head"><p>VALUE</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Physical Port</p></td>
+<td><p>0x1</p></td>
+</tr>
+<tr class="row-odd"><td><p>PFVF</p></td>
+<td><p>0x2</p></td>
+</tr>
+<tr class="row-even"><td><p>Destination MAC</p></td>
+<td><p>0x4</p></td>
+</tr>
+<tr class="row-odd"><td><p>Ethertype</p></td>
+<td><p>0x8</p></td>
+</tr>
+<tr class="row-even"><td><p>Inner VLAN</p></td>
+<td><p>0x10</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer VLAN</p></td>
+<td><p>0x20</p></td>
+</tr>
+<tr class="row-even"><td><p>IP TOS</p></td>
+<td><p>0x40</p></td>
+</tr>
+<tr class="row-odd"><td><p>IP Protocol</p></td>
+<td><p>0x80</p></td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+<p>The supported <code class="docutils literal notranslate"><span class="pre">filtermode</span></code> combinations and their corresponding OR’d
+values are shown in table below.</p>
+<blockquote>
+<div><table class="docutils align-default">
+<colgroup>
+<col style="width: 76%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>FILTERMODE COMBINATIONS</p></th>
+<th class="head"><p>VALUE</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Protocol, TOS, Outer VLAN, Port</p></td>
+<td><p>0xE1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, TOS, Outer VLAN</p></td>
+<td><p>0xE0</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, TOS, Inner VLAN, Port</p></td>
+<td><p>0xD1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, TOS, Inner VLAN</p></td>
+<td><p>0xD0</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, TOS, PFVF, Port</p></td>
+<td><p>0xC3</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, TOS, PFVF</p></td>
+<td><p>0xC2</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, TOS, Port</p></td>
+<td><p>0xC1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, TOS</p></td>
+<td><p>0xC0</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, Outer VLAN, Port</p></td>
+<td><p>0xA1</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, Outer VLAN</p></td>
+<td><p>0xA0</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, Inner VLAN, Port</p></td>
+<td><p>0x91</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, Inner VLAN</p></td>
+<td><p>0x90</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, Ethertype, DstMAC, Port</p></td>
+<td><p>0x8D</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, Ethertype, DstMAC</p></td>
+<td><p>0x8C</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, Ethertype, Port</p></td>
+<td><p>0x89</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, Ethertype</p></td>
+<td><p>0x88</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, DstMAC, PFVF, Port</p></td>
+<td><p>0x87</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, DstMAC, PFVF</p></td>
+<td><p>0x86</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, DstMAC, Port</p></td>
+<td><p>0x85</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, DstMAC</p></td>
+<td><p>0x84</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, PFVF, Port</p></td>
+<td><p>0x83</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol, PFVF</p></td>
+<td><p>0x82</p></td>
+</tr>
+<tr class="row-even"><td><p>Protocol, Port</p></td>
+<td><p>0x81</p></td>
+</tr>
+<tr class="row-odd"><td><p>Protocol</p></td>
+<td><p>0x80</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, Outer VLAN, Port</p></td>
+<td><p>0x61</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, Outer VLAN</p></td>
+<td><p>0x60</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, Inner VLAN, Port</p></td>
+<td><p>0x51</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, Inner VLAN</p></td>
+<td><p>0x50</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, Ethertype, DstMAC, Port</p></td>
+<td><p>0x4D</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, Ethertype, DstMAC</p></td>
+<td><p>0x4C</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, Ethertype, Port</p></td>
+<td><p>0x49</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, Ethertype</p></td>
+<td><p>0x48</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, DstMAC, PFVF, Port</p></td>
+<td><p>0x47</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, DstMAC, PFVF</p></td>
+<td><p>0x46</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, DstMAC, Port</p></td>
+<td><p>0x45</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, DstMAC</p></td>
+<td><p>0x44</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, PFVF, Port</p></td>
+<td><p>0x43</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS, PFVF</p></td>
+<td><p>0x42</p></td>
+</tr>
+<tr class="row-even"><td><p>TOS, Port</p></td>
+<td><p>0x41</p></td>
+</tr>
+<tr class="row-odd"><td><p>TOS</p></td>
+<td><p>0x40</p></td>
+</tr>
+<tr class="row-even"><td><p>Outer VLAN, Inner VLAN, Port</p></td>
+<td><p>0x31</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer VLAN, Ethertype, Port</p></td>
+<td><p>0x29</p></td>
+</tr>
+<tr class="row-even"><td><p>Outer VLAN, Ethertype</p></td>
+<td><p>0x28</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer VLAN, DstMAC, Port</p></td>
+<td><p>0x25</p></td>
+</tr>
+<tr class="row-even"><td><p>Outer VLAN, DstMAC</p></td>
+<td><p>0x24</p></td>
+</tr>
+<tr class="row-odd"><td><p>Outer VLAN, Port</p></td>
+<td><p>0x21</p></td>
+</tr>
+<tr class="row-even"><td><p>Outer VLAN</p></td>
+<td><p>0x20</p></td>
+</tr>
+<tr class="row-odd"><td><p>Inner VLAN, Ethertype, Port</p></td>
+<td><p>0x19</p></td>
+</tr>
+<tr class="row-even"><td><p>Inner VLAN, Ethertype</p></td>
+<td><p>0x18</p></td>
+</tr>
+<tr class="row-odd"><td><p>Inner VLAN, DstMAC, Port</p></td>
+<td><p>0x15</p></td>
+</tr>
+<tr class="row-even"><td><p>Inner VLAN, DstMAC</p></td>
+<td><p>0x14</p></td>
+</tr>
+<tr class="row-odd"><td><p>Inner VLAN, Port</p></td>
+<td><p>0x11</p></td>
+</tr>
+<tr class="row-even"><td><p>Inner VLAN</p></td>
+<td><p>0x10</p></td>
+</tr>
+<tr class="row-odd"><td><p>Ethertype, DstMAC, Port</p></td>
+<td><p>0xD</p></td>
+</tr>
+<tr class="row-even"><td><p>Ethertype, DstMAC</p></td>
+<td><p>0xC</p></td>
+</tr>
+<tr class="row-odd"><td><p>Ethertype, PFVF, Port</p></td>
+<td><p>0xB</p></td>
+</tr>
+<tr class="row-even"><td><p>Ethertype, PFVF</p></td>
+<td><p>0xA</p></td>
+</tr>
+<tr class="row-odd"><td><p>Ethertype, Port</p></td>
+<td><p>0x9</p></td>
+</tr>
+<tr class="row-even"><td><p>Ethertype</p></td>
+<td><p>0x8</p></td>
+</tr>
+<tr class="row-odd"><td><p>DstMAC, PFVF, Port</p></td>
+<td><p>0x7</p></td>
+</tr>
+<tr class="row-even"><td><p>DstMAC, PFVF</p></td>
+<td><p>0x6</p></td>
+</tr>
+<tr class="row-odd"><td><p>DstMAC, Port</p></td>
+<td><p>0x5</p></td>
+</tr>
+<tr class="row-even"><td><p>Destination MAC</p></td>
+<td><p>0x4</p></td>
+</tr>
+<tr class="row-odd"><td><p>PFVF, Port</p></td>
+<td><p>0x3</p></td>
+</tr>
+<tr class="row-even"><td><p>PFVF</p></td>
+<td><p>0x2</p></td>
+</tr>
+<tr class="row-odd"><td rowspan="2"><p>Physical Port</p></td>
+<td rowspan="2"><p>0x1</p></td>
+</tr>
+<tr class="row-even"></tr>
+</tbody>
+</table>
+</div></blockquote>
+<p>For example, to enable matching <code class="docutils literal notranslate"><span class="pre">ethertype</span></code> field in Ethernet
+header, and <code class="docutils literal notranslate"><span class="pre">protocol</span></code> field in IPv4 header, the <code class="docutils literal notranslate"><span class="pre">filtermode</span></code>
+combination must be given as:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-testpmd -a 02:00.4,filtermode=0x88 -- -i</span>
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">filtermask</span></code> (default <strong>0</strong>)</p>
+<p><code class="docutils literal notranslate"><span class="pre">filtermask</span></code> devarg works similar to <code class="docutils literal notranslate"><span class="pre">filtermode</span></code>, but is used
+to configure a filter mode combination for HASH (exact-match) filters.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The combination chosen for <code class="docutils literal notranslate"><span class="pre">filtermask</span></code> devarg <strong>must be a subset</strong> of
+the combination chosen for <code class="docutils literal notranslate"><span class="pre">filtermode</span></code> devarg.</p>
+</div>
+<p>Default value of <strong>0</strong> makes driver pick the combination configured in
+the firmware configuration file on the adapter.</p>
+<p>Note that the filter rule will only be inserted in HASH region, if the
+rule contains <strong>all</strong> the fields specified in the <code class="docutils literal notranslate"><span class="pre">filtermask</span></code> combination.
+Otherwise, the filter rule will get inserted in LETCAM region.</p>
+<p>The same combination list explained in the tables in <code class="docutils literal notranslate"><span class="pre">filtermode</span></code> devarg
+section earlier applies for <code class="docutils literal notranslate"><span class="pre">filtermask</span></code> devarg, as well.</p>
+<p>For example, to enable matching only protocol field in IPv4 header, the
+<code class="docutils literal notranslate"><span class="pre">filtermask</span></code> combination must be given as:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dpdk-testpmd -a 02:00.4,filtermode=0x88,filtermask=0x80 -- -i</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="driver-compilation-and-testing">
+<span id="driver-compilation"></span><h2><span class="section-number">14.7. </span>Driver compilation and testing</h2>
+<p>Refer to the document <a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+for details.</p>
+</section>
+<section id="linux">
+<h2><span class="section-number">14.8. </span>Linux</h2>
+<section id="linux-installation">
+<span id="id1"></span><h3><span class="section-number">14.8.1. </span>Linux Installation</h3>
+<p>Steps to manually install the latest firmware from the downloaded Chelsio
+Unified Wire package for Linux operating system are as follows:</p>
+<ol class="arabic">
+<li><p>Load the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe cxgb4</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use ifconfig to get the interface name assigned to Chelsio card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ifconfig -a | grep &quot;00:07:43&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">p1p1      Link encap:Ethernet  HWaddr 00:07:43:2D:EA:C0</span>
+<span class="go">p1p2      Link encap:Ethernet  HWaddr 00:07:43:2D:EA:C8</span>
+</pre></div>
+</div>
+</li>
+<li><p>Install cxgbtool:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;path_to_uwire&gt;/tools/cxgbtool</span>
+<span class="go">make install</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use cxgbtool to load the firmware config file onto the card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cxgbtool p1p1 loadcfg &lt;path_to_uwire&gt;/src/network/firmware/t5-config.txt</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use cxgbtool to load the firmware image onto the card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cxgbtool p1p1 loadfw &lt;path_to_uwire&gt;/src/network/firmware/t5fw-*.bin</span>
+</pre></div>
+</div>
+</li>
+<li><p>Unload and reload the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe -r cxgb4</span>
+<span class="go">modprobe cxgb4</span>
+</pre></div>
+</div>
+</li>
+<li><p>Verify with ethtool:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ethtool -i p1p1 | grep &quot;firmware&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">firmware-version: 1.25.6.0, TP 0.1.23.2</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="running-testpmd">
+<h3><span class="section-number">14.8.2. </span>Running testpmd</h3>
+<p>This section demonstrates how to launch <strong>testpmd</strong> with Chelsio
+devices managed by librte_net_cxgbe in Linux operating system.</p>
+<ol class="arabic">
+<li><p>Load the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe cxgb4</span>
+</pre></div>
+</div>
+</li>
+<li><p>Get the PCI bus addresses of the interfaces bound to cxgb4 driver:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dmesg | tail -2</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cxgb4 0000:02:00.4 p1p1: renamed from eth0</span>
+<span class="go">cxgb4 0000:02:00.4 p1p2: renamed from eth1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both the interfaces of a Chelsio 2-port adapter are bound to the
+same PCI bus address.</p>
+</div>
+</li>
+<li><p>Unload the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe -ar cxgb4 csiostor</span>
+</pre></div>
+</div>
+</li>
+<li><p>Running testpmd</p>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to run testpmd.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently, CXGBE PMD only supports the binding of PF4 for Chelsio NICs.</p>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:02:00.4 on NUMA socket -1</span>
+<span class="go">EAL:   probe driver: 1425:5401 rte_cxgbe_pmd</span>
+<span class="go">EAL:   PCI memory mapped at 0x7fd7c0200000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7fd77cdfd000</span>
+<span class="go">EAL:   PCI memory mapped at 0x7fd7c10b7000</span>
+<span class="go">PMD: rte_cxgbe_pmd: fw: 1.25.6.0, TP: 0.1.23.2</span>
+<span class="go">PMD: rte_cxgbe_pmd: Coming up as MASTER: Initializing adapter</span>
+<span class="go">Interactive-mode selected</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:07:43:2D:EA:C0</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Port 1: 00:07:43:2D:EA:C8</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">PMD: rte_cxgbe_pmd: Port0: passive DA port module inserted</span>
+<span class="go">PMD: rte_cxgbe_pmd: Port1: passive DA port module inserted</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Flow control pause TX/RX is disabled by default and can be enabled via
+testpmd. Refer section <a class="reference internal" href="#flow-control"><span class="std std-ref">Enable/Disable Flow Control</span></a> for more details.</p>
+</div>
+</li>
+</ol>
+</section>
+<section id="configuring-sr-iov-virtual-functions">
+<h3><span class="section-number">14.8.3. </span>Configuring SR-IOV Virtual Functions</h3>
+<p>This section demonstrates how to enable SR-IOV virtual functions
+on Chelsio NICs and demonstrates how to run testpmd with SR-IOV
+virtual functions.</p>
+<ol class="arabic">
+<li><p>Load the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">modprobe cxgb4</span>
+</pre></div>
+</div>
+</li>
+<li><p>Get the PCI bus addresses of the interfaces bound to cxgb4 driver:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dmesg | tail -2</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cxgb4 0000:02:00.4 p1p1: renamed from eth0</span>
+<span class="go">cxgb4 0000:02:00.4 p1p2: renamed from eth1</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both the interfaces of a Chelsio 2-port adapter are bound to the
+same PCI bus address.</p>
+</div>
+</li>
+<li><p>Use ifconfig to get the interface name assigned to Chelsio card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ifconfig -a | grep &quot;00:07:43&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">p1p1      Link encap:Ethernet  HWaddr 00:07:43:2D:EA:C0</span>
+<span class="go">p1p2      Link encap:Ethernet  HWaddr 00:07:43:2D:EA:C8</span>
+</pre></div>
+</div>
+</li>
+<li><p>Bring up the interfaces:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ifconfig p1p1 up</span>
+<span class="go">ifconfig p1p2 up</span>
+</pre></div>
+</div>
+</li>
+<li><p>Instantiate SR-IOV Virtual Functions. PF0..3 can be used for
+SR-IOV VFs. Multiple VFs can be instantiated on each of PF0..3.
+To instantiate one SR-IOV VF on each PF0 and PF1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">echo 1 &gt; /sys/bus/pci/devices/0000\:02\:00.0/sriov_numvfs</span>
+<span class="go">echo 1 &gt; /sys/bus/pci/devices/0000\:02\:00.1/sriov_numvfs</span>
+</pre></div>
+</div>
+</li>
+<li><p>Get the PCI bus addresses of the virtual functions:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">lspci | grep -i &quot;Chelsio&quot; | grep -i &quot;VF&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">02:01.0 Ethernet controller: Chelsio Communications Inc T540-CR Unified Wire Ethernet Controller [VF]</span>
+<span class="go">02:01.1 Ethernet controller: Chelsio Communications Inc T540-CR Unified Wire Ethernet Controller [VF]</span>
+</pre></div>
+</div>
+</li>
+<li><p>Running testpmd</p>
+<p>Follow instructions available in the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>
+to bind virtual functions and run testpmd.</p>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:02:01.0 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 1425:5803 net_cxgbevf</span>
+<span class="go">PMD: rte_cxgbe_pmd: Firmware version: 1.25.6.0</span>
+<span class="go">PMD: rte_cxgbe_pmd: TP Microcode version: 0.1.23.2</span>
+<span class="go">PMD: rte_cxgbe_pmd: Chelsio rev 0</span>
+<span class="go">PMD: rte_cxgbe_pmd: No bootstrap loaded</span>
+<span class="go">PMD: rte_cxgbe_pmd: No Expansion ROM loaded</span>
+<span class="go">PMD: rte_cxgbe_pmd:  0000:02:01.0 Chelsio rev 0 1G/10GBASE-SFP</span>
+<span class="go">EAL: PCI device 0000:02:01.1 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 1425:5803 net_cxgbevf</span>
+<span class="go">PMD: rte_cxgbe_pmd: Firmware version: 1.25.6.0</span>
+<span class="go">PMD: rte_cxgbe_pmd: TP Microcode version: 0.1.23.2</span>
+<span class="go">PMD: rte_cxgbe_pmd: Chelsio rev 0</span>
+<span class="go">PMD: rte_cxgbe_pmd: No bootstrap loaded</span>
+<span class="go">PMD: rte_cxgbe_pmd: No Expansion ROM loaded</span>
+<span class="go">PMD: rte_cxgbe_pmd:  0000:02:01.1 Chelsio rev 0 1G/10GBASE-SFP</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 06:44:29:44:40:00</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Port 1: 06:44:29:44:40:10</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+<section id="freebsd">
+<h2><span class="section-number">14.9. </span>FreeBSD</h2>
+<section id="freebsd-installation">
+<span id="id2"></span><h3><span class="section-number">14.9.1. </span>FreeBSD Installation</h3>
+<p>Steps to manually install the latest firmware from the downloaded Chelsio
+Unified Wire package for FreeBSD operating system are as follows:</p>
+<ol class="arabic">
+<li><p>Load the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kldload if_cxgbe</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use dmesg to get the t5nex instance assigned to the Chelsio card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dmesg | grep &quot;t5nex&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">t5nex0: &lt;Chelsio T520-CR&gt; irq 16 at device 0.4 on pci2</span>
+<span class="go">cxl0: &lt;port 0&gt; on t5nex0</span>
+<span class="go">cxl1: &lt;port 1&gt; on t5nex0</span>
+<span class="go">t5nex0: PCIe x8, 2 ports, 14 MSI-X interrupts, 31 eq, 13 iq</span>
+</pre></div>
+</div>
+<p>In the example above, a Chelsio T520-CR card is bound to a t5nex0 instance.</p>
+</li>
+<li><p>Install cxgbetool from FreeBSD source repository:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;path_to_FreeBSD_source&gt;/tools/tools/cxgbetool/</span>
+<span class="go">make &amp;&amp; make install</span>
+</pre></div>
+</div>
+</li>
+<li><p>Use cxgbetool to load the firmware image onto the card:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cxgbetool t5nex0 loadfw &lt;path_to_uwire&gt;/src/network/firmware/t5fw-*.bin</span>
+</pre></div>
+</div>
+</li>
+<li><p>Unload and reload the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kldunload if_cxgbe</span>
+<span class="go">kldload if_cxgbe</span>
+</pre></div>
+</div>
+</li>
+<li><p>Verify with sysctl:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">sysctl -a | grep &quot;t5nex&quot; | grep &quot;firmware&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">dev.t5nex.0.firmware_version: 1.25.6.0</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="id3">
+<h3><span class="section-number">14.9.2. </span>Running testpmd</h3>
+<p>This section demonstrates how to launch <strong>testpmd</strong> with Chelsio
+devices managed by librte_net_cxgbe in FreeBSD operating system.</p>
+<ol class="arabic">
+<li><p>Change to DPDK source directory where the target has been compiled in
+section <a class="reference internal" href="#driver-compilation"><span class="std std-ref">Driver compilation and testing</span></a>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd &lt;DPDK-source-directory&gt;</span>
+</pre></div>
+</div>
+</li>
+<li><p>Copy the contigmem kernel module to /boot/kernel directory:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cp &lt;build_dir&gt;/kernel/freebsd/contigmem.ko /boot/kernel/</span>
+</pre></div>
+</div>
+</li>
+<li><p>Add the following lines to /boot/loader.conf:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>reserve <span class="m">2</span> x 1G blocks of contiguous memory using contigmem driver
+<span class="go">hw.contigmem.num_buffers=2</span>
+<span class="go">hw.contigmem.buffer_size=1073741824</span>
+<span class="gp"># </span>load contigmem module during boot process
+<span class="go">contigmem_load=&quot;YES&quot;</span>
+</pre></div>
+</div>
+<p>The above lines load the contigmem kernel module during boot process and
+allocate 2 x 1G blocks of contiguous memory to be used for DPDK later on.
+This is to avoid issues with potential memory fragmentation during later
+system up time, which may result in failure of allocating the contiguous
+memory required for the contigmem kernel module.</p>
+</li>
+<li><p>Restart the system and ensure the contigmem module is loaded successfully:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">reboot</span>
+<span class="go">kldstat | grep &quot;contigmem&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">2    1 0xffffffff817f1000 3118     contigmem.ko</span>
+</pre></div>
+</div>
+</li>
+<li><p>Repeat step 1 to ensure that you are in the DPDK source directory.</p></li>
+<li><p>Load the cxgbe kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kldload if_cxgbe</span>
+</pre></div>
+</div>
+</li>
+<li><p>Get the PCI bus addresses of the interfaces bound to t5nex driver:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">pciconf -l | grep &quot;t5nex&quot;</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">t5nex0@pci0:2:0:4: class=0x020000 card=0x00001425 chip=0x54011425 rev=0x00</span>
+</pre></div>
+</div>
+<p>In the above example, the t5nex0 is bound to 2:0:4 bus address.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Both the interfaces of a Chelsio 2-port adapter are bound to the
+same PCI bus address.</p>
+</div>
+</li>
+<li><p>Unload the kernel module:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kldunload if_cxgbe</span>
+</pre></div>
+</div>
+</li>
+<li><p>Set the PCI bus addresses to hw.nic_uio.bdfs kernel environment parameter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kenv hw.nic_uio.bdfs=&quot;2:0:4&quot;</span>
+</pre></div>
+</div>
+<p>This automatically binds 2:0:4 to nic_uio kernel driver when it is loaded in
+the next step.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Currently, CXGBE PMD only supports the binding of PF4 for Chelsio NICs.</p>
+</div>
+</li>
+<li><p>Load nic_uio kernel driver:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">kldload &lt;build_dir&gt;/kernel/freebsd/nic_uio.ko</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd with basic parameters:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -l 0-3 -n 4 -a 0000:02:00.4 -- -i</span>
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[...]</span>
+<span class="go">EAL: PCI device 0000:02:00.4 on NUMA socket 0</span>
+<span class="go">EAL:   probe driver: 1425:5401 rte_cxgbe_pmd</span>
+<span class="go">EAL:   PCI memory mapped at 0x8007ec000</span>
+<span class="go">EAL:   PCI memory mapped at 0x842800000</span>
+<span class="go">EAL:   PCI memory mapped at 0x80086c000</span>
+<span class="go">PMD: rte_cxgbe_pmd: fw: 1.25.6.0, TP: 0.1.23.2</span>
+<span class="go">PMD: rte_cxgbe_pmd: Coming up as MASTER: Initializing adapter</span>
+<span class="go">Interactive-mode selected</span>
+<span class="go">Configuring Port 0 (socket 0)</span>
+<span class="go">Port 0: 00:07:43:2D:EA:C0</span>
+<span class="go">Configuring Port 1 (socket 0)</span>
+<span class="go">Port 1: 00:07:43:2D:EA:C8</span>
+<span class="go">Checking link statuses...</span>
+<span class="go">PMD: rte_cxgbe_pmd: Port0: passive DA port module inserted</span>
+<span class="go">PMD: rte_cxgbe_pmd: Port1: passive DA port module inserted</span>
+<span class="go">Port 0 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Port 1 Link Up - speed 10000 Mbps - full-duplex</span>
+<span class="go">Done</span>
+<span class="go">testpmd&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Flow control pause TX/RX is disabled by default and can be enabled via
+testpmd. Refer section <a class="reference internal" href="#flow-control"><span class="std std-ref">Enable/Disable Flow Control</span></a> for more details.</p>
+</div>
+</section>
+</section>
+<section id="sample-application-notes">
+<h2><span class="section-number">14.10. </span>Sample Application Notes</h2>
+<section id="enable-disable-flow-control">
+<span id="flow-control"></span><h3><span class="section-number">14.10.1. </span>Enable/Disable Flow Control</h3>
+<p>Flow control pause TX/RX is disabled by default and can be enabled via
+testpmd as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; set flow_ctrl rx on tx on 0 0 0 0 mac_ctrl_frame_fwd off autoneg on 0</span>
+<span class="go">testpmd&gt; set flow_ctrl rx on tx on 0 0 0 0 mac_ctrl_frame_fwd off autoneg on 1</span>
+</pre></div>
+</div>
+<p>To disable again, run:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; set flow_ctrl rx off tx off 0 0 0 0 mac_ctrl_frame_fwd off autoneg off 0</span>
+<span class="go">testpmd&gt; set flow_ctrl rx off tx off 0 0 0 0 mac_ctrl_frame_fwd off autoneg off 1</span>
+</pre></div>
+</div>
+</section>
+<section id="jumbo-mode">
+<h3><span class="section-number">14.10.2. </span>Jumbo Mode</h3>
+<p>There are two ways to enable sending and receiving of jumbo frames via testpmd.
+One method involves using the <strong>mtu</strong> command, which changes the mtu of an
+individual port without having to stop the selected port. Another method
+involves stopping all the ports first and then running <strong>max-pkt-len</strong> command
+to configure the mtu of all the ports with a single command.</p>
+<ul>
+<li><p>To configure each port individually, run the mtu command as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port config mtu 0 9000</span>
+<span class="go">testpmd&gt; port config mtu 1 9000</span>
+</pre></div>
+</div>
+</li>
+<li><p>To configure all the ports at once, stop all the ports first and run the
+max-pkt-len command as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port stop all</span>
+<span class="go">testpmd&gt; port config all max-pkt-len 9000</span>
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+<section id="hardware-configuration-and-debugging">
+<h2><span class="section-number">14.11. </span>Hardware Configuration and Debugging</h2>
+<section id="firmware-configuration-file">
+<h3><span class="section-number">14.11.1. </span>Firmware Configuration File</h3>
+<p>To enable or disable Chelsio NIC features before firmware initialization,
+the Chelsio firmware configuration file can be placed in following
+directory.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp"># </span>For Chelsio T5 NIC series
+<span class="go">cp &lt;path_to_config_file&gt;/t5-config.txt /lib/firmware/cxgb4/t5-config.txt</span>
+
+<span class="gp"># </span>For Chelsio T6 NIC series
+<span class="go">cp &lt;path_to_config_file&gt;/t6-config.txt /lib/firmware/cxgb4/t6-config.txt</span>
+</pre></div>
+</div>
+<p>The firmware configuration file is mainly intended to be used to debug
+firmware initialization failures. It can also be used to redistribute
+NIC resources from disabled physical functions (PFs) to main PF before
+initializing firmware.</p>
+<p>The CXGBE PMD will search and pick up the firmware configuration file
+during the Chelsio NIC probe, in following order.</p>
+<ol class="arabic simple">
+<li><p>If the firmware configuration file is present in /lib/firmware/cxgb4/
+directory, then this file is downloaded to temporary location in
+NIC’s on-chip RAM. When firmware is initializing, it picks up the
+file from the temporary on-chip RAM location.</p></li>
+<li><p>Otherwise, if the firmware configuration file has been written
+onto the NIC persistent flash area using cxgbtool, then this
+file is picked up from the persistent flash area during
+firmware initialization.</p></li>
+<li><p>If no firmware configuration file is found at /lib/firmware/cxgb4/
+directory or on the NIC persistent flash area, then the firmware
+will initialize with the default configuration file embedded inside
+the firmware binary.</p></li>
+</ol>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Note that the Chelsio firmware configuration file contains very low
+level details that is specific to the Chelsio NIC. Hence, the
+firmware configuration file must not be modified without expert
+guidance from Chelsio support team.</p>
+</div>
+</section>
+</section>
+<section id="limitations">
+<h2><span class="section-number">14.12. </span>Limitations</h2>
+<p>The Chelsio Terminator series of devices provide two/four ports but
+expose a single PCI bus address, thus, librte_net_cxgbe registers
+itself as a PCI driver that allocates one Ethernet device per detected
+port.</p>
+<p>For this reason, one cannot allow/block a single port without
+allowing/blocking the other ports on the same device.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="cpfl.html" title="previous chapter"><span class="section-number">13. </span>CPFL Poll Mode Driver</a></li>
+      <li>Next: <a href="dpaa.html" title="next chapter"><span class="section-number">15. </span>DPAA Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/cxgbe.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

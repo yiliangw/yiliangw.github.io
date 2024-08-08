@@ -1,0 +1,190 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>4. Flow Bifurcation How-to Guide &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="5. Generic flow API - examples" href="rte_flow.html" />
+    <link rel="prev" title="3. Live Migration of VM with Virtio on host running vhost_user" href="lm_virtio_vhost_user.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="flow-bifurcation-how-to-guide">
+<h1><span class="section-number">4. </span>Flow Bifurcation How-to Guide</h1>
+<p>Flow Bifurcation is a mechanism which uses hardware capable Ethernet devices
+to split traffic between Linux user space and kernel space. Since it is a
+hardware assisted feature this approach can provide line rate processing
+capability. There is no need to take care of the packet
+movement during the traffic split. This can yield better performance with
+less CPU overhead.</p>
+<p>The Flow Bifurcation splits the incoming data traffic to user space
+applications (such as DPDK applications) and/or kernel space programs (such as
+the Linux kernel stack). It can direct some traffic, for example data plane
+traffic, to DPDK, while directing some other traffic, for example control
+plane traffic, to the traditional Linux networking stack.</p>
+<p>There are a number of technical options to achieve this. A typical example is
+to combine the technology of SR-IOV and packet classification filtering.</p>
+<p>SR-IOV is a PCI standard that allows the same physical adapter to be split as
+multiple virtual functions. Each virtual function (VF) has separated queues
+with physical functions (PF). The network adapter will direct traffic to a
+virtual function with a matching destination MAC address. In a sense, SR-IOV
+has the capability for queue division.</p>
+<p>Packet classification filtering is a hardware capability available on most
+network adapters. Filters can be configured to direct specific flows to a
+given receive queue by hardware. Different NICs may have different filter
+types to direct flows to a Virtual Function or a queue that belong to it.</p>
+<p>In this way the Linux networking stack can receive specific traffic through
+the kernel driver while a DPDK application can receive specific traffic
+bypassing the Linux kernel by using drivers like VFIO or the DPDK <code class="docutils literal notranslate"><span class="pre">igb_uio</span></code>
+module.</p>
+<figure class="align-default" id="id1">
+<span id="figure-flow-bifurcation-overview"></span><img alt="../_images/flow_bifurcation_overview.svg" src="../_images/flow_bifurcation_overview.svg" /><figcaption>
+<p><span class="caption-number">Fig. 4.3 </span><span class="caption-text">Flow Bifurcation Overview</span></p>
+</figcaption>
+</figure>
+<section id="using-flow-bifurcation-on-nvidia-connectx">
+<h2><span class="section-number">4.1. </span>Using Flow Bifurcation on NVIDIA ConnectX</h2>
+<p>The NVIDIA devices are <a class="reference internal" href="../linux_gsg/linux_drivers.html#bifurcated-driver"><span class="std std-ref">natively bifurcated</span></a>,
+so there is no need to split into SR-IOV PF/VF
+in order to get the flow bifurcation mechanism.
+The full device is already shared with the kernel driver.</p>
+<p>The DPDK application can setup some flow steering rules,
+and let the rest go to the kernel stack.
+In order to define the filters strictly with flow rules,
+the <a class="reference internal" href="../prog_guide/rte_flow.html#flow-isolated-mode"><span class="std std-ref">Flow isolated mode</span></a> must be configured,
+so there is no default rule routing traffic to userspace.</p>
+<p>There is no specific instructions to follow.
+The recommended reading is the <a class="reference internal" href="../prog_guide/rte_flow.html"><span class="doc">Generic flow API (rte_flow)</span></a> guide.
+Below is an example of testpmd commands
+for receiving VXLAN 42 in 4 queues of the DPDK port 0,
+while all other packets go to the kernel:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow isolate 0 true</span>
+<span class="go">testpmd&gt; flow create 0 ingress pattern eth / ipv4 / udp / vxlan vni is 42 / end \</span>
+<span class="go">         actions rss queues 0 1 2 3 end / end</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="lm_virtio_vhost_user.html" title="previous chapter"><span class="section-number">3. </span>Live Migration of VM with Virtio on host running vhost_user</a></li>
+      <li>Next: <a href="rte_flow.html" title="next chapter"><span class="section-number">5. </span>Generic flow API - examples</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/flow_bifurcation.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

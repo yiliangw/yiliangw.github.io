@@ -1,0 +1,2992 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>39. NVIDIA MLX5 Ethernet Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="40. MVNETA Poll Mode Driver" href="mvneta.html" />
+    <link rel="prev" title="38. NVIDIA MLX4 Ethernet Driver" href="mlx4.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="nvidia-mlx5-ethernet-driver">
+<h1><span class="section-number">39. </span>NVIDIA MLX5 Ethernet Driver</h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>NVIDIA acquired Mellanox Technologies in 2020.
+The DPDK documentation and code might still include instances
+of or references to Mellanox trademarks (like BlueField and ConnectX)
+that are now NVIDIA trademarks.</p>
+</div>
+<p>The mlx5 Ethernet poll mode driver library (<strong>librte_net_mlx5</strong>) provides support
+for <strong>NVIDIA ConnectX-4</strong>, <strong>NVIDIA ConnectX-4 Lx</strong> , <strong>NVIDIA ConnectX-5</strong>,
+<strong>NVIDIA ConnectX-6</strong>, <strong>NVIDIA ConnectX-6 Dx</strong>, <strong>NVIDIA ConnectX-6 Lx</strong>,
+<strong>NVIDIA ConnectX-7</strong>, <strong>NVIDIA BlueField</strong>, <strong>NVIDIA BlueField-2</strong> and
+<strong>NVIDIA BlueField-3</strong> families of 10/25/40/50/100/200/400 Gb/s adapters
+as well as their virtual functions (VF) in SR-IOV context.</p>
+<section id="supported-nics">
+<h2><span class="section-number">39.1. </span>Supported NICs</h2>
+<p>The following NVIDIA device families are supported by the same mlx5 driver:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>ConnectX-4</p></li>
+<li><p>ConnectX-4 Lx</p></li>
+<li><p>ConnectX-5</p></li>
+<li><p>ConnectX-5 Ex</p></li>
+<li><p>ConnectX-6</p></li>
+<li><p>ConnectX-6 Dx</p></li>
+<li><p>ConnectX-6 Lx</p></li>
+<li><p>ConnectX-7</p></li>
+<li><p>BlueField</p></li>
+<li><p>BlueField-2</p></li>
+<li><p>BlueField-3</p></li>
+</ul>
+</div></blockquote>
+<p>Below are detailed device names:</p>
+<ul class="simple">
+<li><p>NVIDIA® ConnectX®-4 10G MCX4111A-XCAT (1x10G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 10G MCX412A-XCAT (2x10G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 25G MCX4111A-ACAT (1x25G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 25G MCX412A-ACAT (2x25G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 40G MCX413A-BCAT (1x40G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 40G MCX4131A-BCAT (1x40G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 40G MCX415A-BCAT (1x40G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX413A-GCAT (1x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX4131A-GCAT (1x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX414A-BCAT (2x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX415A-GCAT (1x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX416A-BCAT (2x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX416A-GCAT (2x50G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 50G MCX415A-CCAT (1x100G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 100G MCX416A-CCAT (2x100G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 Lx 10G MCX4111A-XCAT (1x10G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 Lx 10G MCX4121A-XCAT (2x10G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 Lx 25G MCX4111A-ACAT (1x25G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 Lx 25G MCX4121A-ACAT (2x25G)</p></li>
+<li><p>NVIDIA® ConnectX®-4 Lx 40G MCX4131A-BCAT (1x40G)</p></li>
+<li><p>NVIDIA® ConnectX®-5 100G MCX556A-ECAT (2x100G)</p></li>
+<li><p>NVIDIA® ConnectX®-5 Ex EN 100G MCX516A-CDAT (2x100G)</p></li>
+<li><p>NVIDIA® ConnectX®-6 200G MCX654106A-HCAT (2x200G)</p></li>
+<li><p>NVIDIA® ConnectX®-6 Dx EN 100G MCX623106AN-CDAT (2x100G)</p></li>
+<li><p>NVIDIA® ConnectX®-6 Dx EN 200G MCX623105AN-VDAT (1x200G)</p></li>
+<li><p>NVIDIA® ConnectX®-6 Lx EN 25G MCX631102AN-ADAT (2x25G)</p></li>
+<li><p>NVIDIA® ConnectX®-7 200G CX713106AE-HEA_QP1_Ax (2x200G)</p></li>
+<li><p>NVIDIA® BlueField®-2 25G MBF2H332A-AEEOT_A1 (2x25Gg</p></li>
+<li><p>NVIDIA® BlueField®-3 200GbE 900-9D3B6-00CV-AA0 (2x200)</p></li>
+<li><p>NVIDIA® BlueField®-3 200GbE 900-9D3B6-00SV-AA0 (2x200)</p></li>
+<li><p>NVIDIA® BlueField®-3 400GbE 900-9D3B6-00CN-AB0 (2x400)</p></li>
+<li><p>NVIDIA® BlueField®-3 100GbE 900-9D3B4-00CC-EA0 (2x100)</p></li>
+<li><p>NVIDIA® BlueField®-3 100GbE 900-9D3B4-00SC-EA0 (2x100)</p></li>
+<li><p>NVIDIA® BlueField®-3 400GbE 900-9D3B4-00EN-EA0 (1x100)</p></li>
+</ul>
+</section>
+<section id="design">
+<h2><span class="section-number">39.2. </span>Design</h2>
+<p>Besides its dependency on libibverbs (that implies libmlx5 and associated
+kernel support), librte_net_mlx5 relies heavily on system calls for control
+operations such as querying/updating the MTU and flow control parameters.</p>
+<p>This capability allows the PMD to coexist with kernel network interfaces
+which remain functional, although they stop receiving unicast packets as
+long as they share the same MAC address.
+This means legacy linux control tools (for example: ethtool, ifconfig and
+more) can operate on the same network interfaces that owned by the DPDK
+application.</p>
+<p>See <a class="reference internal" href="../platform/mlx5.html"><span class="doc">NVIDIA MLX5 Common Driver</span></a> guide for more design details,
+including prerequisites installation.</p>
+</section>
+<section id="features">
+<h2><span class="section-number">39.3. </span>Features</h2>
+<ul class="simple">
+<li><p>Multi arch support: x86_64, POWER8, ARMv8, i686.</p></li>
+<li><p>Multiple TX and RX queues.</p></li>
+<li><p>Shared Rx queue.</p></li>
+<li><p>Rx queue delay drop.</p></li>
+<li><p>Rx queue available descriptor threshold event.</p></li>
+<li><p>Host shaper support.</p></li>
+<li><p>Support steering for external Rx queue created outside the PMD.</p></li>
+<li><p>Support for scattered TX frames.</p></li>
+<li><p>Advanced support for scattered Rx frames with tunable buffer attributes.</p></li>
+<li><p>IPv4, IPv6, TCPv4, TCPv6, UDPv4 and UDPv6 RSS on any number of queues.</p></li>
+<li><p>RSS using different combinations of fields: L3 only, L4 only or both,
+and source only, destination only or both.</p></li>
+<li><p>Several RSS hash keys, one for each flow type.</p></li>
+<li><p>Default RSS operation with no hash key specification.</p></li>
+<li><p>Symmetric RSS function.</p></li>
+<li><p>Configurable RETA table.</p></li>
+<li><p>Link flow control (pause frame).</p></li>
+<li><p>Support for multiple MAC addresses.</p></li>
+<li><p>VLAN filtering.</p></li>
+<li><p>RX VLAN stripping.</p></li>
+<li><p>TX VLAN insertion.</p></li>
+<li><p>RX CRC stripping configuration.</p></li>
+<li><p>TX mbuf fast free offload.</p></li>
+<li><p>Promiscuous mode on PF and VF.</p></li>
+<li><p>Multicast promiscuous mode on PF and VF.</p></li>
+<li><p>Hardware checksum offloads.</p></li>
+<li><p>Flow director (RTE_FDIR_MODE_PERFECT, RTE_FDIR_MODE_PERFECT_MAC_VLAN and
+RTE_ETH_FDIR_REJECT).</p></li>
+<li><p>Flow API, including <a class="reference internal" href="../prog_guide/rte_flow.html#flow-isolated-mode"><span class="std std-ref">Flow isolated mode</span></a>.</p></li>
+<li><p>Multiple process.</p></li>
+<li><p>KVM and VMware ESX SR-IOV modes are supported.</p></li>
+<li><p>RSS hash result is supported.</p></li>
+<li><p>Hardware TSO for generic IP or UDP tunnel, including VXLAN and GRE.</p></li>
+<li><p>Hardware checksum Tx offload for generic IP or UDP tunnel, including VXLAN and GRE.</p></li>
+<li><p>RX interrupts.</p></li>
+<li><p>Statistics query including Basic, Extended and per queue.</p></li>
+<li><p>Rx HW timestamp.</p></li>
+<li><p>Tunnel types: VXLAN, L3 VXLAN, VXLAN-GPE, GRE, MPLSoGRE, MPLSoUDP, IP-in-IP, Geneve, GTP.</p></li>
+<li><p>Tunnel HW offloads: packet type, inner/outer RSS, IP and UDP checksum verification.</p></li>
+<li><p>NIC HW offloads: encapsulation (vxlan, gre, mplsoudp, mplsogre), NAT, routing, TTL
+increment/decrement, count, drop, mark. For details please see <a class="reference internal" href="#mlx5-offloads-support"><span class="std std-ref">Supported hardware offloads</span></a>.</p></li>
+<li><p>Flow insertion rate of more then million flows per second, when using Direct Rules.</p></li>
+<li><p>Support for multiple rte_flow groups.</p></li>
+<li><p>Per packet no-inline hint flag to disable packet data copying into Tx descriptors.</p></li>
+<li><p>Hardware LRO.</p></li>
+<li><p>Hairpin.</p></li>
+<li><p>Multiple-thread flow insertion.</p></li>
+<li><p>Matching on IPv4 Internet Header Length (IHL).</p></li>
+<li><p>Matching on IPv6 routing extension header.</p></li>
+<li><p>Matching on GTP extension header with raw encap/decap action.</p></li>
+<li><p>Matching on Geneve TLV option header with raw encap/decap action.</p></li>
+<li><p>Matching on ESP header SPI field.</p></li>
+<li><p>Matching on InfiniBand BTH.</p></li>
+<li><p>Modify IPv4/IPv6 ECN field.</p></li>
+<li><p>Push or remove IPv6 routing extension.</p></li>
+<li><p>RSS support in sample action.</p></li>
+<li><p>E-Switch mirroring and jump.</p></li>
+<li><p>E-Switch mirroring and modify.</p></li>
+<li><p>Send to kernel.</p></li>
+<li><p>21844 flow priorities for ingress or egress flow groups greater than 0 and for any transfer
+flow group.</p></li>
+<li><p>Flow quota.</p></li>
+<li><p>Flow metering, including meter policy API.</p></li>
+<li><p>Flow meter hierarchy.</p></li>
+<li><p>Flow meter mark.</p></li>
+<li><p>Flow integrity offload API.</p></li>
+<li><p>Connection tracking.</p></li>
+<li><p>Sub-Function representors.</p></li>
+<li><p>Sub-Function.</p></li>
+<li><p>Matching on represented port.</p></li>
+<li><p>Matching on aggregated affinity.</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">39.4. </span>Limitations</h2>
+<ul>
+<li><p>Windows support:</p>
+<p>On Windows, the features are limited:</p>
+<ul class="simple">
+<li><p>Promiscuous mode is not supported</p></li>
+<li><p>The following rules are supported:</p>
+<ul>
+<li><p>IPv4/UDP with CVLAN filtering</p></li>
+<li><p>Unicast MAC filtering</p></li>
+</ul>
+</li>
+<li><p>Additional rules are supported from WinOF2 version 2.70:</p>
+<ul>
+<li><p>IPv4/TCP with CVLAN filtering</p></li>
+<li><p>L4 steering rules for port RSS of UDP, TCP and IP</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>For secondary process:</p>
+<ul class="simple">
+<li><p>Forked secondary process not supported.</p></li>
+<li><p>MPRQ is not supported. Callback to free externally attached MPRQ buffer is set
+in a primary process, but has a different virtual address in a secondary process.
+Calling a function at the wrong address leads to a segmentation fault.</p></li>
+<li><p>External memory unregistered in EAL memseg list cannot be used for DMA
+unless such memory has been registered by <code class="docutils literal notranslate"><span class="pre">mlx5_mr_update_ext_mp()</span></code> in
+primary process and remapped to the same virtual address in secondary
+process. If the external memory is registered by primary process but has
+different virtual address in secondary process, unexpected error may happen.</p></li>
+</ul>
+</li>
+<li><p>Shared Rx queue:</p>
+<ul class="simple">
+<li><p>Counters of received packets and bytes number of devices in same share group are same.</p></li>
+<li><p>Counters of received packets and bytes number of queues in same group and queue ID are same.</p></li>
+</ul>
+</li>
+<li><p>Available descriptor threshold event:</p>
+<ul class="simple">
+<li><p>Does not support shared Rx queue and hairpin Rx queue.</p></li>
+</ul>
+</li>
+<li><p>The symmetric RSS function is supported by swapping source and destination
+addresses and ports.</p></li>
+<li><p>Host shaper:</p>
+<ul class="simple">
+<li><p>Support BlueField series NIC from BlueField-2.</p></li>
+<li><p>When configuring host shaper with <code class="docutils literal notranslate"><span class="pre">RTE_PMD_MLX5_HOST_SHAPER_FLAG_AVAIL_THRESH_TRIGGERED</span></code> flag,
+only rates 0 and 100Mbps are supported.</p></li>
+</ul>
+</li>
+<li><p>HW steering:</p>
+<ul>
+<li><p>WQE based high scaling and safer flow insertion/destruction.</p></li>
+<li><p>Set <code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> to 2 in order to enable HW steering.</p></li>
+<li><p>Async queue-based <code class="docutils literal notranslate"><span class="pre">rte_flow_async</span></code> APIs supported only.</p></li>
+<li><p>NIC ConnectX-5 and before are not supported.</p></li>
+<li><p>Reconfiguring flow API engine is not supported.
+Any subsequent call to <code class="docutils literal notranslate"><span class="pre">rte_flow_configure()</span></code> with different configuration
+than initially provided will be rejected with <code class="docutils literal notranslate"><span class="pre">-ENOTSUP</span></code> error code.</p></li>
+<li><p>Partial match with item template is not supported.</p></li>
+<li><p>IPv6 5-tuple matching is not supported.</p></li>
+<li><p>With E-Switch enabled, ports which share the E-Switch domain
+should be started and stopped in a specific order:</p>
+<ul class="simple">
+<li><p>When starting ports, the transfer proxy port should be started first
+and port representors should follow.</p></li>
+<li><p>When stopping ports, all of the port representors
+should be stopped before stopping the transfer proxy port.</p></li>
+</ul>
+<p>If ports are started/stopped in an incorrect order,
+<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_start()</span></code>/<code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stop()</span></code> will return an appropriate error code:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-EAGAIN</span></code> for <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_start()</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-EBUSY</span></code> for <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_stop()</span></code>.</p></li>
+</ul>
+</li>
+<li><p>Matching on ICMP6 following IPv6 routing extension header,
+should match <code class="docutils literal notranslate"><span class="pre">ipv6_routing_ext_next_hdr</span></code> instead of ICMP6.</p></li>
+</ul>
+</li>
+<li><p>When using Verbs flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 0), flow pattern without any
+specific VLAN will match for VLAN packets as well:</p>
+<p>When VLAN spec is not specified in the pattern, the matching rule will be created with VLAN as a wild card.
+Meaning, the flow rule:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth / vlan vid is 3 / ipv4 / end ...
+</pre></div>
+</div>
+<p>Will only match vlan packets with vid=3. and the flow rule:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth / ipv4 / end ...
+</pre></div>
+</div>
+<p>Will match any ipv4 packet (VLAN included).</p>
+</li>
+<li><p>When using Verbs flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 0), multi-tagged(QinQ) match is not supported.</p></li>
+<li><p>When using DV flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1), flow pattern with any VLAN specification will match only single-tagged packets unless the ETH item <code class="docutils literal notranslate"><span class="pre">type</span></code> field is 0x88A8 or the VLAN item <code class="docutils literal notranslate"><span class="pre">has_more_vlan</span></code> field is 1.
+The flow rule:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth / ipv4 / end ...
+</pre></div>
+</div>
+<p>Will match any ipv4 packet.
+The flow rules:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth / vlan / end ...
+flow create 0 ingress pattern eth has_vlan is 1 / end ...
+flow create 0 ingress pattern eth type is 0x8100 / end ...
+</pre></div>
+</div>
+<p>Will match single-tagged packets only, with any VLAN ID value.
+The flow rules:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern eth type is 0x88A8 / end ...
+flow create 0 ingress pattern eth / vlan has_more_vlan is 1 / end ...
+</pre></div>
+</div>
+<p>Will match multi-tagged packets only, with any VLAN ID value.</p>
+</li>
+<li><p>A flow pattern with 2 sequential VLAN items is not supported.</p></li>
+<li><p>VLAN pop offload command:</p>
+<ul class="simple">
+<li><p>Flow rules having a VLAN pop offload command as one of their actions and
+are lacking a match on VLAN as one of their items are not supported.</p></li>
+<li><p>The command is not supported on egress traffic in NIC mode.</p></li>
+</ul>
+</li>
+<li><p>VLAN push offload is not supported on ingress traffic in NIC mode.</p></li>
+<li><p>VLAN set PCP offload is not supported on existing headers.</p></li>
+<li><p>A multi segment packet must have not more segments than reported by dev_infos_get()
+in tx_desc_lim.nb_seg_max field. This value depends on maximal supported Tx descriptor
+size and <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> settings and may be from 2 (worst case forced by maximal
+inline settings) to 58.</p></li>
+<li><p>Match on VXLAN supports the following fields only:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>VNI</p></li>
+<li><p>Last reserved 8-bits</p></li>
+</ul>
+</div></blockquote>
+<p>Last reserved 8-bits matching is only supported When using DV flow
+engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1).
+For ConnectX-5, the UDP destination port must be the standard one (4789).
+Group zero’s behavior may differ which depends on FW.
+Matching value equals 0 (value &amp; mask) is not supported.</p>
+</li>
+<li><p>L3 VXLAN and VXLAN-GPE tunnels cannot be supported together with MPLSoGRE and MPLSoUDP.</p></li>
+<li><p>MPLSoGRE is not supported in HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 2).</p></li>
+<li><p>MPLSoUDP with multiple MPLS headers is only supported in HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 2).</p></li>
+<li><p>Match on Geneve header supports the following fields only:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>VNI</p></li>
+<li><p>OAM</p></li>
+<li><p>protocol type</p></li>
+<li><p>options length</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Match on Geneve TLV option is supported on the following fields:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Class</p></li>
+<li><p>Type</p></li>
+<li><p>Length</p></li>
+<li><p>Data</p></li>
+</ul>
+</div></blockquote>
+<p>Only one Class/Type/Length Geneve TLV option is supported per shared device.
+Class/Type/Length fields must be specified as well as masks.
+Class/Type/Length specified masks must be full.
+Matching Geneve TLV option without specifying data is not supported.
+Matching Geneve TLV option with <code class="docutils literal notranslate"><span class="pre">data</span> <span class="pre">&amp;</span> <span class="pre">mask</span> <span class="pre">==</span> <span class="pre">0</span></code> is not supported.</p>
+</li>
+<li><p>VF: flow rules created on VF devices can only match traffic targeted at the
+configured MAC addresses (see <code class="docutils literal notranslate"><span class="pre">rte_eth_dev_mac_addr_add()</span></code>).</p></li>
+<li><p>Match on GTP tunnel header item supports the following fields only:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>v_pt_rsv_flags: E flag, S flag, PN flag</p></li>
+<li><p>msg_type</p></li>
+<li><p>teid</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Match on GTP extension header only for GTP PDU session container (next
+extension header type = 0x85).</p></li>
+<li><p>Match on GTP extension header is not supported in group 0.</p></li>
+<li><p>When using DV/Verbs flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1/0 respectively),
+match on SPI field in ESP header for group 0 is supported from ConnectX-7.</p></li>
+<li><p>Matching on SPI field in ESP header is supported over the PF only.</p></li>
+<li><p>Flex item:</p>
+<ul class="simple">
+<li><p>Hardware support: <strong>NVIDIA BlueField-2</strong> and <strong>NVIDIA BlueField-3</strong>.</p></li>
+<li><p>Flex item is supported on PF only.</p></li>
+<li><p>Hardware limits <code class="docutils literal notranslate"><span class="pre">header_length_mask_width</span></code> up to 6 bits.</p></li>
+<li><p>Firmware supports 8 global sample fields.
+Each flex item allocates non-shared sample fields from that pool.</p></li>
+<li><p>Supported flex item can have 1 input link - <code class="docutils literal notranslate"><span class="pre">eth</span></code> or <code class="docutils literal notranslate"><span class="pre">udp</span></code>
+and up to 3 output links - <code class="docutils literal notranslate"><span class="pre">ipv4</span></code> or <code class="docutils literal notranslate"><span class="pre">ipv6</span></code>.</p></li>
+<li><p>Flex item fields (<code class="docutils literal notranslate"><span class="pre">next_header</span></code>, <code class="docutils literal notranslate"><span class="pre">next_protocol</span></code>, <code class="docutils literal notranslate"><span class="pre">samples</span></code>)
+do not participate in RSS hash functions.</p></li>
+<li><p>In flex item configuration, <code class="docutils literal notranslate"><span class="pre">next_header.field_base</span></code> value
+must be byte aligned (multiple of 8).</p></li>
+<li><p>Modify field with flex item, the offset must be byte aligned (multiple of 8).</p></li>
+</ul>
+</li>
+<li><p>No Tx metadata go to the E-Switch steering domain for the Flow group 0.
+The flows within group 0 and set metadata action are rejected by hardware.</p></li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>MAC addresses not already present in the bridge table of the associated
+kernel network device will be added and cleaned up by the PMD when closing
+the device. In case of ungraceful program termination, some entries may
+remain present and should be removed manually by other means.</p>
+</div>
+<ul>
+<li><p>Buffer split offload is supported with regular Rx burst routine only,
+no MPRQ feature or vectorized code can be engaged.</p></li>
+<li><p>When Multi-Packet Rx queue is configured (<code class="docutils literal notranslate"><span class="pre">mprq_en</span></code>), a Rx packet can be
+externally attached to a user-provided mbuf with having RTE_MBUF_F_EXTERNAL in
+ol_flags. As the mempool for the external buffer is managed by PMD, all the
+Rx mbufs must be freed before the device is closed. Otherwise, the mempool of
+the external buffers will be freed by PMD and the application which still
+holds the external buffers may be corrupted.
+User-managed mempools with external pinned data buffers
+cannot be used in conjunction with MPRQ
+since packets may be already attached to PMD-managed external buffers.</p></li>
+<li><p>If Multi-Packet Rx queue is configured (<code class="docutils literal notranslate"><span class="pre">mprq_en</span></code>) and Rx CQE compression is
+enabled (<code class="docutils literal notranslate"><span class="pre">rxq_cqe_comp_en</span></code>) at the same time, RSS hash result is not fully
+supported. Some Rx packets may not have RTE_MBUF_F_RX_RSS_HASH.</p></li>
+<li><p>IPv6 Multicast messages are not supported on VM, while promiscuous mode
+and allmulticast mode are both set to off.
+To receive IPv6 Multicast messages on VM, explicitly set the relevant
+MAC address using rte_eth_dev_mac_addr_add() API.</p></li>
+<li><p>To support a mixed traffic pattern (some buffers from local host memory, some
+buffers from other devices) with high bandwidth, a mbuf flag is used.</p>
+<p>An application hints the PMD whether or not it should try to inline the
+given mbuf data buffer. PMD should do the best effort to act upon this request.</p>
+<p>The hint flag <code class="docutils literal notranslate"><span class="pre">RTE_PMD_MLX5_FINE_GRANULARITY_INLINE</span></code> is dynamic,
+registered by application with rte_mbuf_dynflag_register(). This flag is
+purely driver-specific and declared in PMD specific header <code class="docutils literal notranslate"><span class="pre">rte_pmd_mlx5.h</span></code>,
+which is intended to be used by the application.</p>
+<p>To query the supported specific flags in runtime,
+the function <code class="docutils literal notranslate"><span class="pre">rte_pmd_mlx5_get_dyn_flag_names</span></code> returns the array of
+currently (over present hardware and configuration) supported specific flags.
+The “not inline hint” feature operating flow is the following one:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>application starts</p></li>
+<li><p>probe the devices, ports are created</p></li>
+<li><p>query the port capabilities</p></li>
+<li><p>if port supporting the feature is found</p></li>
+<li><p>register dynamic flag <code class="docutils literal notranslate"><span class="pre">RTE_PMD_MLX5_FINE_GRANULARITY_INLINE</span></code></p></li>
+<li><p>application starts the ports</p></li>
+<li><p>on <code class="docutils literal notranslate"><span class="pre">dev_start()</span></code> PMD checks whether the feature flag is registered and
+enables the feature support in datapath</p></li>
+<li><p>application might set the registered flag bit in <code class="docutils literal notranslate"><span class="pre">ol_flags</span></code> field
+of mbuf being sent and PMD will handle ones appropriately.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>The amount of descriptors in Tx queue may be limited by data inline settings.
+Inline data require the more descriptor building blocks and overall block
+amount may exceed the hardware supported limits. The application should
+reduce the requested Tx size or adjust data inline settings with
+<code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> and <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> devargs keys.</p></li>
+<li><p>To provide the packet send scheduling on mbuf timestamps the <code class="docutils literal notranslate"><span class="pre">tx_pp</span></code>
+parameter should be specified.
+When PMD sees the RTE_MBUF_DYNFLAG_TX_TIMESTAMP_NAME set on the packet
+being sent it tries to synchronize the time of packet appearing on
+the wire with the specified packet timestamp. It the specified one
+is in the past it should be ignored, if one is in the distant future
+it should be capped with some reasonable value (in range of seconds).
+These specific cases (“too late” and “distant future”) can be optionally
+reported via device xstats to assist applications to detect the
+time-related problems.</p>
+<p>The timestamp upper “too-distant-future” limit
+at the moment of invoking the Tx burst routine
+can be estimated as <code class="docutils literal notranslate"><span class="pre">tx_pp</span></code> option (in nanoseconds) multiplied by 2^23.
+Please note, for the testpmd txonly mode,
+the limit is deduced from the expression:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>(n_tx_descriptors / burst_size + 1) * inter_burst_gap
+</pre></div>
+</div>
+<p>There is no any packet reordering according timestamps is supposed,
+neither within packet burst, nor between packets, it is an entirely
+application responsibility to generate packets and its timestamps
+in desired order. The timestamps can be put only in the first packet
+in the burst providing the entire burst scheduling.</p>
+</li>
+<li><p>E-Switch decapsulation Flow:</p>
+<ul class="simple">
+<li><p>can be applied to PF port only.</p></li>
+<li><p>must specify VF port action (packet redirection from PF to VF).</p></li>
+<li><p>optionally may specify tunnel inner source and destination MAC addresses.</p></li>
+</ul>
+</li>
+<li><p>E-Switch  encapsulation Flow:</p>
+<ul class="simple">
+<li><p>can be applied to VF ports only.</p></li>
+<li><p>must specify PF port action (packet redirection from VF to PF).</p></li>
+</ul>
+</li>
+<li><p>E-Switch Manager matching:</p>
+<ul class="simple">
+<li><p>For BlueField with old FW
+which doesn’t expose the E-Switch Manager vport ID in the capability,
+matching E-Switch Manager should be used only in BlueField embedded CPU mode.</p></li>
+</ul>
+</li>
+<li><p>Raw encapsulation:</p>
+<ul class="simple">
+<li><p>The input buffer, used as outer header, is not validated.</p></li>
+</ul>
+</li>
+<li><p>Raw decapsulation:</p>
+<ul class="simple">
+<li><p>The decapsulation is always done up to the outermost tunnel detected by the HW.</p></li>
+<li><p>The input buffer, providing the removal size, is not validated.</p></li>
+<li><p>The buffer size must match the length of the headers to be removed.</p></li>
+</ul>
+</li>
+<li><p>Outer UDP checksum calculation for encapsulation flow actions:</p>
+<ul>
+<li><p>Currently available NVIDIA NICs and DPUs do not have a capability to calculate
+the UDP checksum in the header added using encapsulation flow actions.</p>
+<p>Applications are required to use 0 in UDP checksum field in such flow actions.
+Resulting packet will have outer UDP checksum equal to 0.</p>
+</li>
+</ul>
+</li>
+<li><p>ICMP(code/type/identifier/sequence number) / ICMP6(code/type/identifier/sequence number) matching,
+IP-in-IP and MPLS flow matching are all mutually exclusive features which cannot be supported together
+(see <a class="reference internal" href="../platform/mlx5.html#mlx5-firmware-config"><span class="std std-ref">Firmware Configuration</span></a>).</p></li>
+<li><p>LRO:</p>
+<ul>
+<li><p>Requires DevX and DV flow to be enabled.</p></li>
+<li><p>KEEP_CRC offload cannot be supported with LRO.</p></li>
+<li><p>The first mbuf length, without head-room,  must be big enough to include the
+TCP header (122B).</p></li>
+<li><p>Rx queue with LRO offload enabled, receiving a non-LRO packet, can forward
+it with size limited to max LRO size, not to max RX packet length.</p></li>
+<li><p>The driver rounds down the port configuration value <code class="docutils literal notranslate"><span class="pre">max_lro_pkt_size</span></code>
+(from <code class="docutils literal notranslate"><span class="pre">rte_eth_rxmode</span></code>) to a multiple of 256 due to hardware limitation.</p></li>
+<li><dl class="simple">
+<dt>LRO can be used with outer header of TCP packets of the standard format:</dt><dd><p>eth (with or without vlan) / ipv4 or ipv6 / tcp / payload</p>
+</dd>
+</dl>
+<p>Other TCP packets (e.g. with MPLS label) received on Rx queue with LRO enabled, will be received with bad checksum.</p>
+</li>
+<li><p>LRO packet aggregation is performed by HW only for packet size larger than
+<code class="docutils literal notranslate"><span class="pre">lro_min_mss_size</span></code>. This value is reported on device start, when debug
+mode is enabled.</p></li>
+</ul>
+</li>
+<li><p>CRC:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RTE_ETH_RX_OFFLOAD_KEEP_CRC</span></code> cannot be supported with decapsulation
+for some NICs (such as ConnectX-6 Dx, ConnectX-6 Lx, ConnectX-7, BlueField-2,
+and BlueField-3).
+The capability bit <code class="docutils literal notranslate"><span class="pre">scatter_fcs_w_decap_disable</span></code> shows NIC support.</p></li>
+</ul>
+</li>
+<li><p>TX mbuf fast free:</p>
+<ul class="simple">
+<li><p>fast free offload assumes the all mbufs being sent are originated from the
+same memory pool and there is no any extra references to the mbufs (the
+reference counter for each mbuf is equal 1 on tx_burst call). The latter
+means there should be no any externally attached buffers in mbufs. It is
+an application responsibility to provide the correct mbufs if the fast
+free offload is engaged. The mlx5 PMD implicitly produces the mbufs with
+externally attached buffers if MPRQ option is enabled, hence, the fast
+free offload is neither supported nor advertised if there is MPRQ enabled.</p></li>
+</ul>
+</li>
+<li><p>Sample flow:</p>
+<ul class="simple">
+<li><p>Supports <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SAMPLE</span></code> action only within NIC Rx and
+E-Switch steering domain.</p></li>
+<li><p>In E-Switch steering domain, for sampling with sample ratio &gt; 1 in a transfer rule,
+additional actions are not supported in the sample actions list.</p></li>
+<li><p>For ConnectX-5, the <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SAMPLE</span></code> is typically used as
+first action in the E-Switch egress flow if with header modify or
+encapsulation actions.</p></li>
+<li><p>For NIC Rx flow, supports only <code class="docutils literal notranslate"><span class="pre">MARK</span></code>, <code class="docutils literal notranslate"><span class="pre">COUNT</span></code>, <code class="docutils literal notranslate"><span class="pre">QUEUE</span></code>, <code class="docutils literal notranslate"><span class="pre">RSS</span></code> in the
+sample actions list.</p></li>
+<li><p>In E-Switch steering domain, for mirroring with sample ratio = 1 in a transfer rule,
+supports only <code class="docutils literal notranslate"><span class="pre">RAW_ENCAP</span></code>, <code class="docutils literal notranslate"><span class="pre">PORT_ID</span></code>, <code class="docutils literal notranslate"><span class="pre">REPRESENTED_PORT</span></code>, <code class="docutils literal notranslate"><span class="pre">VXLAN_ENCAP</span></code>, <code class="docutils literal notranslate"><span class="pre">NVGRE_ENCAP</span></code>
+in the sample actions list.</p></li>
+<li><p>In E-Switch steering domain, for mirroring with sample ratio = 1 in a transfer rule,
+the encapsulation actions (<code class="docutils literal notranslate"><span class="pre">RAW_ENCAP</span></code> or <code class="docutils literal notranslate"><span class="pre">VXLAN_ENCAP</span></code> or <code class="docutils literal notranslate"><span class="pre">NVGRE_ENCAP</span></code>)
+support uplink port only.</p></li>
+<li><p>In E-Switch steering domain, for mirroring with sample ratio = 1 in a transfer rule,
+the port actions (<code class="docutils literal notranslate"><span class="pre">PORT_ID</span></code> or <code class="docutils literal notranslate"><span class="pre">REPRESENTED_PORT</span></code>) with uplink port and <code class="docutils literal notranslate"><span class="pre">JUMP</span></code> action
+are not supported without the encapsulation actions
+(<code class="docutils literal notranslate"><span class="pre">RAW_ENCAP</span></code> or <code class="docutils literal notranslate"><span class="pre">VXLAN_ENCAP</span></code> or <code class="docutils literal notranslate"><span class="pre">NVGRE_ENCAP</span></code>) in the sample actions list.</p></li>
+<li><p>For ConnectX-5 trusted device, the application metadata with SET_TAG index 0
+is not supported before <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SAMPLE</span></code> action.</p></li>
+</ul>
+</li>
+<li><p>Modify Field flow:</p>
+<ul class="simple">
+<li><p>Supports the ‘set’ and ‘add’ operations for <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_MODIFY_FIELD</span></code> action.</p></li>
+<li><p>Modification of an arbitrary place in a packet via the special <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_FIELD_START</span></code> Field ID is not supported.</p></li>
+<li><p>Modification of the MPLS header is supported only in HWS and only to copy from,
+the encapsulation level is always 0.</p></li>
+<li><p>Modification of the 802.1Q Tag, VXLAN Network or GENEVE Network ID’s is not supported.</p></li>
+<li><p>Encapsulation levels are not supported, can modify outermost header fields only.</p></li>
+<li><p>Offsets cannot skip past the boundary of a field.</p></li>
+<li><p>If the field type is <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_FIELD_MAC_TYPE</span></code>
+and packet contains one or more VLAN headers,
+the meaningful type field following the last VLAN header
+is used as modify field operation argument.
+The modify field action is not intended to modify VLAN headers type field,
+dedicated VLAN push and pop actions should be used instead.</p></li>
+<li><p>For packet fields (e.g. MAC addresses, IPv4 addresses or L4 ports)
+offset specifies the number of bits to skip from field’s start,
+starting from MSB in the first byte, in the network order.</p></li>
+<li><p>For flow metadata fields (e.g. META or TAG)
+offset specifies the number of bits to skip from field’s start,
+starting from LSB in the least significant byte, in the host order.</p></li>
+</ul>
+</li>
+<li><p>Age action:</p>
+<ul class="simple">
+<li><p>with HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>)</p>
+<ul>
+<li><p>Using the same indirect count action combined with multiple age actions
+in different flows may cause a wrong age state for the age actions.</p></li>
+<li><p>Creating/destroying flow rules with indirect age action when it is active
+(timeout != 0) may cause a wrong age state for the indirect age action.</p></li>
+<li><p>The driver reuses counters for aging action, so for optimization
+the values in <code class="docutils literal notranslate"><span class="pre">rte_flow_port_attr</span></code> structure should describe:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">nb_counters</span></code> is the number of flow rules using counter (with/without age)
+in addition to flow rules using only age (without count action).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nb_aging_objects</span></code> is the number of flow rules containing age action.</p></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>IPv6 header item ‘proto’ field, indicating the next header protocol, should
+not be set as extension header.
+In case the next header is an extension header, it should not be specified in
+IPv6 header item ‘proto’ field.
+The last extension header item ‘next header’ field can specify the following
+header protocol type.</p></li>
+<li><p>Match on IPv6 routing extension header supports the following fields only:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">type</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">next_hdr</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">segments_left</span></code></p></li>
+</ul>
+<p>Only supports HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>).</p>
+</li>
+<li><p>IPv6 routing extension push/remove:</p>
+<ul class="simple">
+<li><p>Supported only with HW Steering enabled (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>).</p></li>
+<li><p>Supported in non-zero group
+(no limits on transfer domain if <code class="docutils literal notranslate"><span class="pre">fdb_def_rule_en=1</span></code> which is default).</p></li>
+<li><p>Only supports TCP or UDP as next layer.</p></li>
+<li><p>IPv6 routing header must be the only present extension.</p></li>
+<li><p>Not supported on guest port.</p></li>
+</ul>
+</li>
+<li><p>Hairpin:</p>
+<ul class="simple">
+<li><p>Hairpin between two ports could only manual binding and explicit Tx flow mode. For single port hairpin, all the combinations of auto/manual binding and explicit/implicit Tx flow mode could be supported.</p></li>
+<li><p>Hairpin in switchdev SR-IOV mode is not supported till now.</p></li>
+</ul>
+</li>
+<li><p>Quota:</p>
+<ul class="simple">
+<li><p>Quota implemented for HWS / template API.</p></li>
+<li><p>Maximal value for quota SET and ADD operations in INT32_MAX (2GB).</p></li>
+<li><p>Application cannot use 2 consecutive ADD updates.
+Next tokens update after ADD must always be SET.</p></li>
+<li><p>Quota flow action cannot be used with Meter or CT flow actions in the same rule.</p></li>
+<li><p>Quota flow action and item supported in non-root HWS tables.</p></li>
+<li><p>Maximal number of HW quota and HW meter objects &lt;= 16e6.</p></li>
+</ul>
+</li>
+<li><p>Meter:</p>
+<ul class="simple">
+<li><p>All the meter colors with drop action will be counted only by the global drop statistics.</p></li>
+<li><p>Yellow detection is only supported with ASO metering.</p></li>
+<li><p>Red color must be with drop action.</p></li>
+<li><p>Meter statistics are supported only for drop case.</p></li>
+<li><dl class="simple">
+<dt>A meter action created with pre-defined policy must be the last action in the flow except single case where the policy actions are:</dt><dd><ul>
+<li><p>green: NULL or END.</p></li>
+<li><p>yellow: NULL or END.</p></li>
+<li><p>RED: DROP / END.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>The only supported meter policy actions:</dt><dd><ul>
+<li><p>green: QUEUE, RSS, PORT_ID, REPRESENTED_PORT, JUMP, DROP, MODIFY_FIELD, MARK, METER and SET_TAG.</p></li>
+<li><p>yellow: QUEUE, RSS, PORT_ID, REPRESENTED_PORT, JUMP, DROP, MODIFY_FIELD, MARK, METER and SET_TAG.</p></li>
+<li><p>RED: must be DROP.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><p>Policy actions of RSS for green and yellow should have the same configuration except queues.</p></li>
+<li><p>Policy with RSS/queue action is not supported when <code class="docutils literal notranslate"><span class="pre">dv_xmeta_en</span></code> enabled.</p></li>
+<li><p>If green action is METER, yellow action must be the same METER action or NULL.</p></li>
+<li><p>meter profile packet mode is supported.</p></li>
+<li><p>meter profiles of RFC2697, RFC2698 and RFC4115 are supported.</p></li>
+<li><p>RFC4115 implementation is following MEF, meaning yellow traffic may reclaim unused green bandwidth when green token bucket is full.</p></li>
+<li><p>When using DV flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1),
+if meter has drop count
+or meter hierarchy contains any meter that uses drop count,
+it cannot be used by flow rule matching all ports.</p></li>
+<li><p>When using DV flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1),
+if meter hierarchy contains any meter that has MODIFY_FIELD/SET_TAG,
+it cannot be used by flow matching all ports.</p></li>
+<li><p>When using HWS flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 2),
+only meter mark action is supported.</p></li>
+</ul>
+</li>
+<li><p>Ptype:</p>
+<ul class="simple">
+<li><p>Only supports HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>).</p></li>
+<li><p>The supported values are:
+L2: <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L2_ETHER</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L2_ETHER_VLAN</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L2_ETHER_QINQ</span></code>
+L3: <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L3_IPV4</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L3_IPV6</span></code>
+L4: <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_TCP</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_UDP</span></code>, <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_ICMP</span></code>
+and their <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_INNER_XXX</span></code> counterparts as well as <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_TUNNEL_ESP</span></code>.
+Any other values are not supported. Using them as a value will cause unexpected behavior.</p></li>
+<li><p>Matching on both outer and inner IP fragmented is supported
+using <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_FRAG</span></code> and <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_INNER_L4_FRAG</span></code> values.
+They are not part of L4 types, so they should be provided explicitly
+as a mask value during pattern template creation.
+Providing <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_MASK</span></code> during pattern template creation
+and <code class="docutils literal notranslate"><span class="pre">RTE_PTYPE_L4_FRAG</span></code> during flow rule creation
+will cause unexpected behavior.</p></li>
+</ul>
+</li>
+<li><p>Integrity:</p>
+<ul>
+<li><p>Verification bits provided by the hardware are <code class="docutils literal notranslate"><span class="pre">l3_ok</span></code>, <code class="docutils literal notranslate"><span class="pre">ipv4_csum_ok</span></code>, <code class="docutils literal notranslate"><span class="pre">l4_ok</span></code>, <code class="docutils literal notranslate"><span class="pre">l4_csum_ok</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">level</span></code> value 0 references outer headers.</p></li>
+<li><p>Negative integrity item verification is not supported.</p></li>
+<li><p>With SW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=1</span></code>)</p>
+<ul>
+<li><p>Integrity offload is enabled starting from <strong>ConnectX-6 Dx</strong>.</p></li>
+<li><p>Multiple integrity items not supported in a single flow rule.</p></li>
+<li><p>Flow rule items supplied by application must explicitly specify
+network headers referred by integrity item.</p>
+<p>For example, if integrity item mask sets <code class="docutils literal notranslate"><span class="pre">l4_ok</span></code> or <code class="docutils literal notranslate"><span class="pre">l4_csum_ok</span></code> bits,
+reference to L4 network header, TCP or UDP, must be in the rule pattern as well:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>flow create 0 ingress pattern integrity level is 0 value mask l3_ok value spec l3_ok / eth / ipv6 / end ...
+flow create 0 ingress pattern integrity level is 0 value mask l4_ok value spec l4_ok / eth / ipv4 proto is udp / end ...
+</pre></div>
+</div>
+</li>
+</ul>
+</li>
+<li><p>With HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>)
+- The <code class="docutils literal notranslate"><span class="pre">l3_ok</span></code> field represents all L3 checks, but nothing about IPv4 checksum.
+- The <code class="docutils literal notranslate"><span class="pre">l4_ok</span></code> field represents all L4 checks including L4 checksum.</p></li>
+</ul>
+</li>
+<li><p>Connection tracking:</p>
+<ul class="simple">
+<li><p>Cannot co-exist with ASO meter, ASO age action in a single flow rule.</p></li>
+<li><p>Flow rules insertion rate and memory consumption need more optimization.</p></li>
+<li><p>256 ports maximum.</p></li>
+<li><p>4M connections maximum with <code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> 1 mode. 16M with <code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> 2.</p></li>
+</ul>
+</li>
+<li><p>Multi-thread flow insertion:</p>
+<ul class="simple">
+<li><p>In order to achieve best insertion rate, application should manage the flows per lcore.</p></li>
+<li><p>Better to disable memory reclaim by setting <code class="docutils literal notranslate"><span class="pre">reclaim_mem_mode</span></code> to 0 to accelerate the flow object allocation and release with cache.</p></li>
+</ul>
+</li>
+<li><p>HW hashed bonding</p>
+<ul class="simple">
+<li><p>TXQ affinity subjects to HW hash once enabled.</p></li>
+</ul>
+</li>
+<li><p>Bonding under socket direct mode</p>
+<ul class="simple">
+<li><p>Needs MLNX_OFED 5.4+.</p></li>
+</ul>
+</li>
+<li><p>Match on aggregated affinity:</p>
+<ul class="simple">
+<li><p>Supports NIC ingress flow in group 0.</p></li>
+<li><p>Supports E-Switch flow in group 0 and depends on
+device-managed flow steering (DMFS) mode.</p></li>
+</ul>
+</li>
+<li><p>Timestamps:</p>
+<ul class="simple">
+<li><p>CQE timestamp field width is limited by hardware to 63 bits, MSB is zero.</p></li>
+<li><p>In the free-running mode the timestamp counter is reset on power on
+and 63-bit value provides over 1800 years of uptime till overflow.</p></li>
+<li><p>In the real-time mode
+(configurable with <code class="docutils literal notranslate"><span class="pre">REAL_TIME_CLOCK_ENABLE</span></code> firmware settings),
+the timestamp presents the nanoseconds elapsed since 01-Jan-1970,
+hardware timestamp overflow will happen on 19-Jan-2038
+(0x80000000 seconds since 01-Jan-1970).</p></li>
+<li><p>The send scheduling is based on timestamps
+from the reference “Clock Queue” completions,
+the scheduled send timestamps should not be specified with non-zero MSB.</p></li>
+</ul>
+</li>
+<li><p>Match on GRE header supports the following fields:</p>
+<ul class="simple">
+<li><p>c_rsvd0_v: C bit, K bit, S bit</p></li>
+<li><p>protocol type</p></li>
+<li><p>checksum</p></li>
+<li><p>key</p></li>
+<li><p>sequence</p></li>
+</ul>
+<p>Matching on checksum and sequence needs MLNX_OFED 5.6+.</p>
+</li>
+<li><p>The NIC egress flow rules on representor port are not supported.</p></li>
+<li><p>A driver limitation for <code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_PORT_REPRESENTOR</span></code> action
+restricts the <code class="docutils literal notranslate"><span class="pre">port_id</span></code> configuration to only accept the value <code class="docutils literal notranslate"><span class="pre">0xffff</span></code>,
+indicating the E-Switch manager.
+If the <code class="docutils literal notranslate"><span class="pre">repr_matching_en</span></code> flag is enabled, the traffic will be directed
+to the representor of the source virtual port (SF/VF), while if it is disabled,
+the traffic will be routed based on the steering rules in the ingress domain.</p></li>
+<li><p>Send to kernel action (<code class="docutils literal notranslate"><span class="pre">RTE_FLOW_ACTION_TYPE_SEND_TO_KERNEL</span></code>):</p>
+<ul class="simple">
+<li><p>Supported on non-root table.</p></li>
+<li><p>Supported in isolated mode.</p></li>
+<li><p>In HW steering (<code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 2):
+- not supported on guest port.</p></li>
+</ul>
+</li>
+<li><p>During live migration to a new process set its flow engine as standby mode,
+the user should only program flow rules in group 0 (<code class="docutils literal notranslate"><span class="pre">fdb_def_rule_en=0</span></code>).
+Live migration is only supported under SWS (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=1</span></code>).
+The flow group 0 is shared between DPDK processes
+while the other flow groups are limited to the current process.
+The flow engine of a process cannot move from active to standby mode
+if preceding active application rules are still present and vice versa.</p></li>
+</ul>
+</section>
+<section id="statistics">
+<h2><span class="section-number">39.5. </span>Statistics</h2>
+<p>MLX5 supports various methods to report statistics:</p>
+<p>Port statistics can be queried using <code class="docutils literal notranslate"><span class="pre">rte_eth_stats_get()</span></code>. The received and sent statistics are through SW only and counts the number of packets received or sent successfully by the PMD. The imissed counter is the amount of packets that could not be delivered to SW because a queue was full. Packets not received due to congestion in the bus or on the NIC can be queried via the rx_discards_phy xstats counter.</p>
+<p>Extended statistics can be queried using <code class="docutils literal notranslate"><span class="pre">rte_eth_xstats_get()</span></code>. The extended statistics expose a wider set of counters counted by the device. The extended port statistics counts the number of packets received or sent successfully by the port. As NVIDIA NICs are using the <a class="reference internal" href="../linux_gsg/linux_drivers.html#linux-gsg-linux-drivers"><span class="std std-ref">Bifurcated Linux Driver</span></a> those counters counts also packet received or sent by the Linux kernel. The counters with <code class="docutils literal notranslate"><span class="pre">_phy</span></code> suffix counts the total events on the physical port, therefore not valid for VF.</p>
+<p>Finally per-flow statistics can by queried using <code class="docutils literal notranslate"><span class="pre">rte_flow_query</span></code> when attaching a count action for specific flow. The flow counter counts the number of packets received successfully by the port and match the specific flow.</p>
+</section>
+<section id="compilation">
+<h2><span class="section-number">39.6. </span>Compilation</h2>
+<p>See <a class="reference internal" href="../platform/mlx5.html#mlx5-common-compilation"><span class="std std-ref">mlx5 common compilation</span></a>.</p>
+</section>
+<section id="configuration">
+<h2><span class="section-number">39.7. </span>Configuration</h2>
+<section id="environment-configuration">
+<h3><span class="section-number">39.7.1. </span>Environment Configuration</h3>
+<p>See <a class="reference internal" href="../platform/mlx5.html#mlx5-common-env"><span class="std std-ref">mlx5 common configuration</span></a>.</p>
+</section>
+<section id="firmware-configuration">
+<h3><span class="section-number">39.7.2. </span>Firmware configuration</h3>
+<p>See <a class="reference internal" href="../platform/mlx5.html#mlx5-firmware-config"><span class="std std-ref">Firmware Configuration</span></a> guide.</p>
+</section>
+<section id="runtime-configuration">
+<h3><span class="section-number">39.7.3. </span>Runtime Configuration</h3>
+<p>Please refer to <a class="reference internal" href="../platform/mlx5.html#mlx5-common-driver-options"><span class="std std-ref">mlx5 common options</span></a>
+for an additional list of options shared with other mlx5 drivers.</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">rxq_cqe_comp_en</span></code> parameter [int]</p>
+<p>A nonzero value enables the compression of CQE on RX side. This feature
+allows to save PCI bandwidth and improve performance. Enabled by default.
+Different compression formats are supported in order to achieve the best
+performance for different traffic patterns. Default format depends on
+Multi-Packet Rx queue configuration: Hash RSS format is used in case
+MPRQ is disabled, Checksum format is used in case MPRQ is enabled.</p>
+<p>The lower 3 bits define the CQE compression format:
+Specifying 2 in these bits of the <code class="docutils literal notranslate"><span class="pre">rxq_cqe_comp_en</span></code> parameter selects
+the flow tag format for better compression rate in case of flow mark traffic.
+Specifying 3 in these bits selects checksum format.
+Specifying 4 in these bits selects L3/L4 header format for
+better compression rate in case of mixed TCP/UDP and IPv4/IPv6 traffic.
+CQE compression format selection requires DevX to be enabled. If there is
+no DevX enabled/supported the value is reset to 1 by default.</p>
+<p>8th bit defines the CQE compression layout.
+Setting this bit to 1 turns enhanced CQE compression layout on.
+Enhanced CQE compression is designed for better latency and SW utilization.
+This bit is ignored if only the basic CQE compression layout is supported.</p>
+<p>Supported on:</p>
+<ul class="simple">
+<li><p>x86_64 with ConnectX-4, ConnectX-4 Lx, ConnectX-5, ConnectX-6, ConnectX-6 Dx,
+ConnectX-6 Lx, ConnectX-7, BlueField, BlueField-2, and BlueField-3.</p></li>
+<li><p>POWER9 and ARMv8 with ConnectX-4 Lx, ConnectX-5, ConnectX-6, ConnectX-6 Dx,
+ConnectX-6 Lx, ConnectX-7 BlueField, BlueField-2, and BlueField-3.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rxq_pkt_pad_en</span></code> parameter [int]</p>
+<p>A nonzero value enables padding Rx packet to the size of cacheline on PCI
+transaction. This feature would waste PCI bandwidth but could improve
+performance by avoiding partial cacheline write which may cause costly
+read-modify-copy in memory transaction on some architectures. Disabled by
+default.</p>
+<p>Supported on:</p>
+<ul class="simple">
+<li><p>x86_64 with ConnectX-4, ConnectX-4 Lx, ConnectX-5, ConnectX-6, ConnectX-6 Dx,
+ConnectX-6 Lx, ConnectX-7, BlueField, BlueField-2, and BlueField-3.</p></li>
+<li><p>POWER8 and ARMv8 with ConnectX-4 Lx, ConnectX-5, ConnectX-6, ConnectX-6 Dx,
+ConnectX-6 Lx, ConnectX-7, BlueField, BlueField-2, and BlueField-3.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">delay_drop</span></code> parameter [int]</p>
+<p>Bitmask value for the Rx queue delay drop attribute. Bit 0 is used for the
+standard Rx queue and bit 1 is used for the hairpin Rx queue. By default, the
+delay drop is disabled for all Rx queues. It will be ignored if the port does
+not support the attribute even if it is enabled explicitly.</p>
+<p>The packets being received will not be dropped immediately when the WQEs are
+exhausted in a Rx queue with delay drop enabled.</p>
+<p>A timeout value is set in the driver to control the waiting time before
+dropping a packet. Once the timer is expired, the delay drop will be
+deactivated for all the Rx queues with this feature enable. To re-activate
+it, a rearming is needed and it is part of the kernel driver starting from
+MLNX_OFED 5.5.</p>
+<p>To enable / disable the delay drop rearming, the private flag <code class="docutils literal notranslate"><span class="pre">dropless_rq</span></code>
+can be set and queried via ethtool:</p>
+<ul class="simple">
+<li><p>ethtool –set-priv-flags &lt;netdev&gt; dropless_rq on (/ off)</p></li>
+<li><p>ethtool –show-priv-flags &lt;netdev&gt;</p></li>
+</ul>
+<p>The configuration flag is global per PF and can only be set on the PF, once
+it is on, all the VFs’, SFs’ and representors’ Rx queues will share the timer
+and rearming.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mprq_en</span></code> parameter [int]</p>
+<p>A nonzero value enables configuring Multi-Packet Rx queues. Rx queue is
+configured as Multi-Packet RQ if the total number of Rx queues is
+<code class="docutils literal notranslate"><span class="pre">rxqs_min_mprq</span></code> or more. Disabled by default.</p>
+<p>Multi-Packet Rx Queue (MPRQ a.k.a Striding RQ) can further save PCIe bandwidth
+by posting a single large buffer for multiple packets. Instead of posting a
+buffers per a packet, one large buffer is posted in order to receive multiple
+packets on the buffer. A MPRQ buffer consists of multiple fixed-size strides
+and each stride receives one packet. MPRQ can improve throughput for
+small-packet traffic.</p>
+<p>When MPRQ is enabled, MTU can be larger than the size of
+user-provided mbuf even if RTE_ETH_RX_OFFLOAD_SCATTER isn’t enabled. PMD will
+configure large stride size enough to accommodate MTU as long as
+device allows. Note that this can waste system memory compared to enabling Rx
+scatter and multi-segment packet.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mprq_log_stride_num</span></code> parameter [int]</p>
+<p>Log 2 of the number of strides for Multi-Packet Rx queue. Configuring more
+strides can reduce PCIe traffic further. If configured value is not in the
+range of device capability, the default value will be set with a warning
+message. The default value is 4 which is 16 strides per a buffer, valid only
+if <code class="docutils literal notranslate"><span class="pre">mprq_en</span></code> is set.</p>
+<p>The size of Rx queue should be bigger than the number of strides.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mprq_log_stride_size</span></code> parameter [int]</p>
+<p>Log 2 of the size of a stride for Multi-Packet Rx queue. Configuring a smaller
+stride size can save some memory and reduce probability of a depletion of all
+available strides due to unreleased packets by an application. If configured
+value is not in the range of device capability, the default value will be set
+with a warning message. The default value is 11 which is 2048 bytes per a
+stride, valid only if <code class="docutils literal notranslate"><span class="pre">mprq_en</span></code> is set. With <code class="docutils literal notranslate"><span class="pre">mprq_log_stride_size</span></code> set
+it is possible for a packet to span across multiple strides. This mode allows
+support of jumbo frames (9K) with MPRQ. The memcopy of some packets (or part
+of a packet if Rx scatter is configured) may be required in case there is no
+space left for a head room at the end of a stride which incurs some
+performance penalty.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mprq_max_memcpy_len</span></code> parameter [int]</p>
+<p>The maximum length of packet to memcpy in case of Multi-Packet Rx queue. Rx
+packet is mem-copied to a user-provided mbuf if the size of Rx packet is less
+than or equal to this parameter. Otherwise, PMD will attach the Rx packet to
+the mbuf by external buffer attachment - <code class="docutils literal notranslate"><span class="pre">rte_pktmbuf_attach_extbuf()</span></code>.
+A mempool for external buffers will be allocated and managed by PMD. If Rx
+packet is externally attached, ol_flags field of the mbuf will have
+RTE_MBUF_F_EXTERNAL and this flag must be preserved. <code class="docutils literal notranslate"><span class="pre">RTE_MBUF_HAS_EXTBUF()</span></code>
+checks the flag. The default value is 128, valid only if <code class="docutils literal notranslate"><span class="pre">mprq_en</span></code> is set.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rxqs_min_mprq</span></code> parameter [int]</p>
+<p>Configure Rx queues as Multi-Packet RQ if the total number of Rx queues is
+greater or equal to this value. The default value is 12, valid only if
+<code class="docutils literal notranslate"><span class="pre">mprq_en</span></code> is set.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_inline</span></code> parameter [int]</p>
+<p>Amount of data to be inlined during TX operations. This parameter is
+deprecated and converted to the new parameter <code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> providing
+partial compatibility.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txqs_min_inline</span></code> parameter [int]</p>
+<p>Enable inline data send only when the number of TX queues is greater or equal
+to this value.</p>
+<p>This option should be used in combination with <code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> and
+<code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> below and does not affect <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> settings above.</p>
+<p>If this option is not specified the default value 16 is used for BlueField
+and 8 for other platforms</p>
+<p>The data inlining consumes the CPU cycles, so this option is intended to
+auto enable inline data if we have enough Tx queues, which means we have
+enough CPU cores and PCI bandwidth is getting more critical and CPU
+is not supposed to be bottleneck anymore.</p>
+<p>The copying data into WQE improves latency and can improve PPS performance
+when PCI back pressure is detected and may be useful for scenarios involving
+heavy traffic on many queues.</p>
+<p>Because additional software logic is necessary to handle this mode, this
+option should be used with care, as it may lower performance when back
+pressure is not expected.</p>
+<p>If inline data are enabled it may affect the maximal size of Tx queue in
+descriptors because the inline data increase the descriptor size and
+queue size limits supported by hardware may be exceeded.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> parameter [int]</p>
+<p>Minimal amount of data to be inlined into WQE during Tx operations. NICs
+may require this minimal data amount to operate correctly. The exact value
+may depend on NIC operation mode, requested offloads, etc. It is strongly
+recommended to omit this parameter and use the default values. Anyway,
+applications using this parameter should take into consideration that
+specifying an inconsistent value may prevent the NIC from sending packets.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> key is present the specified value (may be aligned
+by the driver in order not to exceed the limits and provide better descriptor
+space utilization) will be used by the driver and it is guaranteed that
+requested amount of data bytes are inlined into the WQE beside other inline
+settings. This key also may update <code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> value (default
+or specified explicitly in devargs) to reserve the space for inline data.</p>
+<p>If <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> key is not present, the value may be queried by the
+driver from the NIC via DevX if this feature is available. If there is no DevX
+enabled/supported the value 18 (supposing L2 header including VLAN) is set
+for ConnectX-4 and ConnectX-4 Lx, and 0 is set by default for ConnectX-5
+and newer NICs. If packet is shorter the <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> value, the entire
+packet is inlined.</p>
+<p>For ConnectX-4 NIC, driver does not allow specifying value below 18
+(minimal L2 header, including VLAN), error will be raised.</p>
+<p>For ConnectX-4 Lx NIC, it is allowed to specify values below 18, but
+it is not recommended and may prevent NIC from sending packets over
+some configurations.</p>
+<p>For ConnectX-4 and ConnectX-4 Lx NICs, automatically configured value
+is insufficient for some traffic, because they require at least all L2 headers
+to be inlined. For example, Q-in-Q adds 4 bytes to default 18 bytes
+of Ethernet and VLAN, thus <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code> must be set to 22.
+MPLS would add 4 bytes per label. Final value must account for all possible
+L2 encapsulation headers used in particular environment.</p>
+<p>Please, note, this minimal data inlining disengages eMPW feature (Enhanced
+Multi-Packet Write), because last one does not support partial packet inlining.
+This is not very critical due to minimal data inlining is mostly required
+by ConnectX-4 and ConnectX-4 Lx, these NICs do not support eMPW feature.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> parameter [int]</p>
+<p>Specifies the maximal packet length to be completely inlined into WQE
+Ethernet Segment for ordinary SEND method. If packet is larger than specified
+value, the packet data won’t be copied by the driver at all, data buffer
+is addressed with a pointer. If packet length is less or equal all packet
+data will be copied into WQE. This may improve PCI bandwidth utilization for
+short packets significantly but requires the extra CPU cycles.</p>
+<p>The data inline feature is controlled by number of Tx queues, if number of Tx
+queues is larger than <code class="docutils literal notranslate"><span class="pre">txqs_min_inline</span></code> key parameter, the inline feature
+is engaged, if there are not enough Tx queues (which means not enough CPU cores
+and CPU resources are scarce), data inline is not performed by the driver.
+Assigning <code class="docutils literal notranslate"><span class="pre">txqs_min_inline</span></code> with zero always enables the data inline.</p>
+<p>The default <code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> value is 290. The specified value may be adjusted
+by the driver in order not to exceed the limit (930 bytes) and to provide better
+WQE space filling without gaps, the adjustment is reflected in the debug log.
+Also, the default value (290) may be decreased in run-time if the large transmit
+queue size is requested and hardware does not support enough descriptor
+amount, in this case warning is emitted. If <code class="docutils literal notranslate"><span class="pre">txq_inline_max</span></code> key is
+specified and requested inline settings can not be satisfied then error
+will be raised.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> parameter [int]</p>
+<p>Specifies the maximal packet length to be completely inlined into WQE for
+Enhanced MPW method. If packet is large the specified value, the packet data
+won’t be copied, and data buffer is addressed with pointer. If packet length
+is less or equal, all packet data will be copied into WQE. This may improve PCI
+bandwidth utilization for short packets significantly but requires the extra
+CPU cycles.</p>
+<p>The data inline feature is controlled by number of TX queues, if number of Tx
+queues is larger than <code class="docutils literal notranslate"><span class="pre">txqs_min_inline</span></code> key parameter, the inline feature
+is engaged, if there are not enough Tx queues (which means not enough CPU cores
+and CPU resources are scarce), data inline is not performed by the driver.
+Assigning <code class="docutils literal notranslate"><span class="pre">txqs_min_inline</span></code> with zero always enables the data inline.</p>
+<p>The default <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> value is 268. The specified value may be adjusted
+by the driver in order not to exceed the limit (930 bytes) and to provide better
+WQE space filling without gaps, the adjustment is reflected in the debug log.
+Due to multiple packets may be included to the same WQE with Enhanced Multi
+Packet Write Method and overall WQE size is limited it is not recommended to
+specify large values for the <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code>. Also, the default value (268)
+may be decreased in run-time if the large transmit queue size is requested
+and hardware does not support enough descriptor amount, in this case warning
+is emitted. If <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> key is  specified and requested inline
+settings can not be satisfied then error will be raised.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txqs_max_vec</span></code> parameter [int]</p>
+<p>Enable vectorized Tx only when the number of TX queues is less than or
+equal to this value. This parameter is deprecated and ignored, kept
+for compatibility issue to not prevent driver from probing.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_mpw_hdr_dseg_en</span></code> parameter [int]</p>
+<p>A nonzero value enables including two pointers in the first block of TX
+descriptor. The parameter is deprecated and ignored, kept for compatibility
+issue.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_max_inline_len</span></code> parameter [int]</p>
+<p>Maximum size of packet to be inlined. This limits the size of packet to
+be inlined. If the size of a packet is larger than configured value, the
+packet isn’t inlined even though there’s enough space remained in the
+descriptor. Instead, the packet is included with pointer. This parameter
+is deprecated and converted directly to <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> providing full
+compatibility. Valid only if eMPW feature is engaged.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">txq_mpw_en</span></code> parameter [int]</p>
+<p>A nonzero value enables Enhanced Multi-Packet Write (eMPW) for ConnectX-5,
+ConnectX-6, ConnectX-6 Dx, ConnectX-6 Lx, ConnectX-7, BlueField, BlueField-2
+BlueField-3. eMPW allows the Tx burst function to pack up multiple packets
+in a single descriptor session in order to save PCI bandwidth
+and improve performance at the cost of a slightly higher CPU usage.
+When <code class="docutils literal notranslate"><span class="pre">txq_inline_mpw</span></code> is set along with <code class="docutils literal notranslate"><span class="pre">txq_mpw_en</span></code>,
+Tx burst function copies entire packet data on to Tx descriptor
+instead of including pointer of packet.</p>
+<p>The Enhanced Multi-Packet Write feature is enabled by default if NIC supports
+it, can be disabled by explicit specifying 0 value for <code class="docutils literal notranslate"><span class="pre">txq_mpw_en</span></code> option.
+Also, if minimal data inlining is requested by non-zero <code class="docutils literal notranslate"><span class="pre">txq_inline_min</span></code>
+option or reported by the NIC, the eMPW feature is disengaged.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_db_nc</span></code> parameter [int]</p>
+<p>This parameter name is deprecated and ignored.
+The new name for this parameter is <code class="docutils literal notranslate"><span class="pre">sq_db_nc</span></code>.
+See <a class="reference internal" href="../platform/mlx5.html#mlx5-common-driver-options"><span class="std std-ref">common driver options</span></a>.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_pp</span></code> parameter [int]</p>
+<p>If a nonzero value is specified the driver creates all necessary internal
+objects to provide accurate packet send scheduling on mbuf timestamps.
+The positive value specifies the scheduling granularity in nanoseconds,
+the packet send will be accurate up to specified digits. The allowed range is
+from 500 to 1 million of nanoseconds. The negative value specifies the module
+of granularity and engages the special test mode the check the schedule rate.
+By default (if the <code class="docutils literal notranslate"><span class="pre">tx_pp</span></code> is not specified) send scheduling on timestamps
+feature is disabled.</p>
+<p>Starting with ConnectX-7 the capability to schedule traffic directly
+on timestamp specified in descriptor is provided,
+no extra objects are needed anymore and scheduling capability
+is advertised and handled regardless <code class="docutils literal notranslate"><span class="pre">tx_pp</span></code> parameter presence.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_skew</span></code> parameter [int]</p>
+<p>The parameter adjusts the send packet scheduling on timestamps and represents
+the average delay between beginning of the transmitting descriptor processing
+by the hardware and appearance of actual packet data on the wire. The value
+should be provided in nanoseconds and is valid only if <code class="docutils literal notranslate"><span class="pre">tx_pp</span></code> parameter is
+specified. The default value is zero.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_vec_en</span></code> parameter [int]</p>
+<p>A nonzero value enables Tx vector on ConnectX-5, ConnectX-6, ConnectX-6 Dx,
+ConnectX-6 Lx, ConnectX-7, BlueField, BlueField-2, and BlueField-3 NICs
+if the number of global Tx queues on the port is less than <code class="docutils literal notranslate"><span class="pre">txqs_max_vec</span></code>.
+The parameter is deprecated and ignored.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_vec_en</span></code> parameter [int]</p>
+<p>A nonzero value enables Rx vector if the port is not configured in
+multi-segment otherwise this parameter is ignored.</p>
+<p>Enabled by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vf_nl_en</span></code> parameter [int]</p>
+<p>A nonzero value enables Netlink requests from the VF to add/remove MAC
+addresses or/and enable/disable promiscuous/all multicast on the Netdevice.
+Otherwise the relevant configuration must be run with Linux iproute2 tools.
+This is a prerequisite to receive this kind of traffic.</p>
+<p>Enabled by default, valid only on VF devices ignored otherwise.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">l3_vxlan_en</span></code> parameter [int]</p>
+<p>A nonzero value allows L3 VXLAN and VXLAN-GPE flow creation. To enable
+L3 VXLAN or VXLAN-GPE, users has to configure firmware and enable this
+parameter. This is a prerequisite to receive this kind of traffic.</p>
+<p>Disabled by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dv_xmeta_en</span></code> parameter [int]</p>
+<p>A nonzero value enables extensive flow metadata support if device is
+capable and driver supports it. This can enable extensive support of
+<code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code> item of <code class="docutils literal notranslate"><span class="pre">rte_flow</span></code>. The newly introduced
+<code class="docutils literal notranslate"><span class="pre">SET_TAG</span></code> and <code class="docutils literal notranslate"><span class="pre">SET_META</span></code> actions do not depend on <code class="docutils literal notranslate"><span class="pre">dv_xmeta_en</span></code>.</p>
+<p>There are some possible configurations, depending on parameter value:</p>
+<ul class="simple">
+<li><p>0, this is default value, defines the legacy mode, the <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and
+<code class="docutils literal notranslate"><span class="pre">META</span></code> related actions and items operate only within NIC Tx and
+NIC Rx steering domains, no <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code> information crosses
+the domain boundaries. The <code class="docutils literal notranslate"><span class="pre">MARK</span></code> item is 24 bits wide, the <code class="docutils literal notranslate"><span class="pre">META</span></code>
+item is 32 bits wide and match supported on egress only.</p></li>
+<li><p>1, this engages extensive metadata mode, the <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code>
+related actions and items operate within all supported steering domains,
+including FDB, <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code> information may cross the domain
+boundaries. The <code class="docutils literal notranslate"><span class="pre">MARK</span></code> item is 24 bits wide, the <code class="docutils literal notranslate"><span class="pre">META</span></code> item width
+depends on kernel and firmware configurations and might be 0, 16 or
+32 bits. Within NIC Tx domain <code class="docutils literal notranslate"><span class="pre">META</span></code> data width is 32 bits for
+compatibility, the actual width of data transferred to the FDB domain
+depends on kernel configuration and may be vary. The actual supported
+width can be retrieved in runtime by series of rte_flow_validate()
+trials.</p></li>
+<li><p>2, this engages extensive metadata mode, the <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code>
+related actions and items operate within all supported steering domains,
+including FDB, <code class="docutils literal notranslate"><span class="pre">MARK</span></code> and <code class="docutils literal notranslate"><span class="pre">META</span></code> information may cross the domain
+boundaries. The <code class="docutils literal notranslate"><span class="pre">META</span></code> item is 32 bits wide, the <code class="docutils literal notranslate"><span class="pre">MARK</span></code> item width
+depends on kernel and firmware configurations and might be 0, 16 or
+24 bits. The actual supported width can be retrieved in runtime by
+series of rte_flow_validate() trials.</p></li>
+<li><p>3, this engages tunnel offload mode. In E-Switch configuration, that
+mode implicitly activates <code class="docutils literal notranslate"><span class="pre">dv_xmeta_en=1</span></code>.</p></li>
+<li><p>4, this mode is only supported in HWS (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>).
+The Rx/Tx metadata with 32b width copy between FDB and NIC is supported.
+The mark is only supported in NIC and there is no copy supported.</p></li>
+</ul>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 24%" />
+<col style="width: 24%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Mode</p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">MARK</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">META</span></code></p></th>
+<th class="head"><p><code class="docutils literal notranslate"><span class="pre">META</span></code> Tx</p></th>
+<th class="head"><p>FDB/Through</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>0</p></td>
+<td><p>24 bits</p></td>
+<td><p>32 bits</p></td>
+<td><p>32 bits</p></td>
+<td><p>no</p></td>
+</tr>
+<tr class="row-odd"><td><p>1</p></td>
+<td><p>24 bits</p></td>
+<td><p>vary 0-32</p></td>
+<td><p>32 bits</p></td>
+<td><p>yes</p></td>
+</tr>
+<tr class="row-even"><td><p>2</p></td>
+<td><p>vary 0-24</p></td>
+<td><p>32 bits</p></td>
+<td><p>32 bits</p></td>
+<td><p>yes</p></td>
+</tr>
+</tbody>
+</table>
+<p>If there is no E-Switch configuration the <code class="docutils literal notranslate"><span class="pre">dv_xmeta_en</span></code> parameter is
+ignored and the device is configured to operate in legacy mode (0).</p>
+<p>Disabled by default (set to 0).</p>
+<p>The Direct Verbs/Rules (engaged with <code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> = 1) supports all
+of the extensive metadata features. The legacy Verbs supports FLAG and
+MARK metadata actions over NIC Rx steering domain only.</p>
+<p>Setting META value to zero in flow action means there is no item provided
+and receiving datapath will not report in mbufs the metadata are present.
+Setting MARK value to zero in flow action means the zero FDIR ID value
+will be reported on packet receiving.</p>
+<p>For the MARK action the last 16 values in the full range are reserved for
+internal PMD purposes (to emulate FLAG action). The valid range for the
+MARK action values is 0-0xFFEF for the 16-bit mode and 0-0xFFFFEF
+for the 24-bit mode, the flows with the MARK action value outside
+the specified range will be rejected.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dv_flow_en</span></code> parameter [int]</p>
+<p>Value 0 means legacy Verbs flow offloading.</p>
+<p>Value 1 enables the DV flow steering assuming it is supported by the
+driver (requires rdma-core 24 or higher).</p>
+<p>Value 2 enables the WQE based hardware steering.
+In this mode, only queue-based flow management is supported.</p>
+<p>It is configured by default to 1 (DV flow steering) if supported.
+Otherwise, the value is 0 which indicates legacy Verbs flow offloading.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">dv_esw_en</span></code> parameter [int]</p>
+<p>A nonzero value enables E-Switch using Direct Rules.</p>
+<p>Enabled by default if supported.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">fdb_def_rule_en</span></code> parameter [int]</p>
+<p>A non-zero value enables to create a dedicated rule on E-Switch root table.
+This dedicated rule forwards all incoming packets into table 1.
+Other rules will be created in E-Switch table original table level plus one,
+to improve the flow insertion rate due to skipping root table managed by firmware.
+If set to 0, all rules will be created on the original E-Switch table level.</p>
+<p>By default, the PMD will set this value to 1.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lacp_by_user</span></code> parameter [int]</p>
+<p>A nonzero value enables the control of LACP traffic by the user application.
+When a bond exists in the driver, by default it should be managed by the
+kernel and therefore LACP traffic should be steered to the kernel.
+If this devarg is set to 1 it will allow the user to manage the bond by
+itself and not steer LACP traffic to the kernel.</p>
+<p>Disabled by default (set to 0).</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">representor</span></code> parameter [list]</p>
+<p>This parameter can be used to instantiate DPDK Ethernet devices from
+existing port (PF, VF or SF) representors configured on the device.</p>
+<p>It is a standard parameter whose format is described in
+<a class="reference internal" href="../prog_guide/poll_mode_drv.html#ethernet-device-standard-device-arguments"><span class="std std-ref">Ethernet Device Standard Device Arguments</span></a>.</p>
+<p>For instance, to probe VF port representors 0 through 2:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;PCI_BDF&gt;,representor=vf[0-2]
+</pre></div>
+</div>
+<p>To probe SF port representors 0 through 2:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;PCI_BDF&gt;,representor=sf[0-2]
+</pre></div>
+</div>
+<p>To probe VF port representors 0 through 2 on both PFs of bonding device:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&lt;Primary_PCI_BDF&gt;,representor=pf[0,1]vf[0-2]
+</pre></div>
+</div>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">repr_matching_en</span></code> parameter [int]</p>
+<ul class="simple">
+<li><p>0. If representor matching is disabled, then there will be no implicit
+item added. As a result, ingress flow rules will match traffic
+coming to any port, not only the port on which flow rule is created.
+Because of that, default flow rules for ingress traffic cannot be created
+and port starts in isolated mode by default. Port cannot be switched back
+to non-isolated mode.</p></li>
+<li><p>1. If representor matching is enabled (default setting),
+then each ingress pattern template has an implicit REPRESENTED_PORT
+item added. Flow rules based on this pattern template will match
+the vport associated with port on which rule is created.</p></li>
+</ul>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">max_dump_files_num</span></code> parameter [int]</p>
+<p>The maximum number of files per PMD entity that may be created for debug information.
+The files will be created in /var/log directory or in current directory.</p>
+<p>set to 128 by default.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lro_timeout_usec</span></code> parameter [int]</p>
+<p>The maximum allowed duration of an LRO session, in micro-seconds.
+PMD will set the nearest value supported by HW, which is not bigger than
+the input <code class="docutils literal notranslate"><span class="pre">lro_timeout_usec</span></code> value.
+If this parameter is not specified, by default PMD will set
+the smallest value supported by HW.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hp_buf_log_sz</span></code> parameter [int]</p>
+<p>The total data buffer size of a hairpin queue (logarithmic form), in bytes.
+PMD will set the data buffer size to 2 ** <code class="docutils literal notranslate"><span class="pre">hp_buf_log_sz</span></code>, both for RX &amp; TX.
+The capacity of the value is specified by the firmware and the initialization
+will get a failure if it is out of scope.
+The range of the value is from 11 to 19 right now, and the supported frame
+size of a single packet for hairpin is from 512B to 128KB. It might change if
+different firmware release is being used. By using a small value, it could
+reduce memory consumption but not work with a large frame. If the value is
+too large, the memory consumption will be high and some potential performance
+degradation will be introduced.
+By default, the PMD will set this value to 16, which means that 9KB jumbo
+frames will be supported.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">reclaim_mem_mode</span></code> parameter [int]</p>
+<p>Cache some resources in flow destroy will help flow recreation more efficient.
+While some systems may require the all the resources can be reclaimed after
+flow destroyed.
+The parameter <code class="docutils literal notranslate"><span class="pre">reclaim_mem_mode</span></code> provides the option for user to configure
+if the resource cache is needed or not.</p>
+<p>There are three options to choose:</p>
+<ul class="simple">
+<li><p>0. It means the flow resources will be cached as usual. The resources will
+be cached, helpful with flow insertion rate.</p></li>
+<li><ol class="arabic simple">
+<li><p>It will only enable the DPDK PMD level resources reclaim.</p></li>
+</ol>
+</li>
+<li><p>2. Both DPDK PMD level and rdma-core low level will be configured as
+reclaimed mode.</p></li>
+</ul>
+<p>By default, the PMD will set this value to 0.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">decap_en</span></code> parameter [int]</p>
+<p>Some devices do not support FCS (frame checksum) scattering for
+tunnel-decapsulated packets.
+If set to 0, this option forces the FCS feature and rejects tunnel
+decapsulation in the flow engine for such devices.</p>
+<p>By default, the PMD will set this value to 1.</p>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">allow_duplicate_pattern</span></code> parameter [int]</p>
+<p>There are two options to choose:</p>
+<ul class="simple">
+<li><p>0. Prevent insertion of rules with the same pattern items on non-root table.
+In this case, only the first rule is inserted and the following rules are
+rejected and error code EEXIST is returned.</p></li>
+<li><p>1. Allow insertion of rules with the same pattern items.
+In this case, all rules are inserted but only the first rule takes effect,
+the next rule takes effect only if the previous rules are deleted.</p></li>
+</ul>
+<p>By default, the PMD will set this value to 1.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="multiport-e-switch">
+<h2><span class="section-number">39.8. </span>Multiport E-Switch</h2>
+<p>In standard deployments of NVIDIA ConnectX and BlueField HCAs, where embedded switch is enabled,
+each physical port is associated with a single switching domain.
+Only PFs, VFs and SFs related to that physical port are connected to this domain
+and offloaded flow rules are allowed to steer traffic only between the entities in the given domain.</p>
+<p>The following diagram pictures the high level overview of this architecture:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  .---. .------. .------. .---. .------. .------.
+  |PF0| |PF0VFi| |PF0SFi| |PF1| |PF1VFi| |PF1SFi|
+  .-+-. .--+---. .--+---. .-+-. .--+---. .--+---.
+    |      |        |       |      |        |
+.---|------|--------|-------|------|--------|---------.
+|   |      |        |       |      |        |      HCA|
+| .-+------+--------+---. .-+------+--------+---.     |
+| |                     | |                     |     |
+| |      E-Switch       | |     E-Switch        |     |
+| |         PF0         | |        PF1          |     |
+| |                     | |                     |     |
+| .---------+-----------. .--------+------------.     |
+|           |                      |                  |
+.--------+--+---+---------------+--+---+--------------.
+         |      |               |      |
+         | PHY0 |               | PHY1 |
+         |      |               |      |
+         .------.               .------.
+</pre></div>
+</div>
+<p>Multiport E-Switch is a deployment scenario where:</p>
+<ul class="simple">
+<li><p>All physical ports, PFs, VFs and SFs share the same switching domain.</p></li>
+<li><p>Each physical port gets a separate representor port.</p></li>
+<li><p>Traffic can be matched or forwarded explicitly between any of the entities
+connected to the domain.</p></li>
+</ul>
+<p>The following diagram pictures the high level overview of this architecture:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>  .---. .------. .------. .---. .------. .------.
+  |PF0| |PF0VFi| |PF0SFi| |PF1| |PF1VFi| |PF1SFi|
+  .-+-. .--+---. .--+---. .-+-. .--+---. .--+---.
+    |      |        |       |      |        |
+.---|------|--------|-------|------|--------|---------.
+|   |      |        |       |      |        |      HCA|
+| .-+------+--------+-------+------+--------+---.     |
+| |                                             |     |
+| |                   Shared                    |     |
+| |                  E-Switch                   |     |
+| |                                             |     |
+| .---------+----------------------+------------.     |
+|           |                      |                  |
+.--------+--+---+---------------+--+---+--------------.
+         |      |               |      |
+         | PHY0 |               | PHY1 |
+         |      |               |      |
+         .------.               .------.
+</pre></div>
+</div>
+<p>In this deployment a single application can control the switching and forwarding behavior for all
+entities on the HCA.</p>
+<p>With this configuration, mlx5 PMD supports:</p>
+<ul class="simple">
+<li><p>matching traffic coming from physical port, PF, VF or SF using REPRESENTED_PORT items;</p></li>
+<li><p>forwarding traffic to physical port, PF, VF or SF using REPRESENTED_PORT actions;</p></li>
+</ul>
+<section id="requirements">
+<h3><span class="section-number">39.8.1. </span>Requirements</h3>
+<p>Supported HCAs:</p>
+<ul class="simple">
+<li><p>ConnectX family: ConnectX-6 Dx and above.</p></li>
+<li><p>BlueField family: BlueField-2 and above.</p></li>
+<li><p>FW version: at least <code class="docutils literal notranslate"><span class="pre">XX.37.1014</span></code>.</p></li>
+</ul>
+<p>Supported mlx5 kernel modules versions:</p>
+<ul class="simple">
+<li><p>Upstream Linux - from version 6.3.</p></li>
+<li><p>Modules packaged in MLNX_OFED - from version v23.04-0.5.3.3.</p></li>
+</ul>
+</section>
+<section id="id1">
+<h3><span class="section-number">39.8.2. </span>Configuration</h3>
+<ol class="arabic">
+<li><p>Apply required FW configuration:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo mlxconfig -d /dev/mst/mt4125_pciconf0 set LAG_RESOURCE_ALLOCATION=1
+</pre></div>
+</div>
+</li>
+<li><p>Reset FW or cold reboot the host.</p></li>
+<li><p>Switch E-Switch mode on all of the PFs to <code class="docutils literal notranslate"><span class="pre">switchdev</span></code> mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo devlink dev eswitch set pci/0000:08:00.0 mode switchdev
+sudo devlink dev eswitch set pci/0000:08:00.1 mode switchdev
+</pre></div>
+</div>
+</li>
+<li><p>Enable Multiport E-Switch on all of the PFs:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>sudo devlink dev param set pci/0000:08:00.0 name esw_multiport value true cmode runtime
+sudo devlink dev param set pci/0000:08:00.1 name esw_multiport value true cmode runtime
+</pre></div>
+</div>
+</li>
+<li><p>Configure required number of VFs/SFs:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>echo 4 | sudo tee /sys/class/net/eth2/device/sriov_numvfs
+echo 4 | sudo tee /sys/class/net/eth3/device/sriov_numvfs
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd and verify that all ports are visible:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ sudo dpdk-testpmd -a 08:00.0,dv_flow_en=2,representor=pf0-1vf0-3 -- -i
+testpmd&gt; show port summary all
+Number of available ports: 10
+Port MAC Address       Name         Driver         Status   Link
+0    E8:EB:D5:18:22:BC 08:00.0_p0   mlx5_pci       up       200 Gbps
+1    E8:EB:D5:18:22:BD 08:00.0_p1   mlx5_pci       up       200 Gbps
+2    D2:F6:43:0B:9E:19 08:00.0_representor_c0pf0vf0 mlx5_pci       up       200 Gbps
+3    E6:42:27:B7:68:BD 08:00.0_representor_c0pf0vf1 mlx5_pci       up       200 Gbps
+4    A6:5B:7F:8B:B8:47 08:00.0_representor_c0pf0vf2 mlx5_pci       up       200 Gbps
+5    12:93:50:45:89:02 08:00.0_representor_c0pf0vf3 mlx5_pci       up       200 Gbps
+6    06:D3:B2:79:FE:AC 08:00.0_representor_c0pf1vf0 mlx5_pci       up       200 Gbps
+7    12:FC:08:E4:C2:CA 08:00.0_representor_c0pf1vf1 mlx5_pci       up       200 Gbps
+8    8E:A9:9A:D0:35:4C 08:00.0_representor_c0pf1vf2 mlx5_pci       up       200 Gbps
+9    E6:35:83:1F:B0:A9 08:00.0_representor_c0pf1vf3 mlx5_pci       up       200 Gbps
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="id2">
+<h3><span class="section-number">39.8.3. </span>Limitations</h3>
+<ul>
+<li><p>Multiport E-Switch is not supported on Windows.</p></li>
+<li><p>Multiport E-Switch is supported only with HW Steering flow engine (<code class="docutils literal notranslate"><span class="pre">dv_flow_en=2</span></code>).</p></li>
+<li><p>Matching traffic coming from a physical port and forwarding it to a physical port
+(either the same or other one) is not supported.</p>
+<p>In order to achieve such a functionality, an application has to setup hairpin queues
+between physical port representors and forward the traffic using hairpin queues.</p>
+</li>
+</ul>
+</section>
+</section>
+<section id="sub-function">
+<h2><span class="section-number">39.9. </span>Sub-Function</h2>
+<p>See <a class="reference internal" href="../platform/mlx5.html#mlx5-sub-function"><span class="std std-ref">Sub-Function with MLNX_OFED/EN</span></a>.</p>
+<section id="sub-function-representor-support">
+<h3><span class="section-number">39.9.1. </span>Sub-Function representor support</h3>
+<p>A SF netdev supports E-Switch representation offload
+similar to PF and VF representors.
+Use &lt;sfnum&gt; to probe SF representor:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; port attach &lt;PCI_BDF&gt;,representor=sf&lt;sfnum&gt;,dv_flow_en=1
+</pre></div>
+</div>
+</section>
+</section>
+<section id="performance-tuning">
+<h2><span class="section-number">39.10. </span>Performance tuning</h2>
+<ol class="arabic">
+<li><p>Configure aggressive CQE Zipping for maximum performance:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;mst device&gt; s CQE_COMPRESSION=1
+</pre></div>
+</div>
+<p>To set it back to the default CQE Zipping mode use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>mlxconfig -d &lt;mst device&gt; s CQE_COMPRESSION=0
+</pre></div>
+</div>
+</li>
+<li><p>In case of virtualization:</p>
+<ul class="simple">
+<li><p>Make sure that hypervisor kernel is 3.16 or newer.</p></li>
+<li><p>Configure boot with <code class="docutils literal notranslate"><span class="pre">iommu=pt</span></code>.</p></li>
+<li><p>Use 1G huge pages.</p></li>
+<li><p>Make sure to allocate a VM on huge pages.</p></li>
+<li><p>Make sure to set CPU pinning.</p></li>
+</ul>
+</li>
+<li><p>Use the CPU near local NUMA node to which the PCIe adapter is connected,
+for better performance. For VMs, verify that the right CPU
+and NUMA node are pinned according to the above. Run:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>lstopo-no-graphics --merge
+</pre></div>
+</div>
+<p>to identify the NUMA node to which the PCIe adapter is connected.</p>
+</li>
+<li><p>If more than one adapter is used, and root complex capabilities allow
+to put both adapters on the same NUMA node without PCI bandwidth degradation,
+it is recommended to locate both adapters on the same NUMA node.
+This in order to forward packets from one to the other without
+NUMA performance penalty.</p></li>
+<li><p>Disable pause frames:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ethtool -A &lt;netdev&gt; rx off tx off
+</pre></div>
+</div>
+</li>
+<li><p>Verify IO non-posted prefetch is disabled by default. This can be checked
+via the BIOS configuration. Please contact you server provider for more
+information about the settings.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On some machines, depends on the machine integrator, it is beneficial
+to set the PCI max read request parameter to 1K. This can be
+done in the following way:</p>
+<p>To query the read request size use:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>setpci -s &lt;NIC PCI address&gt; 68.w
+</pre></div>
+</div>
+<p>If the output is different than 3XXX, set it by:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>setpci -s &lt;NIC PCI address&gt; 68.w=3XXX
+</pre></div>
+</div>
+<p>The XXX can be different on different systems. Make sure to configure
+according to the setpci output.</p>
+</div>
+</li>
+<li><p>To minimize overhead of searching Memory Regions:</p>
+<ul class="simple">
+<li><p>‘–socket-mem’ is recommended to pin memory by predictable amount.</p></li>
+<li><p>Configure per-lcore cache when creating Mempools for packet buffer.</p></li>
+<li><p>Refrain from dynamically allocating/freeing memory in run-time.</p></li>
+</ul>
+</li>
+</ol>
+</section>
+<section id="rx-burst-functions">
+<h2><span class="section-number">39.11. </span>Rx burst functions</h2>
+<p>There are multiple Rx burst functions with different advantages and limitations.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-number">Table 39.1 </span><span class="caption-text">Rx burst functions</span></caption>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 29%" />
+<col style="width: 11%" />
+<col style="width: 21%" />
+<col style="width: 7%" />
+<col style="width: 9%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><div class="line-block">
+<div class="line">Function Name</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line">Enabler</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line">Scatter</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line">Error Recovery</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line">CQE</div>
+<div class="line">comp</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line">Large</div>
+<div class="line">MTU</div>
+</div>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>rx_burst</p></td>
+<td><p>rx_vec_en=0</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>rx_burst_vec</p></td>
+<td><p>rx_vec_en=1 (default)</p></td>
+<td><p>No</p></td>
+<td><p>if CQE comp off</p></td>
+<td><p>Yes</p></td>
+<td><p>No</p></td>
+</tr>
+<tr class="row-even"><td><p>rx_burst_mprq</p></td>
+<td><div class="line-block">
+<div class="line">mprq_en=1</div>
+<div class="line">RxQs &gt;= rxqs_min_mprq</div>
+</div>
+</td>
+<td><p>No</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+<tr class="row-odd"><td><p>rx_burst_mprq_vec</p></td>
+<td><div class="line-block">
+<div class="line">rx_vec_en=1 (default)</div>
+<div class="line">mprq_en=1</div>
+<div class="line">RxQs &gt;= rxqs_min_mprq</div>
+</div>
+</td>
+<td><p>No</p></td>
+<td><p>if CQE comp off</p></td>
+<td><p>Yes</p></td>
+<td><p>Yes</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="supported-hardware-offloads">
+<span id="mlx5-offloads-support"></span><h2><span class="section-number">39.12. </span>Supported hardware offloads</h2>
+<p>Below tables show offload support depending on hardware, firmware,
+and Linux software support.</p>
+<p>The <a class="reference internal" href="../platform/mlx5.html#mlx5-linux-prerequisites"><span class="std std-ref">Linux prerequisites</span></a>
+are Linux kernel and rdma-core libraries.
+These dependencies are also packaged in MLNX_OFED or MLNX_EN,
+shortened below as “OFED”.</p>
+<table class="docutils align-default" id="id4">
+<caption><span class="caption-number">Table 39.2 </span><span class="caption-text">Minimal SW/HW versions for queue offloads</span></caption>
+<colgroup>
+<col style="width: 23%" />
+<col style="width: 8%" />
+<col style="width: 8%" />
+<col style="width: 15%" />
+<col style="width: 8%" />
+<col style="width: 16%" />
+<col style="width: 21%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Offload</p></th>
+<th class="head"><p>DPDK</p></th>
+<th class="head"><p>Linux</p></th>
+<th class="head"><p>rdma-core</p></th>
+<th class="head"><p>OFED</p></th>
+<th class="head"><p>firmware</p></th>
+<th class="head"><p>hardware</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>common base</p></td>
+<td><p>17.11</p></td>
+<td><p>4.14</p></td>
+<td><p>16</p></td>
+<td><p>4.2-1</p></td>
+<td><p>12.21.1000</p></td>
+<td><p>ConnectX-4</p></td>
+</tr>
+<tr class="row-odd"><td><p>checksums</p></td>
+<td><p>17.11</p></td>
+<td><p>4.14</p></td>
+<td><p>16</p></td>
+<td><p>4.2-1</p></td>
+<td><p>12.21.1000</p></td>
+<td><p>ConnectX-4</p></td>
+</tr>
+<tr class="row-even"><td><p>Rx timestamp</p></td>
+<td><p>17.11</p></td>
+<td><p>4.14</p></td>
+<td><p>16</p></td>
+<td><p>4.2-1</p></td>
+<td><p>12.21.1000</p></td>
+<td><p>ConnectX-4</p></td>
+</tr>
+<tr class="row-odd"><td><p>TSO</p></td>
+<td><p>17.11</p></td>
+<td><p>4.14</p></td>
+<td><p>16</p></td>
+<td><p>4.2-1</p></td>
+<td><p>12.21.1000</p></td>
+<td><p>ConnectX-4</p></td>
+</tr>
+<tr class="row-even"><td><p>LRO</p></td>
+<td><p>19.08</p></td>
+<td><p>N/A</p></td>
+<td><p>N/A</p></td>
+<td><p>4.6-4</p></td>
+<td><p>16.25.6406</p></td>
+<td><p>ConnectX-5</p></td>
+</tr>
+<tr class="row-odd"><td><p>Tx scheduling</p></td>
+<td><p>20.08</p></td>
+<td><p>N/A</p></td>
+<td><p>N/A</p></td>
+<td><p>5.1-2</p></td>
+<td><p>22.28.2006</p></td>
+<td><p>ConnectX-6 Dx</p></td>
+</tr>
+<tr class="row-even"><td><p>Buffer Split</p></td>
+<td><p>20.11</p></td>
+<td><p>N/A</p></td>
+<td><p>N/A</p></td>
+<td><p>5.1-2</p></td>
+<td><p>16.28.2006</p></td>
+<td><p>ConnectX-5</p></td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id5">
+<caption><span class="caption-number">Table 39.3 </span><span class="caption-text">Minimal SW/HW versions for rte_flow offloads</span></caption>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Offload</p></th>
+<th class="head"><p>with E-Switch</p></th>
+<th class="head"><p>with NIC</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Count</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.02</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Drop</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 18.11</div>
+<div class="line">OFED 4.5</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-4</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Queue / RSS</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 18.11</div>
+<div class="line">OFED 4.5</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-4</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Shared action</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line"><a class="reference internal" href="#sact"><span class="std std-numref">Table 39.4</span></a></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line"><a class="reference internal" href="#sact"><span class="std std-numref">Table 39.4</span></a></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">VLAN</div>
+<div class="line">(of_pop_vlan /</div>
+<div class="line">of_push_vlan /</div>
+<div class="line">of_set_vlan_pcp /</div>
+<div class="line">of_set_vlan_vid)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">ConnectX-5</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">ConnectX-5</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><div class="line-block">
+<div class="line">VLAN</div>
+<div class="line">ingress and /</div>
+<div class="line">of_push_vlan /</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 5.3</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">VLAN</div>
+<div class="line">egress and /</div>
+<div class="line">of_pop_vlan /</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 5.3</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Encapsulation
+(VXLAN / NVGRE / RAW)</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.02</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Encapsulation
+GENEVE</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 27</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 27</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Tunnel Offload</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.1-2</div>
+<div class="line">rdma-core 32</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.1-2</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">Header rewrite</div>
+<div class="line">(set_ipv4_src /</div>
+<div class="line">set_ipv4_dst /</div>
+<div class="line">set_ipv6_src /</div>
+<div class="line">set_ipv6_dst /</div>
+<div class="line">set_tp_src /</div>
+<div class="line">set_tp_dst /</div>
+<div class="line">dec_ttl /</div>
+<div class="line">set_ttl /</div>
+<div class="line">set_mac_src /</div>
+<div class="line">set_mac_dst)</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.02</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><div class="line-block">
+<div class="line">Header rewrite</div>
+<div class="line">(set_dscp)</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.02</div>
+<div class="line">OFED 5.0</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.02</div>
+<div class="line">OFED 5.0</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><div class="line-block">
+<div class="line">Header rewrite</div>
+<div class="line">(ipv4_ecn /</div>
+<div class="line">ipv6_ecn)</div>
+<div class="line"><br /></div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 22.07</div>
+<div class="line">OFED 5.6-2</div>
+<div class="line">rdma-core 41</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 22.07</div>
+<div class="line">OFED 5.6-2</div>
+<div class="line">rdma-core 41</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Jump</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.02</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Mark / Flag</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 18.11</div>
+<div class="line">OFED 4.5</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-4</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Meta data</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 26</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 26</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Port ID</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.05</div>
+<div class="line">OFED 4.7-1</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">N/A</div>
+<div class="line">N/A</div>
+<div class="line">N/A</div>
+<div class="line">N/A</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Hairpin</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 26</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>2-port Hairpin</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.1-2</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Metering</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 26</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 19.11</div>
+<div class="line">OFED 4.7-3</div>
+<div class="line">rdma-core 26</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>ASO Metering</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 5.3</div>
+<div class="line">rdma-core 33</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 5.3</div>
+<div class="line">rdma-core 33</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Metering Hierarchy</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.08</div>
+<div class="line">OFED 5.3</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.08</div>
+<div class="line">OFED 5.3</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Sampling</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.1-2</div>
+<div class="line">rdma-core 32</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.1-2</div>
+<div class="line">N/A</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Encapsulation
+GTP PSC</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 35</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 35</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Encapsulation
+GENEVE TLV option</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 34</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 34</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Modify Field</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 35</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.02</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 35</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Connection tracking</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 5.3</div>
+<div class="line">rdma-core 35</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="sact">
+<caption><span class="caption-number">Table 39.4 </span><span class="caption-text">Minimal SW/HW versions for shared action offload</span></caption>
+<colgroup>
+<col style="width: 40%" />
+<col style="width: 30%" />
+<col style="width: 30%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Shared Action</p></th>
+<th class="head"><p>with E-Switch</p></th>
+<th class="head"><p>with NIC</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>RSS</p></td>
+<td><div class="line-block">
+<div class="line"><br /></div>
+<div class="line-block">
+<div class="line">N/A</div>
+<div class="line"><br /></div>
+<div class="line"><br /></div>
+</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 33</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+<tr class="row-odd"><td><p>Age</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 32</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 20.11</div>
+<div class="line">OFED 5.2</div>
+<div class="line">rdma-core 32</div>
+<div class="line">ConnectX-6 Dx</div>
+</div>
+</td>
+</tr>
+<tr class="row-even"><td><p>Count</p></td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 24</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+<td><div class="line-block">
+<div class="line">DPDK 21.05</div>
+<div class="line">OFED 4.6</div>
+<div class="line">rdma-core 23</div>
+<div class="line">ConnectX-5</div>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+<table class="docutils align-default" id="id6">
+<caption><span class="caption-number">Table 39.5 </span><span class="caption-text">Minimal SW/HW versions for flow template API</span></caption>
+<colgroup>
+<col style="width: 30%" />
+<col style="width: 35%" />
+<col style="width: 35%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>DPDK</p></th>
+<th class="head"><p>NIC</p></th>
+<th class="head"><p>Firmware</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>22.11</p></td>
+<td><p>ConnectX-6 Dx</p></td>
+<td><p>xx.35.1012</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="notes-for-metadata">
+<h2><span class="section-number">39.13. </span>Notes for metadata</h2>
+<p>MARK and META items are interrelated with datapath - they might move from/to
+the applications in mbuf fields. Hence, zero value for these items has the
+special meaning - it means “no metadata are provided”, not zero values are
+treated by applications and PMD as valid ones.</p>
+<p>Moreover in the flow engine domain the value zero is acceptable to match and
+set, and we should allow to specify zero values as rte_flow parameters for the
+META and MARK items and actions. In the same time zero mask has no meaning and
+should be rejected on validation stage.</p>
+</section>
+<section id="notes-for-rte-flow">
+<h2><span class="section-number">39.14. </span>Notes for rte_flow</h2>
+<p>Flows are not cached in the driver.
+When stopping a device port, all the flows created on this port from the
+application will be flushed automatically in the background.
+After stopping the device port, all flows on this port become invalid and
+not represented in the system.
+All references to these flows held by the application should be discarded
+directly but neither destroyed nor flushed.</p>
+<p>The application should re-create the flows as required after the port restart.</p>
+</section>
+<section id="notes-for-hairpin">
+<h2><span class="section-number">39.15. </span>Notes for hairpin</h2>
+<p>NVIDIA ConnectX and BlueField devices support
+specifying memory placement for hairpin Rx and Tx queues.
+This feature requires NVIDIA MLNX_OFED 5.8.</p>
+<p>By default, data buffers and packet descriptors for hairpin queues
+are placed in device memory
+which is shared with other resources (e.g. flow rules).</p>
+<p>Starting with DPDK 22.11 and NVIDIA MLNX_OFED 5.8,
+applications are allowed to:</p>
+<ol class="arabic">
+<li><p>Place data buffers and Rx packet descriptors in dedicated device memory.
+Application can request that configuration
+through <code class="docutils literal notranslate"><span class="pre">use_locked_device_memory</span></code> configuration option.</p>
+<p>Placing data buffers and Rx packet descriptors in dedicated device memory
+can decrease latency on hairpinned traffic,
+since traffic processing for the hairpin queue will not be memory starved.</p>
+<p>However, reserving device memory for hairpin Rx queues
+may decrease throughput under heavy load,
+since less resources will be available on device.</p>
+<p>This option is supported only for Rx hairpin queues.</p>
+</li>
+<li><p>Place Tx packet descriptors in host memory.
+Application can request that configuration
+through <code class="docutils literal notranslate"><span class="pre">use_rte_memory</span></code> configuration option.</p>
+<p>Placing Tx packet descritors in host memory can increase traffic throughput.
+This results in more resources available on the device for other purposes,
+which reduces memory contention on device.
+Side effect of this option is visible increase in latency,
+since each packet incurs additional PCI transactions.</p>
+<p>This option is supported only for Tx hairpin queues.</p>
+</li>
+</ol>
+</section>
+<section id="notes-for-testpmd">
+<h2><span class="section-number">39.16. </span>Notes for testpmd</h2>
+<p>Compared to librte_net_mlx4 that implements a single RSS configuration per
+port, librte_net_mlx5 supports per-protocol RSS configuration.</p>
+<p>Since <code class="docutils literal notranslate"><span class="pre">testpmd</span></code> defaults to IP RSS mode and there is currently no
+command-line parameter to enable additional protocols (UDP and TCP as well
+as IP), the following commands must be entered from its CLI to get the same
+behavior as librte_net_mlx4:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>&gt; port stop all
+&gt; port config all rss all
+&gt; port start all
+</pre></div>
+</div>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">39.17. </span>Usage example</h2>
+<p>This section demonstrates how to launch <strong>testpmd</strong> with NVIDIA
+ConnectX-4/ConnectX-5/ConnectX-6/BlueField devices managed by librte_net_mlx5.</p>
+<ol class="arabic">
+<li><p>Load the kernel modules:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>modprobe -a ib_uverbs mlx5_core mlx5_ib
+</pre></div>
+</div>
+<p>Alternatively if MLNX_OFED/MLNX_EN is fully installed, the following script
+can be run:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>/etc/init.d/openibd restart
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>User space I/O kernel modules (uio and igb_uio) are not used and do
+not have to be loaded.</p>
+</div>
+</li>
+<li><p>Make sure Ethernet interfaces are in working order and linked to kernel
+verbs. Related sysfs entries should be present:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>ls -d /sys/class/net/*/device/infiniband_verbs/uverbs* | cut -d / -f 5
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>eth30
+eth31
+eth32
+eth33
+</pre></div>
+</div>
+</li>
+<li><p>Optionally, retrieve their PCI bus addresses for to be used with the allow list:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>{
+    for intf in eth2 eth3 eth4 eth5;
+    do
+        (cd &quot;/sys/class/net/${intf}/device/&quot; &amp;&amp; pwd -P);
+    done;
+} |
+sed -n &#39;s,.*/\(.*\),-a \1,p&#39;
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>-a 0000:05:00.1
+-a 0000:06:00.0
+-a 0000:06:00.1
+-a 0000:05:00.0
+</pre></div>
+</div>
+</li>
+<li><p>Request huge pages:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-hugepages.py --setup 2G
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd with basic parameters:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>dpdk-testpmd -l 8-15 -n 4 -a 05:00.0 -a 05:00.1 -a 06:00.0 -a 06:00.1 -- --rxq=2 --txq=2 -i
+</pre></div>
+</div>
+<p>Example output:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[...]
+EAL: PCI device 0000:05:00.0 on NUMA socket 0
+EAL:   probe driver: 15b3:1013 librte_net_mlx5
+PMD: librte_net_mlx5: PCI information matches, using device &quot;mlx5_0&quot; (VF: false)
+PMD: librte_net_mlx5: 1 port(s) detected
+PMD: librte_net_mlx5: port 1 MAC address is e4:1d:2d:e7:0c:fe
+EAL: PCI device 0000:05:00.1 on NUMA socket 0
+EAL:   probe driver: 15b3:1013 librte_net_mlx5
+PMD: librte_net_mlx5: PCI information matches, using device &quot;mlx5_1&quot; (VF: false)
+PMD: librte_net_mlx5: 1 port(s) detected
+PMD: librte_net_mlx5: port 1 MAC address is e4:1d:2d:e7:0c:ff
+EAL: PCI device 0000:06:00.0 on NUMA socket 0
+EAL:   probe driver: 15b3:1013 librte_net_mlx5
+PMD: librte_net_mlx5: PCI information matches, using device &quot;mlx5_2&quot; (VF: false)
+PMD: librte_net_mlx5: 1 port(s) detected
+PMD: librte_net_mlx5: port 1 MAC address is e4:1d:2d:e7:0c:fa
+EAL: PCI device 0000:06:00.1 on NUMA socket 0
+EAL:   probe driver: 15b3:1013 librte_net_mlx5
+PMD: librte_net_mlx5: PCI information matches, using device &quot;mlx5_3&quot; (VF: false)
+PMD: librte_net_mlx5: 1 port(s) detected
+PMD: librte_net_mlx5: port 1 MAC address is e4:1d:2d:e7:0c:fb
+Interactive-mode selected
+Configuring Port 0 (socket 0)
+PMD: librte_net_mlx5: 0x8cba80: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx5: 0x8cba80: RX queues number update: 0 -&gt; 2
+Port 0: E4:1D:2D:E7:0C:FE
+Configuring Port 1 (socket 0)
+PMD: librte_net_mlx5: 0x8ccac8: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx5: 0x8ccac8: RX queues number update: 0 -&gt; 2
+Port 1: E4:1D:2D:E7:0C:FF
+Configuring Port 2 (socket 0)
+PMD: librte_net_mlx5: 0x8cdb10: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx5: 0x8cdb10: RX queues number update: 0 -&gt; 2
+Port 2: E4:1D:2D:E7:0C:FA
+Configuring Port 3 (socket 0)
+PMD: librte_net_mlx5: 0x8ceb58: TX queues number update: 0 -&gt; 2
+PMD: librte_net_mlx5: 0x8ceb58: RX queues number update: 0 -&gt; 2
+Port 3: E4:1D:2D:E7:0C:FB
+Checking link statuses...
+Port 0 Link Up - speed 40000 Mbps - full-duplex
+Port 1 Link Up - speed 40000 Mbps - full-duplex
+Port 2 Link Up - speed 10000 Mbps - full-duplex
+Port 3 Link Up - speed 10000 Mbps - full-duplex
+Done
+testpmd&gt;
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="how-to-dump-flows">
+<h2><span class="section-number">39.18. </span>How to dump flows</h2>
+<p>This section demonstrates how to dump flows. Currently, it’s possible to dump
+all flows with assistance of external tools.</p>
+<ol class="arabic">
+<li><p>2 ways to get flow raw file:</p>
+<ul class="simple">
+<li><p>Using testpmd CLI:</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">To dump all flows:</span>
+<span class="go">testpmd&gt; flow dump &lt;port&gt; all &lt;output_file&gt;</span>
+<span class="go">and dump one flow:</span>
+<span class="go">testpmd&gt; flow dump &lt;port&gt; rule &lt;rule_id&gt; &lt;output_file&gt;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>call rte_flow_dev_dump api:</p></li>
+</ul>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">rte_flow_dev_dump(port, flow, file, NULL);</span>
+</pre></div>
+</div>
+</li>
+<li><p>Dump human-readable flows from raw file:</p>
+<p>Get flow parsing tool from: <a class="reference external" href="https://github.com/Mellanox/mlx_steering_dump">https://github.com/Mellanox/mlx_steering_dump</a></p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mlx_steering_dump.py -f &lt;output_file&gt; -flowptr &lt;flow_ptr&gt;</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="how-to-share-a-meter-between-ports-in-the-same-switch-domain">
+<h2><span class="section-number">39.19. </span>How to share a meter between ports in the same switch domain</h2>
+<p>This section demonstrates how to use the shared meter. A meter M can be created
+on port X and to be shared with a port Y on the same switch domain by the next way:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">flow create X ingress transfer pattern eth / port_id id is Y / end actions meter mtr_id M / end</span>
+</pre></div>
+</div>
+</section>
+<section id="how-to-use-meter-hierarchy">
+<h2><span class="section-number">39.20. </span>How to use meter hierarchy</h2>
+<p>This section demonstrates how to create and use a meter hierarchy.
+A termination meter M can be the policy green action of another termination meter N.
+The two meters are chained together as a chain. Using meter N in a flow will apply
+both the meters in hierarchy on that flow.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">add port meter policy 0 1 g_actions queue index 0 / end y_actions end r_actions drop / end</span>
+<span class="go">create port meter 0 M 1 1 yes 0xffff 1 0</span>
+<span class="go">add port meter policy 0 2 g_actions meter mtr_id M / end y_actions end r_actions drop / end</span>
+<span class="go">create port meter 0 N 2 2 yes 0xffff 1 0</span>
+<span class="go">flow create 0 ingress group 1 pattern eth / end actions meter mtr_id N / end</span>
+</pre></div>
+</div>
+</section>
+<section id="how-to-configure-a-vf-as-trusted">
+<h2><span class="section-number">39.21. </span>How to configure a VF as trusted</h2>
+<p>This section demonstrates how to configure a virtual function (VF) interface as trusted.
+Trusted VF is needed to offload rules with rte_flow to a group that is bigger than 0.
+The configuration is done in two parts: driver and FW.</p>
+<p>The procedure below is an example of using a ConnectX-5 adapter card (pf0) with 2 VFs:</p>
+<ol class="arabic">
+<li><p>Create 2 VFs on the PF pf0 when in Legacy SR-IOV mode:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ echo 2 &gt; /sys/class/net/pf0/device/mlx5_num_vfs
+</pre></div>
+</div>
+</li>
+<li><p>Verify the VFs are created:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="gp">$ </span>lspci <span class="p">|</span> grep Mellanox
+<span class="go">82:00.0 Ethernet controller: Mellanox Technologies MT27800 Family [ConnectX-5]</span>
+<span class="go">82:00.1 Ethernet controller: Mellanox Technologies MT27800 Family [ConnectX-5]</span>
+<span class="go">82:00.2 Ethernet controller: Mellanox Technologies MT27800 Family [ConnectX-5 Virtual Function]</span>
+<span class="go">82:00.3 Ethernet controller: Mellanox Technologies MT27800 Family [ConnectX-5 Virtual Function]</span>
+</pre></div>
+</div>
+</li>
+<li><p>Unbind all VFs. For each VF PCIe, using the following command to unbind the driver:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ echo &quot;0000:82:00.2&quot; &gt;&gt; /sys/bus/pci/drivers/mlx5_core/unbind
+</pre></div>
+</div>
+</li>
+<li><p>Set the VFs to be trusted for the kernel by using one of the methods below:</p>
+<blockquote>
+<div><ul>
+<li><p>Using sysfs file:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ echo ON | tee /sys/class/net/pf0/device/sriov/0/trust
+$ echo ON | tee /sys/class/net/pf0/device/sriov/1/trust
+</pre></div>
+</div>
+</li>
+<li><p>Using “ip link” command:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ ip link set p0 vf 0 trust on
+$ ip link set p0 vf 1 trust on
+</pre></div>
+</div>
+</li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Configure all VFs using <code class="docutils literal notranslate"><span class="pre">mlxreg</span></code>:</p>
+<ul>
+<li><p>For MFT &gt;= 4.21:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ mlxreg -d /dev/mst/mt4121_pciconf0 --reg_name VHCA_TRUST_LEVEL --yes --indexes &#39;all_vhca=0x1,vhca_id=0x0&#39; --set &#39;trust_level=0x1&#39;
+</pre></div>
+</div>
+</li>
+<li><p>For MFT &lt; 4.21:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ mlxreg -d /dev/mst/mt4121_pciconf0 --reg_name VHCA_TRUST_LEVEL --yes --set &quot;all_vhca=0x1,trust_level=0x1&quot;
+</pre></div>
+</div>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Firmware version used must be &gt;= xx.29.1016 and MFT &gt;= 4.18</p>
+</div>
+</li>
+<li><p>For each VF PCIe, using the following command to bind the driver:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$ echo &quot;0000:82:00.2&quot; &gt;&gt; /sys/bus/pci/drivers/mlx5_core/bind
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+<section id="how-to-trace-tx-datapath">
+<h2><span class="section-number">39.22. </span>How to trace Tx datapath</h2>
+<p>The mlx5 PMD provides Tx datapath tracing capability with extra debug information:
+when and how packets were scheduled,
+and when the actual sending was completed by the NIC hardware.</p>
+<p>Steps to enable Tx datapath tracing:</p>
+<ol class="arabic">
+<li><p>Build DPDK application with enabled datapath tracing</p>
+<p>The Meson option <code class="docutils literal notranslate"><span class="pre">--enable_trace_fp=true</span></code> and
+the C flag <code class="docutils literal notranslate"><span class="pre">ALLOW_EXPERIMENTAL_API</span></code> should be specified.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson configure --buildtype=debug -Denable_trace_fp=true</span>
+<span class="go">   -Dc_args=&#39;-DRTE_LIBRTE_MLX5_DEBUG -DRTE_ENABLE_ASSERT -DALLOW_EXPERIMENTAL_API&#39; build</span>
+</pre></div>
+</div>
+</li>
+<li><p>Configure the NIC</p>
+<p>If the sending completion timings are important,
+the NIC should be configured to provide realtime timestamps.
+The non-volatile settings parameter  <code class="docutils literal notranslate"><span class="pre">REAL_TIME_CLOCK_ENABLE</span></code> should be configured as <code class="docutils literal notranslate"><span class="pre">1</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mlxconfig -d /dev/mst/mt4125_pciconf0 s REAL_TIME_CLOCK_ENABLE=1</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">mlxconfig</span></code> utility is part of the MFT package.</p>
+</li>
+<li><p>Run application with EAL parameter enabling tracing in mlx5 Tx datapath</p>
+<p>By default all tracepoints are disabled.
+To analyze Tx datapath and its timings: <code class="docutils literal notranslate"><span class="pre">--trace=pmd.net.mlx5.tx</span></code>.</p>
+</li>
+<li><p>Commit the tracing data to the storage (with <code class="docutils literal notranslate"><span class="pre">rte_trace_save()</span></code> API call).</p></li>
+<li><p>Install or build the <code class="docutils literal notranslate"><span class="pre">babeltrace2</span></code> package</p>
+<p>The Python script analyzing gathered trace data uses the <code class="docutils literal notranslate"><span class="pre">babeltrace2</span></code> library.
+The package should be either installed or built from source as shown below.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/efficios/babeltrace.git</span>
+<span class="go">cd babeltrace</span>
+<span class="go">./bootstrap</span>
+<span class="go">./configure -help</span>
+<span class="go">./configure --disable-api-doc --disable-man-pages</span>
+<span class="go">            --disable-python-bindings-doc --enable-python-plugins</span>
+<span class="go">            --enable-python-binding</span>
+</pre></div>
+</div>
+</li>
+<li><p>Run analyzing script</p>
+<p><code class="docutils literal notranslate"><span class="pre">mlx5_trace.py</span></code> is used to combine related events (packet firing and completion)
+and to show the results in human-readable view.</p>
+<p>The analyzing script is located in the DPDK source tree: <code class="docutils literal notranslate"><span class="pre">drivers/net/mlx5/tools</span></code>.</p>
+<p>It requires Python 3.6 and <code class="docutils literal notranslate"><span class="pre">babeltrace2</span></code> package.</p>
+<p>The parameter of the script is the trace data folder.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">mlx5_trace.py /var/log/rte-2023-01-23-AM-11-52-39</span>
+</pre></div>
+</div>
+</li>
+<li><p>Interpreting the script output data</p>
+<p>All the timings are given in nanoseconds.
+The list of Tx bursts per port/queue is presented in the output.
+Each list element contains the list of built WQEs with specific opcodes.
+Each WQE contains the list of the encompassed packets to send.</p>
+</li>
+</ol>
+</section>
+<section id="host-shaper">
+<h2><span class="section-number">39.23. </span>Host shaper</h2>
+<p>Host shaper register is per host port register
+which sets a shaper on the host port.
+All VF/host PF representors belonging to one host port share one host shaper.
+For example, if representor 0 and representor 1 belong to the same host port,
+and a host shaper rate of 1Gbps is configured,
+the shaper throttles both representors traffic from the host.</p>
+<p>Host shaper has two modes for setting the shaper,
+immediate and deferred to available descriptor threshold event trigger.</p>
+<p>In immediate mode, the rate limit is configured immediately to host shaper.</p>
+<p>When deferring to the available descriptor threshold trigger,
+the shaper is not set until an available descriptor threshold event
+is received by any Rx queue in a VF representor belonging to the host port.
+The only rate supported for deferred mode is 100Mbps
+(there is no limit on the supported rates for immediate mode).
+In deferred mode, the shaper is set on the host port by the firmware
+upon receiving the available descriptor threshold event,
+which allows throttling host traffic on available descriptor threshold events
+at minimum latency, preventing excess drops in the Rx queue.</p>
+<section id="dependency-on-mstflint-package">
+<h3><span class="section-number">39.23.1. </span>Dependency on mstflint package</h3>
+<p>In order to configure host shaper register,
+<code class="docutils literal notranslate"><span class="pre">librte_net_mlx5</span></code> depends on <code class="docutils literal notranslate"><span class="pre">libmtcr_ul</span></code>
+which can be installed from MLNX_OFED mstflint package.
+Meson detects <code class="docutils literal notranslate"><span class="pre">libmtcr_ul</span></code> existence at configure stage.
+If the library is detected, the application must link with <code class="docutils literal notranslate"><span class="pre">-lmtcr_ul</span></code>,
+as done by the pkg-config file libdpdk.pc.</p>
+</section>
+<section id="available-descriptor-threshold-and-host-shaper">
+<h3><span class="section-number">39.23.2. </span>Available descriptor threshold and host shaper</h3>
+<p>There is a command to configure the available descriptor threshold in testpmd.
+Testpmd also contains sample logic to handle available descriptor threshold events.
+The typical workflow is:
+testpmd configures available descriptor threshold for Rx queues,
+enables <code class="docutils literal notranslate"><span class="pre">avail_thresh_triggered</span></code> in host shaper and registers a callback.
+When traffic from the host is too high
+and Rx queue emptiness is below the available descriptor threshold,
+the PMD receives an event
+and the firmware configures a 100Mbps shaper on the host port automatically.
+Then the PMD call the callback registered previously,
+which will delay a while to let Rx queue empty,
+then disable host shaper.</p>
+<p>Let’s assume we have a simple BlueField-2 setup:
+port 0 is uplink, port 1 is VF representor.
+Each port has 2 Rx queues.
+To control traffic from the host to the Arm device,
+we can enable the available descriptor threshold in testpmd by:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; mlx5 set port 1 host_shaper avail_thresh_triggered 1 rate 0</span>
+<span class="go">testpmd&gt; set port 1 rxq 0 avail_thresh 70</span>
+<span class="go">testpmd&gt; set port 1 rxq 1 avail_thresh 70</span>
+</pre></div>
+</div>
+<p>The first command disables the current host shaper
+and enables the available descriptor threshold triggered mode.
+The other commands configure the available descriptor threshold
+to 70% of Rx queue size for both Rx queues.</p>
+<p>When traffic from the host is too high,
+testpmd console prints log about available descriptor threshold event,
+then host shaper is disabled.
+The traffic rate from the host is controlled and less drop happens in Rx queues.</p>
+<p>The threshold event and shaper can be disabled like this:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; mlx5 set port 1 host_shaper avail_thresh_triggered 0 rate 0</span>
+<span class="go">testpmd&gt; set port 1 rxq 0 avail_thresh 0</span>
+<span class="go">testpmd&gt; set port 1 rxq 1 avail_thresh 0</span>
+</pre></div>
+</div>
+<p>It is recommended an application disables the available descriptor threshold
+and <code class="docutils literal notranslate"><span class="pre">avail_thresh_triggered</span></code> before exit,
+if it enables them before.</p>
+<p>The shaper can also be configured with a value, the rate unit is 100Mbps.
+Below, the command sets the current shaper to 5Gbps
+and disables <code class="docutils literal notranslate"><span class="pre">avail_thresh_triggered</span></code>.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; mlx5 set port 1 host_shaper avail_thresh_triggered 0 rate 50</span>
+</pre></div>
+</div>
+</section>
+</section>
+<section id="testpmd-driver-specific-commands">
+<h2><span class="section-number">39.24. </span>Testpmd driver specific commands</h2>
+<section id="port-attach-with-socket-path">
+<h3><span class="section-number">39.24.1. </span>port attach with socket path</h3>
+<p>It is possible to allocate a port with <code class="docutils literal notranslate"><span class="pre">libibverbs</span></code> from external application.
+For importing the external port with extra device arguments,
+there is a specific testpmd command
+similar to <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html#port-attach"><span class="std std-ref">port attach command</span></a>:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; mlx5 port attach (identifier) socket=(path)
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">identifier</span></code>: device identifier with optional parameters
+as same as <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html#port-attach"><span class="std std-ref">port attach command</span></a>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">path</span></code>: path to IPC server socket created by the external application.</p></li>
+</ul>
+<p>This command performs:</p>
+<ol class="arabic simple">
+<li><p>Open IPC client socket using the given path, and connect it.</p></li>
+<li><p>Import ibverbs context and ibverbs protection domain.</p></li>
+<li><p>Add two device arguments for context (<code class="docutils literal notranslate"><span class="pre">cmd_fd</span></code>)
+and protection domain (<code class="docutils literal notranslate"><span class="pre">pd_handle</span></code>) to the device identifier.
+See <a class="reference internal" href="../platform/mlx5.html#mlx5-common-driver-options"><span class="std std-ref">mlx5 driver options</span></a> for more
+information about these device arguments.</p></li>
+<li><p>Call the regular <code class="docutils literal notranslate"><span class="pre">port</span> <span class="pre">attach</span></code> function with updated identifier.</p></li>
+</ol>
+<p>For example, to attach a port whose PCI address is <code class="docutils literal notranslate"><span class="pre">0000:0a:00.0</span></code>
+and its socket path is <code class="docutils literal notranslate"><span class="pre">/var/run/import_ipc_socket</span></code>:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; mlx5 port attach 0000:0a:00.0 socket=/var/run/import_ipc_socket</span>
+<span class="go">testpmd: MLX5 socket path is /var/run/import_ipc_socket</span>
+<span class="go">testpmd: Attach port with extra devargs 0000:0a:00.0,cmd_fd=40,pd_handle=1</span>
+<span class="go">Attaching a new port...</span>
+<span class="go">EAL: Probe PCI driver: mlx5_pci (15b3:101d) device: 0000:0a:00.0 (socket 0)</span>
+<span class="go">Port 0 is attached. Now total ports is 1</span>
+<span class="go">Done</span>
+</pre></div>
+</div>
+</section>
+<section id="port-map-external-rx-queue">
+<h3><span class="section-number">39.24.2. </span>port map external Rx queue</h3>
+<p>External Rx queue indexes mapping management.</p>
+<p>Map HW queue index (32-bit) to ethdev queue index (16-bit) for external Rx queue:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; mlx5 port (port_id) ext_rxq map (sw_queue_id) (hw_queue_id)
+</pre></div>
+</div>
+<p>Unmap external Rx queue:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; mlx5 port (port_id) ext_rxq unmap (sw_queue_id)
+</pre></div>
+</div>
+<p>where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">sw_queue_id</span></code>: queue index in range [64536, 65535].
+This range is the highest 1000 numbers.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">hw_queue_id</span></code>: queue index given by HW in queue creation.</p></li>
+</ul>
+</section>
+<section id="set-flow-engine-mode">
+<h3><span class="section-number">39.24.3. </span>Set Flow Engine Mode</h3>
+<p>Set the flow engine to active or standby mode with specific flags (bitmap style).
+See <code class="docutils literal notranslate"><span class="pre">RTE_PMD_MLX5_FLOW_ENGINE_FLAG_*</span></code> for the flag definitions.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; mlx5 set flow_engine &lt;active|standby&gt; [&lt;flags&gt;]</span>
+</pre></div>
+</div>
+<p>This command is used for testing live migration,
+and works for software steering only.
+Default FDB jump should be disabled if switchdev is enabled.
+The mode will propagate to all the probed ports.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="mlx4.html" title="previous chapter"><span class="section-number">38. </span>NVIDIA MLX4 Ethernet Driver</a></li>
+      <li>Next: <a href="mvneta.html" title="next chapter"><span class="section-number">40. </span>MVNETA Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/mlx5.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

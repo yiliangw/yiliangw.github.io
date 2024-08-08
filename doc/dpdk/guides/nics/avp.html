@@ -1,0 +1,198 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>8. AVP Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="9. AXGBE Poll Mode Driver" href="axgbe.html" />
+    <link rel="prev" title="7. Aquantia Atlantic DPDK Driver" href="atlantic.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="avp-poll-mode-driver">
+<h1><span class="section-number">8. </span>AVP Poll Mode Driver</h1>
+<p>The Accelerated Virtual Port (AVP) device is a shared memory based device
+only available on <a class="reference external" href="http://www.windriver.com/products/titanium-cloud/">virtualization platforms</a>
+from Wind River Systems.  The Wind River Systems virtualization platform
+currently uses QEMU/KVM as its hypervisor and as such provides support for all
+of the QEMU supported virtual and/or emulated devices (e.g., virtio, e1000,
+etc.).  The platform offers the virtio device type as the default device when
+launching a virtual machine or creating a virtual machine port.  The AVP device
+is a specialized device available to customers that require increased
+throughput and decreased latency to meet the demands of their performance
+focused applications.</p>
+<p>The AVP driver binds to any AVP PCI devices that have been exported by the Wind
+River Systems QEMU/KVM hypervisor.  As a user of the DPDK driver API it
+supports a subset of the full Ethernet device API to enable the application to
+use the standard device configuration functions and packet receive/transmit
+functions.</p>
+<p>These devices enable optimized packet throughput by bypassing QEMU and
+delivering packets directly to the virtual switch via a shared memory
+mechanism.  This provides DPDK applications running in virtual machines with
+significantly improved throughput and latency over other device types.</p>
+<p>The AVP device implementation is integrated with the QEMU/KVM live-migration
+mechanism to allow applications to seamlessly migrate from one hypervisor node
+to another with minimal packet loss.</p>
+<section id="features-and-limitations-of-the-avp-pmd">
+<h2><span class="section-number">8.1. </span>Features and Limitations of the AVP PMD</h2>
+<p>The AVP PMD provides the following functionality.</p>
+<ul class="simple">
+<li><p>Receive and transmit of both simple and chained mbuf packets,</p></li>
+<li><p>Chained mbufs may include up to 5 chained segments,</p></li>
+<li><p>Up to 8 receive and transmit queues per device,</p></li>
+<li><p>Only a single MAC address is supported,</p></li>
+<li><p>The MAC address cannot be modified,</p></li>
+<li><p>The maximum receive packet length is 9238 bytes,</p></li>
+<li><p>VLAN header stripping and inserting,</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>VM live-migration</p></li>
+<li><p>PCI hotplug insertion and removal</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">8.2. </span>Prerequisites</h2>
+<p>The following prerequisites apply:</p>
+<ul class="simple">
+<li><p>A virtual machine running in a Wind River Systems virtualization
+environment and configured with at least one neutron port defined with a
+vif-model set to “avp”.</p></li>
+</ul>
+</section>
+<section id="launching-a-vm-with-an-avp-type-network-attachment">
+<h2><span class="section-number">8.3. </span>Launching a VM with an AVP type network attachment</h2>
+<p>The following example will launch a VM with three network attachments.  The
+first attachment will have a default vif-model of “virtio”.  The next two
+network attachments will have a vif-model of “avp” and may be used with a DPDK
+application which is built to include the AVP PMD.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">nova boot --flavor small --image my-image \</span>
+<span class="go">   --nic net-id=${NETWORK1_UUID} \</span>
+<span class="go">   --nic net-id=${NETWORK2_UUID},vif-model=avp \</span>
+<span class="go">   --nic net-id=${NETWORK3_UUID},vif-model=avp \</span>
+<span class="go">   --security-group default my-instance1</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="atlantic.html" title="previous chapter"><span class="section-number">7. </span>Aquantia Atlantic DPDK Driver</a></li>
+      <li>Next: <a href="axgbe.html" title="next chapter"><span class="section-number">9. </span>AXGBE Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/avp.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

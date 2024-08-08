@@ -1,0 +1,254 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Compiling the DPDK Target from Source &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. Running DPDK Applications" href="run_apps.html" />
+    <link rel="prev" title="1. Introduction" href="intro.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="compiling-the-dpdk-target-from-source">
+<h1><span class="section-number">3. </span>Compiling the DPDK Target from Source</h1>
+<section id="system-requirements">
+<h2><span class="section-number">3.1. </span>System Requirements</h2>
+<p>Building the DPDK and its applications requires one of the following
+environments:</p>
+<ul class="simple">
+<li><p>LLVM 14.0.0 (or later) and Microsoft MSVC linker.</p></li>
+<li><p>The MinGW-w64 toolchain (either native or cross).</p></li>
+<li><p>Microsoft Visual Studio 2022 (any edition).</p>
+<ul>
+<li><p>note Microsoft Visual Studio 2022 does not currently build enough
+of DPDK to produce a working DPDK application
+but may be used to validate that changes are portable between toolchains.</p></li>
+</ul>
+</li>
+</ul>
+<p>The Meson Build system is used to prepare the sources for compilation
+with the Ninja backend.
+The installation of these tools is covered in this section.</p>
+</section>
+<section id="option-1-clang-llvm-c-compiler-and-microsoft-msvc-linker">
+<h2><span class="section-number">3.2. </span>Option 1. Clang-LLVM C Compiler and Microsoft MSVC Linker</h2>
+<section id="install-the-compiler">
+<h3><span class="section-number">3.2.1. </span>Install the Compiler</h3>
+<p>Download and install the clang compiler from
+<a class="reference external" href="http://releases.llvm.org/download.html">LLVM website</a>.
+For example, Clang-LLVM direct download link:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>http://releases.llvm.org/7.0.1/LLVM-7.0.1-win64.exe
+</pre></div>
+</div>
+</section>
+<section id="install-the-linker">
+<h3><span class="section-number">3.2.2. </span>Install the Linker</h3>
+<p>Download and install the Build Tools for Visual Studio to link and build the
+files on windows,
+from <a class="reference external" href="https://visualstudio.microsoft.com/downloads">Microsoft website</a>.
+When installing build tools, select the “Visual C++ build tools” option
+and ensure the Windows SDK is selected.</p>
+</section>
+</section>
+<section id="option-2-mingw-w64-toolchain">
+<h2><span class="section-number">3.3. </span>Option 2. MinGW-w64 Toolchain</h2>
+<p>On Linux, i.e. for cross-compilation, install MinGW-w64 via a package manager.
+Version 4.0.4 for Ubuntu 16.04 cannot be used due to a
+<a class="reference external" href="https://sourceforge.net/p/mingw-w64/bugs/562/">MinGW-w64 bug</a>.</p>
+<p>On Windows, obtain the latest version installer from
+<a class="reference external" href="https://sourceforge.net/projects/mingw-w64/files/">MinGW-w64 repository</a>.
+Any thread model (POSIX or Win32) can be chosen, DPDK does not rely on it.
+Install to a folder without spaces in its name, like <code class="docutils literal notranslate"><span class="pre">C:\MinGW</span></code>.
+This path is assumed for the rest of this guide.</p>
+</section>
+<section id="option-3-microsoft-visual-studio-toolset-msvc">
+<h2><span class="section-number">3.4. </span>Option 3. Microsoft Visual Studio Toolset (MSVC)</h2>
+<p>Install any edition of Microsoft Visual Studio 2022
+from the <a class="reference external" href="https://visualstudio.microsoft.com/downloads/">Visual Studio website</a>.</p>
+</section>
+<section id="install-the-build-system">
+<h2><span class="section-number">3.5. </span>Install the Build System</h2>
+<p>Download and install the build system from
+<a class="reference external" href="http://mesonbuild.com/Getting-meson.html">Meson website</a>.
+A good option to choose is the MSI installer for both meson and ninja together:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>http://mesonbuild.com/Getting-meson.html#installing-meson-and-ninja-with-the-msi-installer%22
+</pre></div>
+</div>
+<p>Required version is Meson 0.57.</p>
+<p>Versions starting from 0.58 are unusable with LLVM toolchain
+because of a <a class="reference external" href="https://github.com/mesonbuild/meson/issues/8981">Meson issue</a>.</p>
+</section>
+<section id="install-the-backend">
+<h2><span class="section-number">3.6. </span>Install the Backend</h2>
+<p>If using Ninja, download and install the backend from
+<a class="reference external" href="https://ninja-build.org/">Ninja website</a> or
+install along with the meson build system.</p>
+</section>
+<section id="build-the-code">
+<h2><span class="section-number">3.7. </span>Build the code</h2>
+<p>The build environment is setup to build the EAL and the helloworld example by
+default.</p>
+<section id="option-1-native-build-on-windows-using-llvm">
+<h3><span class="section-number">3.7.1. </span>Option 1. Native Build on Windows using LLVM</h3>
+<p>When using Clang-LLVM, specifying the compiler might be required to complete
+the meson command:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">set CC=clang</span>
+</pre></div>
+</div>
+<p>When using MinGW-w64, it is sufficient to have toolchain executables in PATH:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">set PATH=C:\MinGW\mingw64\bin;%PATH%</span>
+</pre></div>
+</div>
+<p>To compile the examples, the flag <code class="docutils literal notranslate"><span class="pre">-Dexamples</span></code> is required.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd C:\Users\me\dpdk</span>
+<span class="go">meson setup -Dexamples=helloworld build</span>
+<span class="go">meson compile -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="option-2-cross-compile-with-mingw-w64">
+<h3><span class="section-number">3.7.2. </span>Option 2. Cross-Compile with MinGW-w64</h3>
+<p>The cross-file option must be specified for Meson.
+Depending on the distribution, paths in this file may need adjustments.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup --cross-file config/x86/cross-mingw -Dexamples=helloworld build</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="option-3-native-build-on-windows-using-msvc">
+<h3><span class="section-number">3.7.3. </span>Option 3. Native Build on Windows using MSVC</h3>
+<p>Open a ‘Developer PowerShell for VS 2022’ prompt from the start menu.
+The developer prompt will configure the environment
+to select the appropriate compiler, linker and SDK paths
+required to build with Visual Studio 2022.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd C:\Users\me\dpdk</span>
+<span class="go">meson setup -Denable_stdatomic=true build</span>
+<span class="go">meson compile -C build</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Windows</a><ul>
+      <li>Previous: <a href="intro.html" title="previous chapter"><span class="section-number">1. </span>Introduction</a></li>
+      <li>Next: <a href="run_apps.html" title="next chapter"><span class="section-number">4. </span>Running DPDK Applications</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/windows_gsg/build_dpdk.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

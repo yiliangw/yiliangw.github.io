@@ -1,0 +1,493 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>55. Dispatcher Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="56. Quality of Service (QoS) Framework" href="qos_framework.html" />
+    <link rel="prev" title="54. Event DMA Adapter Library" href="event_dma_adapter.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dispatcher-library">
+<h1><span class="section-number">55. </span>Dispatcher Library</h1>
+<section id="overview">
+<h2><span class="section-number">55.1. </span>Overview</h2>
+<p>The purpose of the dispatcher is to help reduce coupling in an
+<a class="reference internal" href="eventdev.html"><span class="doc">Eventdev</span></a>-based DPDK application.</p>
+<p>In particular, the dispatcher addresses a scenario where an
+application’s modules share the same event device and event device
+ports, and performs work on the same lcore threads.</p>
+<p>The dispatcher replaces the conditional logic that follows an event
+device dequeue operation, where events are dispatched to different
+parts of the application, typically based on fields in the
+<code class="docutils literal notranslate"><span class="pre">rte_event</span></code>, such as the <code class="docutils literal notranslate"><span class="pre">queue_id</span></code>, <code class="docutils literal notranslate"><span class="pre">sub_event_type</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">sched_type</span></code>.</p>
+<p>Below is an excerpt from a fictitious application consisting of two
+modules; A and B. In this example, event-to-module routing is based
+purely on queue id, where module A expects all events to a certain
+queue id, and module B two other queue ids.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Event routing may reasonably be done based on other <code class="docutils literal notranslate"><span class="pre">rte_event</span></code>
+fields (or even event user data). Indeed, that’s the very reason to
+have match callback functions, instead of a simple queue
+id-to-handler mapping scheme. Queue id-based routing serves well in
+a simple example.</p>
+</div>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">for</span><span class="w"> </span><span class="p">(;;)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="n">events</span><span class="p">[</span><span class="n">MAX_BURST</span><span class="p">];</span><span class="w"></span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">n</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_event_dequeue_burst</span><span class="p">(</span><span class="n">dev_id</span><span class="p">,</span><span class="w"> </span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="n">events</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                    </span><span class="n">MAX_BURST</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">n</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="o">*</span><span class="n">event</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">events</span><span class="p">[</span><span class="n">i</span><span class="p">];</span><span class="w"></span>
+
+<span class="w">                </span><span class="k">switch</span><span class="w"> </span><span class="p">(</span><span class="n">event</span><span class="o">-&gt;</span><span class="n">queue_id</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="nl">MODULE_A_QUEUE_ID</span><span class="p">:</span><span class="w"></span>
+<span class="w">                        </span><span class="n">module_a_process</span><span class="p">(</span><span class="n">event</span><span class="p">);</span><span class="w"></span>
+<span class="w">                        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="nl">MODULE_B_STAGE_0_QUEUE_ID</span><span class="p">:</span><span class="w"></span>
+<span class="w">                        </span><span class="n">module_b_process_stage_0</span><span class="p">(</span><span class="n">event</span><span class="p">);</span><span class="w"></span>
+<span class="w">                        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">                </span><span class="k">case</span><span class="w"> </span><span class="nl">MODULE_B_STAGE_1_QUEUE_ID</span><span class="p">:</span><span class="w"></span>
+<span class="w">                        </span><span class="n">module_b_process_stage_1</span><span class="p">(</span><span class="n">event</span><span class="p">);</span><span class="w"></span>
+<span class="w">                        </span><span class="k">break</span><span class="p">;</span><span class="w"></span>
+<span class="w">                </span><span class="p">}</span><span class="w"></span>
+<span class="w">        </span><span class="p">}</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The issue this example attempts to illustrate is that the centralized
+conditional logic has knowledge of things that should be private to
+the modules. In other words, this pattern leads to a violation of
+module encapsulation.</p>
+<p>The shared conditional logic contains explicit knowledge about what
+events should go where. In case, for example, the
+<code class="docutils literal notranslate"><span class="pre">module_a_process()</span></code> is broken into two processing stages — a
+module-internal affair — the shared conditional code must be updated
+to reflect this change.</p>
+<p>The centralized event routing code becomes an issue in larger
+applications, where modules are developed by different organizations.
+This pattern also makes module reuse across different applications more
+difficult. The part of the conditional logic relevant for a particular
+application may need to be duplicated across many module
+instantiations (e.g., applications and test setups).</p>
+<p>The dispatcher separates the mechanism (routing events to their
+receiver) from the policy (which events should go where).</p>
+<p>The basic operation of the dispatcher is as follows:</p>
+<ul class="simple">
+<li><p>Dequeue a batch of events from the event device.</p></li>
+<li><p>For each event determine which handler should receive the event, using
+a set of application-provided, per-handler event matching callback
+functions.</p></li>
+<li><p>Provide events matching a particular handler, to that handler, using
+its process callback.</p></li>
+</ul>
+<p>If the above application would have made use of the dispatcher, the
+code relevant for its module A may have looked something like this:</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kt">bool</span><span class="w"></span>
+<span class="nf">module_a_match</span><span class="p">(</span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="o">*</span><span class="n">event</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">cb_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">       </span><span class="k">return</span><span class="w"> </span><span class="n">event</span><span class="o">-&gt;</span><span class="n">queue_id</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="n">MODULE_A_QUEUE_ID</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">module_a_process_events</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">event_dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">event_port_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="k">const</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_event</span><span class="w"> </span><span class="o">*</span><span class="n">events</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">num</span><span class="p">,</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">cb_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="kt">uint16_t</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">num</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"></span>
+<span class="w">                </span><span class="n">module_a_process_event</span><span class="p">(</span><span class="o">&amp;</span><span class="n">events</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* In the module&#39;s initialization code */</span><span class="w"></span>
+<span class="n">rte_dispatcher_register</span><span class="p">(</span><span class="n">dispatcher</span><span class="p">,</span><span class="w"> </span><span class="n">module_a_match</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"></span>
+<span class="w">                        </span><span class="n">module_a_process_events</span><span class="p">,</span><span class="w"> </span><span class="n">module_a_data</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Error handling is left out of this and future example code in this chapter.</p>
+</div>
+<p>When the shared conditional logic is removed, a new question arises:
+which part of the system actually runs the dispatching mechanism? Or
+phrased differently, what is replacing the function hosting the shared
+conditional logic (typically launched on all lcores using
+<code class="docutils literal notranslate"><span class="pre">rte_eal_remote_launch()</span></code>)? To solve this issue, the dispatcher is
+run as a DPDK <a class="reference internal" href="service_cores.html"><span class="doc">Service</span></a>.</p>
+<p>The dispatcher is a layer between the application and the event device
+in the receive direction. In the transmit (i.e., item of work
+submission) direction, the application directly accesses the Eventdev
+core API (e.g., <code class="docutils literal notranslate"><span class="pre">rte_event_enqueue_burst()</span></code>) to submit new or
+forwarded events to the event device.</p>
+</section>
+<section id="dispatcher-creation">
+<h2><span class="section-number">55.2. </span>Dispatcher Creation</h2>
+<p>A dispatcher is created using the <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_create()</span></code> function.</p>
+<p>The event device must be configured before the dispatcher is created.</p>
+<p>Usually, only one dispatcher is needed per event device. A dispatcher
+handles exactly one event device.</p>
+<p>A dispatcher is freed using the <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_free()</span></code> function.
+The dispatcher’s service functions must not be running on
+any lcore at the point of this call.</p>
+</section>
+<section id="event-port-binding">
+<h2><span class="section-number">55.3. </span>Event Port Binding</h2>
+<p>To be able to dequeue events, the dispatcher must know which event
+ports are to be used, on all the lcores it uses. The application
+provides this information using
+<code class="docutils literal notranslate"><span class="pre">rte_dispatcher_bind_port_to_lcore()</span></code>.</p>
+<p>This call is typically made from the part of the application that
+deals with deployment issues (e.g., iterating lcores and determining
+which lcore does what), at the time of application initialization.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_unbind_port_from_lcore()</span></code> is used to undo
+this operation.</p>
+<p>Multiple lcore threads may not safely use the same event
+port.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This property (which is a feature, not a bug) is inherited from the
+core Eventdev APIs.</p>
+</div>
+<p>Event ports cannot safely be bound or unbound while the dispatcher’s
+service function is running on any lcore.</p>
+</section>
+<section id="event-handlers">
+<h2><span class="section-number">55.4. </span>Event Handlers</h2>
+<p>The dispatcher handler is an interface between the dispatcher and an
+application module, used to route events to the appropriate part of
+the application.</p>
+<section id="handler-registration">
+<h3><span class="section-number">55.4.1. </span>Handler Registration</h3>
+<p>The event handler interface consists of two function pointers:</p>
+<ul class="simple">
+<li><p>The <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_match_t</span></code> callback, which job is to
+decide if this event is to be the property of this handler.</p></li>
+<li><p>The <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_process_t</span></code>, which is used by the
+dispatcher to deliver matched events.</p></li>
+</ul>
+<p>An event handler registration is valid on all lcores.</p>
+<p>The functions pointed to by the match and process callbacks resides in
+the application’s domain logic, with one or more handlers per
+application module.</p>
+<p>A module may use more than one event handler, for convenience or to
+further decouple sub-modules. However, the dispatcher may impose an
+upper limit of the number of handlers. In addition, installing a large
+number of handlers increase dispatcher overhead, although this does
+not necessarily translate to a system-level performance degradation. See
+the section on <a class="reference internal" href="#event-clustering"><span class="std std-ref">Event Clustering</span></a> for more information.</p>
+<p>Handler registration and unregistration cannot safely be done while
+the dispatcher’s service function is running on any lcore.</p>
+</section>
+<section id="event-matching">
+<h3><span class="section-number">55.4.2. </span>Event Matching</h3>
+<p>A handler’s match callback function decides if an event should be
+delivered to this handler, or not.</p>
+<p>An event is routed to no more than one handler. Thus, if a match
+function returns true, no further match functions will be invoked for
+that event.</p>
+<p>Match functions must not depend on being invocated in any particular
+order (e.g., in the handler registration order).</p>
+<p>Events failing to match any handler are dropped, and the
+<code class="docutils literal notranslate"><span class="pre">ev_drop_count</span></code> counter is updated accordingly.</p>
+</section>
+<section id="event-delivery">
+<h3><span class="section-number">55.4.3. </span>Event Delivery</h3>
+<p>The handler callbacks are invocated by the dispatcher’s service
+function, upon the arrival of events to the event ports bound to the
+running service lcore.</p>
+<p>A particular event is delivered to at most one handler.</p>
+<p>The application must not depend on all match callback invocations for
+a particular event batch being made prior to any process calls are
+being made. For example, if the dispatcher dequeues two events from
+the event device, it may choose to find out the destination for the
+first event, and deliver it, and then continue to find out the
+destination for the second, and then deliver that event as well. The
+dispatcher may also choose a strategy where no event is delivered
+until the destination handler for both events have been determined.</p>
+<p>The events provided in a single process call always belong to the same
+event port dequeue burst.</p>
+</section>
+<section id="event-clustering">
+<span id="id1"></span><h3><span class="section-number">55.4.4. </span>Event Clustering</h3>
+<p>The dispatcher maintains the order of events destined for the same
+handler.</p>
+<p><em>Order</em> here refers to the order in which the events were delivered
+from the event device to the dispatcher (i.e., in the event array
+populated by <code class="docutils literal notranslate"><span class="pre">rte_event_dequeue_burst()</span></code>), in relation to the order
+in which the dispatcher delivers these events to the application.</p>
+<p>The dispatcher <em>does not</em> guarantee to maintain the order of events
+delivered to <em>different</em> handlers.</p>
+<p>For example, assume that <code class="docutils literal notranslate"><span class="pre">MODULE_A_QUEUE_ID</span></code> expands to the value 0,
+and <code class="docutils literal notranslate"><span class="pre">MODULE_B_STAGE_0_QUEUE_ID</span></code> expands to the value 1. Then
+consider a scenario where the following events are dequeued from the
+event device (qid is short for event queue id).</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>[e0: qid=1], [e1: qid=1], [e2: qid=0], [e3: qid=1]
+</pre></div>
+</div>
+<p>The dispatcher may deliver the events in the following manner:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>module_b_stage_0_process([e0: qid=1], [e1: qid=1])
+module_a_process([e2: qid=0])
+module_b_stage_0_process([e2: qid=1])
+</pre></div>
+</div>
+<p>The dispatcher may also choose to cluster (group) all events destined
+for <code class="docutils literal notranslate"><span class="pre">module_b_stage_0_process()</span></code> into one array:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>module_b_stage_0_process([e0: qid=1], [e1: qid=1], [e3: qid=1])
+module_a_process([e2: qid=0])
+</pre></div>
+</div>
+<p>Here, the event <code class="docutils literal notranslate"><span class="pre">e2</span></code> is reordered and placed behind <code class="docutils literal notranslate"><span class="pre">e3</span></code>, from a
+delivery order point of view. This kind of reshuffling is allowed,
+since the events are destined for different handlers.</p>
+<p>The dispatcher may also deliver <code class="docutils literal notranslate"><span class="pre">e2</span></code> before the three events
+destined for module B.</p>
+<p>An example of what the dispatcher may not do, is to reorder event
+<code class="docutils literal notranslate"><span class="pre">e1</span></code> so, that it precedes <code class="docutils literal notranslate"><span class="pre">e0</span></code> in the array passed to the module
+B’s stage 0 process callback.</p>
+<p>Although clustering requires some extra work for the dispatcher, it
+leads to fewer process function calls. In addition, and likely more
+importantly, it improves temporal locality of memory accesses to
+handler-specific data structures in the application, which in turn may
+lead to fewer cache misses and improved overall performance.</p>
+</section>
+</section>
+<section id="finalize">
+<h2><span class="section-number">55.5. </span>Finalize</h2>
+<p>The dispatcher may be configured to notify one or more parts of the
+application when the matching and processing of a batch of events has
+completed.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">rte_dispatcher_finalize_register</span></code> call is used to
+register a finalize callback. The function
+<code class="docutils literal notranslate"><span class="pre">rte_dispatcher_finalize_unregister</span></code> is used to remove a
+callback.</p>
+<p>The finalize hook may be used by a set of event handlers (in the same
+modules, or a set of cooperating modules) sharing an event output
+buffer, since it allows for flushing of the buffers at the last
+possible moment. In particular, it allows for buffering of
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_OP_FORWARD</span></code> events, which must be flushed before the next
+<code class="docutils literal notranslate"><span class="pre">rte_event_dequeue_burst()</span></code> call is made (assuming implicit release
+is employed).</p>
+<p>The following is an example with an application-defined event output
+buffer (the <code class="docutils literal notranslate"><span class="pre">event_buffer</span></code>):</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">finalize_batch</span><span class="p">(</span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">event_dev_id</span><span class="p">,</span><span class="w"> </span><span class="kt">uint8_t</span><span class="w"> </span><span class="n">event_port_id</span><span class="p">,</span><span class="w"></span>
+<span class="w">               </span><span class="kt">void</span><span class="w"> </span><span class="o">*</span><span class="n">cb_data</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">event_buffer</span><span class="w"> </span><span class="o">*</span><span class="n">buffer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">cb_data</span><span class="p">;</span><span class="w"></span>
+<span class="w">        </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">lcore_id</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_lcore_id</span><span class="p">();</span><span class="w"></span>
+<span class="w">        </span><span class="k">struct</span><span class="w"> </span><span class="nc">event_buffer_lcore</span><span class="w"> </span><span class="o">*</span><span class="n">lcore_buffer</span><span class="w"> </span><span class="o">=</span><span class="w"></span>
+<span class="w">                </span><span class="o">&amp;</span><span class="n">buffer</span><span class="o">-&gt;</span><span class="n">lcore_buffer</span><span class="p">[</span><span class="n">lcore_id</span><span class="p">];</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">event_buffer_lcore_flush</span><span class="p">(</span><span class="n">lcore_buffer</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* In the module&#39;s initialization code */</span><span class="w"></span>
+<span class="n">rte_dispatcher_finalize_register</span><span class="p">(</span><span class="n">dispatcher</span><span class="p">,</span><span class="w"> </span><span class="n">finalize_batch</span><span class="p">,</span><span class="w"></span>
+<span class="w">                                 </span><span class="n">shared_event_buffer</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>The dispatcher does not track any relationship between a handler and a
+finalize callback, and all finalize callbacks will be called, if (and
+only if) at least one event was dequeued from the event device.</p>
+<p>Finalize callback registration and unregistration cannot safely be
+done while the dispatcher’s service function is running on any lcore.</p>
+</section>
+<section id="service">
+<h2><span class="section-number">55.6. </span>Service</h2>
+<p>The dispatcher is a DPDK service, and is managed in a manner similar
+to other DPDK services (e.g., an Event Timer Adapter).</p>
+<p>Below is an example of how to configure a particular lcore to serve as
+a service lcore, and to map an already-configured dispatcher
+(identified by <code class="docutils literal notranslate"><span class="pre">DISPATCHER_ID</span></code>) to that lcore.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"></span>
+<span class="nf">launch_dispatcher_core</span><span class="p">(</span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_dispatcher</span><span class="w"> </span><span class="o">*</span><span class="n">dispatcher</span><span class="p">,</span><span class="w"></span>
+<span class="w">                       </span><span class="kt">unsigned</span><span class="w"> </span><span class="n">lcore_id</span><span class="p">)</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="kt">uint32_t</span><span class="w"> </span><span class="n">service_id</span><span class="p">;</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_service_lcore_add</span><span class="p">(</span><span class="n">lcore_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_dispatcher_service_id_get</span><span class="p">(</span><span class="n">dispatcher</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">service_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_service_map_lcore_set</span><span class="p">(</span><span class="n">service_id</span><span class="p">,</span><span class="w"> </span><span class="n">lcore_id</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_service_lcore_start</span><span class="p">(</span><span class="n">lcore_id</span><span class="p">);</span><span class="w"></span>
+
+<span class="w">        </span><span class="n">rte_service_runstate_set</span><span class="p">(</span><span class="n">service_id</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">);</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>As the final step, the dispatcher must be started.</p>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="n">rte_dispatcher_start</span><span class="p">(</span><span class="n">dispatcher</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<section id="multi-service-dispatcher-lcores">
+<h3><span class="section-number">55.6.1. </span>Multi Service Dispatcher Lcores</h3>
+<p>In an Eventdev application, most (or all) compute-intensive and
+performance-sensitive processing is done in an event-driven manner,
+where CPU cycles spent on application domain logic is the direct
+result of items of work (i.e., <code class="docutils literal notranslate"><span class="pre">rte_event</span></code> events) dequeued from an
+event device.</p>
+<p>In the light of this, it makes sense to have the dispatcher service be
+the only DPDK service on all lcores used for packet processing — at
+least in principle.</p>
+<p>However, there is nothing in DPDK that prevents colocating other
+services with the dispatcher service on the same lcore.</p>
+<p>Tasks that prior to the introduction of the dispatcher into the
+application was performed on the lcore, even though no events were
+received, are prime targets for being converted into such auxiliary
+services, running on the dispatcher core set.</p>
+<p>An example of such a task would be the management of a per-lcore timer
+wheel (i.e., calling <code class="docutils literal notranslate"><span class="pre">rte_timer_manage()</span></code>).</p>
+<p>Applications employing <a class="reference internal" href="rcu_lib.html"><span class="doc">Read-Copy-Update (RCU)</span></a> (or
+similar technique) may opt for having quiescent state (e.g., calling
+<code class="docutils literal notranslate"><span class="pre">rte_rcu_qsbr_quiescent()</span></code>) signaling factored out into a separate
+service, to assure resource reclaiming occurs even though some
+lcores currently do not process any events.</p>
+<p>If more services than the dispatcher service is mapped to a service
+lcore, it’s important that the other service are well-behaved and
+don’t interfere with event processing to the extent the system’s
+throughput and/or latency requirements are at risk of not being met.</p>
+<p>In particular, to avoid jitter, they should have a small upper bound
+for the maximum amount of time spent in a single service function
+call.</p>
+<p>An example of scenario with a more CPU-heavy colocated service is a
+low-lcore count deployment, where the event device lacks the
+<code class="docutils literal notranslate"><span class="pre">RTE_EVENT_ETH_RX_ADAPTER_CAP_INTERNAL_PORT</span></code> capability (and thus
+requires software to feed incoming packets into the event device). In
+this case, the best performance may be achieved if the Event Ethernet
+RX and/or TX Adapters are mapped to lcores also used for event
+dispatching, since otherwise the adapter lcores would have a lot of
+idle CPU cycles.</p>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="event_dma_adapter.html" title="previous chapter"><span class="section-number">54. </span>Event DMA Adapter Library</a></li>
+      <li>Next: <a href="qos_framework.html" title="next chapter"><span class="section-number">56. </span>Quality of Service (QoS) Framework</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/dispatcher_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

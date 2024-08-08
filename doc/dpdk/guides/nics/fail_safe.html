@@ -1,0 +1,336 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>22. Fail-safe poll mode driver library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="23. FM10K Poll Mode Driver" href="fm10k.html" />
+    <link rel="prev" title="21. ENIC Poll Mode Driver" href="enic.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="fail-safe-poll-mode-driver-library">
+<h1><span class="section-number">22. </span>Fail-safe poll mode driver library</h1>
+<p>The Fail-safe poll mode driver library (<strong>librte_net_failsafe</strong>) implements a
+virtual device that allows using device supporting hotplug, without modifying
+other components relying on such device (application, other PMDs).
+In this context, hotplug support is meant as plugging or removing a device
+from its bus suddenly.</p>
+<p>Additionally to the Seamless Hotplug feature, the Fail-safe PMD offers the
+ability to redirect operations to a secondary device when the primary has been
+removed from the system.</p>
+<section id="features">
+<h2><span class="section-number">22.1. </span>Features</h2>
+<p>The Fail-safe PMD only supports a limited set of features. If you plan to use a
+device underneath the Fail-safe PMD with a specific feature, this feature must
+also be supported by the Fail-safe PMD.</p>
+<p>A notable exception is the device removal feature. The fail-safe PMD is not
+meant to be removed itself, unlike its sub-devices which should support it.
+If a sub-device supports hotplugging, the fail-safe PMD will enable its use
+automatically by detecting capable devices and registering the relevant handler.</p>
+<p>Check the feature matrix for the complete set of supported features.</p>
+</section>
+<section id="using-the-fail-safe-pmd-from-the-eal-command-line">
+<h2><span class="section-number">22.2. </span>Using the Fail-safe PMD from the EAL command line</h2>
+<p>The Fail-safe PMD can be used like most other DPDK virtual devices, by passing a
+<code class="docutils literal notranslate"><span class="pre">--vdev</span></code> parameter to the EAL when starting the application. The device name
+must start with the <em>net_failsafe</em> prefix, followed by numbers or letters. This
+name must be unique for each device. Each fail-safe instance must have at least one
+sub-device, and at most two.</p>
+<p>A sub-device can be any DPDK device, including possibly another fail-safe device.</p>
+<section id="fail-safe-command-line-parameters">
+<h3><span class="section-number">22.2.1. </span>Fail-safe command line parameters</h3>
+<ul>
+<li><p><strong>dev(&lt;iface&gt;)</strong> parameter</p>
+<p>This parameter allows the user to define a sub-device. The <code class="docutils literal notranslate"><span class="pre">&lt;iface&gt;</span></code> part of
+this parameter must be a valid device definition. It follows the same format
+provided to any <code class="docutils literal notranslate"><span class="pre">-a</span></code> or <code class="docutils literal notranslate"><span class="pre">--vdev</span></code> options.</p>
+<p>Enclosing the device definition within parentheses here allows using
+additional sub-device parameters if need be. They will be passed on to the
+sub-device.</p>
+</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In case where the sub-device is also used as an allowed device, using <code class="docutils literal notranslate"><span class="pre">-a</span></code>
+on the EAL command line, the fail-safe PMD will use the device with the
+options provided to the EAL instead of its own parameters.</p>
+<p>When trying to use a PCI device automatically probed by the command line,
+the name for the fail-safe sub-device must be the full PCI id:
+Domain:Bus:Device.Function, <em>i.e.</em> <code class="docutils literal notranslate"><span class="pre">00:00:00.0</span></code> instead of <code class="docutils literal notranslate"><span class="pre">00:00.0</span></code>,
+as the second form is historically accepted by the DPDK.</p>
+</div>
+<ul>
+<li><p><strong>exec(&lt;shell command&gt;)</strong> parameter</p>
+<p>This parameter allows the user to provide a command to the fail-safe PMD to
+execute and define a sub-device.
+It is done within a regular shell context.
+The first line of its output is read by the fail-safe PMD and otherwise
+interpreted as if passed to a <strong>dev</strong> parameter.
+Any other line is discarded.
+If the command fails or output an incorrect string, the sub-device is not
+initialized.
+All commas within the <code class="docutils literal notranslate"><span class="pre">shell</span> <span class="pre">command</span></code> are replaced by spaces before
+executing the command. This helps using scripts to specify devices.</p>
+</li>
+<li><p><strong>fd(&lt;file descriptor number&gt;)</strong> parameter</p>
+<p>This parameter reads a device definition from an arbitrary file descriptor
+number in <code class="docutils literal notranslate"><span class="pre">&lt;iface&gt;</span></code> format as described above.</p>
+<p>The file descriptor is read in non-blocking mode and is never closed in
+order to take only the last line into account (unlike <code class="docutils literal notranslate"><span class="pre">exec()</span></code>) at every
+probe attempt.</p>
+</li>
+<li><p><strong>mac</strong> parameter [MAC address]</p>
+<p>This parameter allows the user to set a default MAC address to the fail-safe
+and all of its sub-devices.
+If no default mac address is provided, the fail-safe PMD will read the MAC
+address of the first of its sub-device to be successfully probed and use it as
+its default MAC address, trying to set it to all of its other sub-devices.
+If no sub-device was successfully probed at initialization, then a random MAC
+address is generated, that will be subsequently applied to all sub-devices once
+they are probed.</p>
+</li>
+<li><p><strong>hotplug_poll</strong> parameter [UINT64] (default <strong>2000</strong>)</p>
+<p>This parameter allows the user to configure the amount of time in milliseconds
+between two sub-device upkeep round.</p>
+</li>
+</ul>
+</section>
+<section id="usage-example">
+<h3><span class="section-number">22.2.2. </span>Usage example</h3>
+<p>This section shows some example of using <strong>testpmd</strong> with a fail-safe PMD.</p>
+<ol class="arabic">
+<li><p>To build a PMD and configure DPDK, refer to the document
+<a class="reference internal" href="build_and_test.html#pmd-build-and-test"><span class="std std-ref">compiling and testing a PMD for a NIC</span></a>.</p></li>
+<li><p>Start testpmd. The sub-device <code class="docutils literal notranslate"><span class="pre">84:00.0</span></code> should be blocked from normal EAL
+operations to avoid probing it twice, as the PCI bus is in blocklist mode.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -c 0xff -n 4 \</span>
+<span class="go">   --vdev &#39;net_failsafe0,mac=de:ad:be:ef:01:02,dev(84:00.0),dev(net_ring0)&#39; \</span>
+<span class="go">   -b 84:00.0 -b 00:04.0 -- -i</span>
+</pre></div>
+</div>
+<p>If the sub-device <code class="docutils literal notranslate"><span class="pre">84:00.0</span></code> is not blocked, it will be probed by the
+EAL first. When the fail-safe then tries to initialize it the probe operation
+fails.</p>
+<p>Note that PCI blocklist mode is the default PCI operating mode.</p>
+</li>
+<li><p>Alternatively, it can be used alongside any other device in allow mode.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -c 0xff -n 4 \</span>
+<span class="go">   --vdev &#39;net_failsafe0,mac=de:ad:be:ef:01:02,dev(84:00.0),dev(net_ring0)&#39; \</span>
+<span class="go">   -a 81:00.0 -- -i</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd using a flexible device definition</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -c 0xff -n 4 -a ff:ff.f \</span>
+<span class="go">   --vdev=&#39;net_failsafe0,exec(echo 84:00.0)&#39; -- -i</span>
+</pre></div>
+</div>
+</li>
+<li><p>Start testpmd, automatically probing the device 84:00.0 and using it with
+the fail-safe.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./&lt;build_dir&gt;/app/dpdk-testpmd -c 0xff -n 4 \</span>
+<span class="go">   --vdev &#39;net_failsafe0,dev(0000:84:00.0),dev(net_ring0)&#39; -- -i</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+<section id="using-the-fail-safe-pmd-from-an-application">
+<h2><span class="section-number">22.3. </span>Using the Fail-safe PMD from an application</h2>
+<p>This driver strives to be as seamless as possible to existing applications, in
+order to propose the hotplug functionality in the easiest way possible.</p>
+<p>Care must be taken, however, to respect the <strong>ether</strong> API concerning device
+access, and in particular, using the <code class="docutils literal notranslate"><span class="pre">RTE_ETH_FOREACH_DEV</span></code> macro to iterate
+over ethernet devices, instead of directly accessing them or by writing one’s
+own device iterator.</p>
+<blockquote>
+<div><div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="kt">unsigned</span><span class="w"> </span><span class="kt">int</span><span class="w"> </span><span class="n">i</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* VALID iteration over eth-dev. */</span><span class="w"></span>
+<span class="n">RTE_ETH_FOREACH_DEV</span><span class="p">(</span><span class="n">i</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">[...]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* INVALID iteration over eth-dev. */</span><span class="w"></span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="n">i</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">RTE_MAX_ETHPORTS</span><span class="p">;</span><span class="w"> </span><span class="n">i</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">        </span><span class="p">[...]</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+</div></blockquote>
+</section>
+<section id="plug-in-feature">
+<h2><span class="section-number">22.4. </span>Plug-in feature</h2>
+<p>A sub-device can be defined without existing on the system when the fail-safe
+PMD is initialized. Upon probing this device, the fail-safe PMD will detect its
+absence and postpone its use. It will then register for a periodic check on any
+missing sub-device.</p>
+<p>During this time, the fail-safe PMD can be used normally, configured and told to
+emit and receive packets. It will store any applied configuration but will fail
+to emit anything, returning <code class="docutils literal notranslate"><span class="pre">0</span></code> from its TX function. Any unsent packet must
+be freed.</p>
+<p>Upon the probing of its missing sub-device, the current stored configuration
+will be applied. After this configuration pass, the new sub-device will be
+synchronized with other sub-devices, i.e. be started if the fail-safe PMD has
+been started by the user before.</p>
+</section>
+<section id="plug-out-feature">
+<h2><span class="section-number">22.5. </span>Plug-out feature</h2>
+<p>A sub-device supporting the device removal event can be removed from its bus at
+any time. The fail-safe PMD will register a callback for such event and react
+accordingly. It will try to safely stop, close and uninit the sub-device having
+emitted this event, allowing it to free its eventual resources.</p>
+</section>
+<section id="fail-safe-glossary">
+<h2><span class="section-number">22.6. </span>Fail-safe glossary</h2>
+<dl>
+<dt>Fallback device</dt><dd><p>Also called <strong>Secondary device</strong>.</p>
+<p>The fail-safe will fail-over onto this device when the preferred device is
+absent.</p>
+</dd>
+<dt>Preferred device</dt><dd><p>Also called <strong>Primary device</strong>.</p>
+<p>The first declared sub-device in the fail-safe parameters.
+When this device is plugged, it is always used as emitting device.
+It is the main sub-device and is used as target for configuration
+operations if there is any ambiguity.</p>
+</dd>
+<dt>Upkeep round</dt><dd><p>Periodical event during which sub-devices are serviced. Each devices having a state
+different to that of the fail-safe device itself, is synchronized with it
+(brought down or up accordingly). Additionally, any sub-device marked for
+removal is cleaned-up.</p>
+</dd>
+<dt>Slave</dt><dd><p>In the context of the fail-safe PMD, synonymous to sub-device.</p>
+</dd>
+<dt>Sub-device</dt><dd><p>A device being utilized by the fail-safe PMD.
+This is another PMD running underneath the fail-safe PMD.
+Any sub-device can disappear at any time. The fail-safe will ensure
+that the device removal happens gracefully.</p>
+</dd>
+</dl>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="enic.html" title="previous chapter"><span class="section-number">21. </span>ENIC Poll Mode Driver</a></li>
+      <li>Next: <a href="fm10k.html" title="next chapter"><span class="section-number">23. </span>FM10K Poll Mode Driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/fail_safe.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

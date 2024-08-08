@@ -1,0 +1,431 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>5. Generic flow API - examples &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="6. PVP reference benchmark setup using testpmd" href="pvp_reference_benchmark.html" />
+    <link rel="prev" title="4. Flow Bifurcation How-to Guide" href="flow_bifurcation.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="generic-flow-api-examples">
+<h1><span class="section-number">5. </span>Generic flow API - examples</h1>
+<p>This document demonstrates some concrete examples for programming flow rules
+with the <code class="docutils literal notranslate"><span class="pre">rte_flow</span></code> APIs.</p>
+<ul class="simple">
+<li><p>Detail of the rte_flow APIs can be found in the following link:
+<a class="reference internal" href="../prog_guide/rte_flow.html"><span class="doc">Generic flow API (rte_flow)</span></a>.</p></li>
+<li><p>Details of the TestPMD commands to set the flow rules can be found in the
+following link: <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html#testpmd-rte-flow"><span class="std std-ref">TestPMD Flow rules</span></a></p></li>
+</ul>
+<section id="simple-ipv4-drop">
+<h2><span class="section-number">5.1. </span>Simple IPv4 drop</h2>
+<section id="description">
+<h3><span class="section-number">5.1.1. </span>Description</h3>
+<p>In this example we will create a simple rule that drops packets whose IPv4
+destination equals 192.168.3.2. This code is equivalent to the following
+testpmd command (wrapped for clarity):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 ingress pattern eth / vlan /
+                  ipv4 dst is 192.168.3.2 / end actions drop / end
+</pre></div>
+</div>
+</section>
+<section id="code">
+<h3><span class="section-number">5.1.2. </span>Code</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="cm">/* create the attribute structure */</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_attr</span><span class="w"> </span><span class="n">attr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">ingress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item</span><span class="w"> </span><span class="n">pattern</span><span class="p">[</span><span class="n">MAX_PATTERN_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_action</span><span class="w"> </span><span class="n">actions</span><span class="p">[</span><span class="n">MAX_ACTIONS_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_eth</span><span class="w"> </span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_vlan</span><span class="w"> </span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_ipv4</span><span class="w"> </span><span class="n">ipv4</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow</span><span class="w"> </span><span class="o">*</span><span class="n">flow</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_error</span><span class="w"> </span><span class="n">error</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* setting the eth to pass all packets */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_ETH</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* set the vlan to pass all packets */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_VLAN</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* set the dst ipv4 packet to the required value */</span><span class="w"></span>
+<span class="n">ipv4</span><span class="p">.</span><span class="n">hdr</span><span class="p">.</span><span class="n">dst_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">htonl</span><span class="p">(</span><span class="mh">0xc0a80302</span><span class="p">);</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_IPV4</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ipv4</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* end the pattern array */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">3</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* create the drop action */</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_DROP</span><span class="p">;</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* validate and create the flow rule */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">rte_flow_validate</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="n">flow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_flow_create</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="output">
+<h3><span class="section-number">5.1.3. </span>Output</h3>
+<p>Terminal 1: running sample app with the flow rule disabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program disable
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.5&#39;, dst=&#39;192.168.3.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.4
+received packet with src ip = 176.80.50.5
+</pre></div>
+</div>
+<p>Terminal 1: running sample the app flow rule enabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program enabled
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;),  \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.5&#39;, dst =&#39;192.168.3.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.4
+</pre></div>
+</div>
+</section>
+</section>
+<section id="range-ipv4-drop">
+<h2><span class="section-number">5.2. </span>Range IPv4 drop</h2>
+<section id="id1">
+<h3><span class="section-number">5.2.1. </span>Description</h3>
+<p>In this example we will create a simple rule that drops packets whose IPv4
+destination is in the range 192.168.3.0 to 192.168.3.255. This is done using
+a mask.</p>
+<p>This code is equivalent to the following testpmd command (wrapped for
+clarity):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 ingress pattern eth / vlan /
+                  ipv4 dst spec 192.168.3.0 dst mask 255.255.255.0 /
+                  end actions drop / end
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h3><span class="section-number">5.2.2. </span>Code</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_attr</span><span class="w"> </span><span class="n">attr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{.</span><span class="n">ingress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="p">};</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item</span><span class="w"> </span><span class="n">pattern</span><span class="p">[</span><span class="n">MAX_PATTERN_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_action</span><span class="w"> </span><span class="n">actions</span><span class="p">[</span><span class="n">MAX_ACTIONS_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_eth</span><span class="w"> </span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_vlan</span><span class="w"> </span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_ipv4</span><span class="w"> </span><span class="n">ipv4</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_ipv4</span><span class="w"> </span><span class="n">ipv4_mask</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow</span><span class="w"> </span><span class="o">*</span><span class="n">flow</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_error</span><span class="w"> </span><span class="n">error</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* setting the eth to pass all packets */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_ETH</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* set the vlan to pass all packets */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_VLAN</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* set the dst ipv4 packet to the required value */</span><span class="w"></span>
+<span class="n">ipv4</span><span class="p">.</span><span class="n">hdr</span><span class="p">.</span><span class="n">dst_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">htonl</span><span class="p">(</span><span class="mh">0xc0a80300</span><span class="p">);</span><span class="w"></span>
+<span class="n">ipv4_mask</span><span class="p">.</span><span class="n">hdr</span><span class="p">.</span><span class="n">dst_addr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">htonl</span><span class="p">(</span><span class="mh">0xffffff00</span><span class="p">);</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_IPV4</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ipv4</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">mask</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">ipv4_mask</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* end the pattern array */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">3</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* create the drop action */</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_DROP</span><span class="p">;</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* validate and create the flow rule */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">rte_flow_validate</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="n">flow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_flow_create</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="id3">
+<h3><span class="section-number">5.2.3. </span>Output</h3>
+<p>Terminal 1: running sample app flow rule disabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program disable
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.5&#39;, dst=&#39;192.168.3.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.6&#39;, dst=&#39;192.168.5.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.4
+received packet with src ip = 176.80.50.5
+received packet with src ip = 176.80.50.6
+</pre></div>
+</div>
+<p>Terminal 1: running sample app flow rule enabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program enabled
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.5&#39;, dst=&#39;192.168.3.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q()/IP(src=&#39;176.80.50.6&#39;, dst=&#39;192.168.5.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.6
+</pre></div>
+</div>
+</section>
+</section>
+<section id="send-vlan-to-queue">
+<h2><span class="section-number">5.3. </span>Send vlan to queue</h2>
+<section id="id4">
+<h3><span class="section-number">5.3.1. </span>Description</h3>
+<p>In this example we will create a rule that routes all vlan id 123 to queue 3.</p>
+<p>This code is equivalent to the following testpmd command (wrapped for
+clarity):</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>testpmd&gt; flow create 0 ingress pattern eth / vlan vid spec 123 /
+                  end actions queue index 3 / end
+</pre></div>
+</div>
+</section>
+<section id="id5">
+<h3><span class="section-number">5.3.2. </span>Code</h3>
+<div class="highlight-c notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_attr</span><span class="w"> </span><span class="n">attr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">ingress</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item</span><span class="w"> </span><span class="n">pattern</span><span class="p">[</span><span class="n">MAX_PATTERN_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_action</span><span class="w"> </span><span class="n">actions</span><span class="p">[</span><span class="n">MAX_ACTIONS_IN_FLOW</span><span class="p">];</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_eth</span><span class="w"> </span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_item_vlan</span><span class="w"> </span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_action_queue</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">.</span><span class="n">index</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="w"> </span><span class="p">};</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow</span><span class="w"> </span><span class="o">*</span><span class="n">flow</span><span class="p">;</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">rte_flow_error</span><span class="w"> </span><span class="n">error</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* setting the eth to pass all packets */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_ETH</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">eth</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* set the vlan to pas all packets */</span><span class="w"></span>
+<span class="n">vlan</span><span class="p">.</span><span class="n">vid</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">123</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_VLAN</span><span class="p">;</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">spec</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">vlan</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* end the pattern array */</span><span class="w"></span>
+<span class="n">pattern</span><span class="p">[</span><span class="mi">2</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ITEM_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* create the queue action */</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_QUEUE</span><span class="p">;</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">].</span><span class="n">conf</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="o">&amp;</span><span class="n">queue</span><span class="p">;</span><span class="w"></span>
+<span class="n">actions</span><span class="p">[</span><span class="mi">1</span><span class="p">].</span><span class="n">type</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RTE_FLOW_ACTION_TYPE_END</span><span class="p">;</span><span class="w"></span>
+
+<span class="cm">/* validate and create the flow rule */</span><span class="w"></span>
+<span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="o">!</span><span class="n">rte_flow_validate</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">))</span><span class="w"></span>
+<span class="w">    </span><span class="n">flow</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">rte_flow_create</span><span class="p">(</span><span class="n">port_id</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">attr</span><span class="p">,</span><span class="w"> </span><span class="n">pattern</span><span class="p">,</span><span class="w"> </span><span class="n">actions</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">error</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="id6">
+<h3><span class="section-number">5.3.3. </span>Output</h3>
+<p>Terminal 1: running sample app flow rule disabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program disable
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=123)/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=50)/IP(src=&#39;176.80.50.5&#39;, dst=&#39;192.168.3.2&#39;),  \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=123)/IP(src=&#39;176.80.50.6&#39;, dst=&#39;192.168.5.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.4 sent to queue 2
+received packet with src ip = 176.80.50.5 sent to queue 1
+received packet with src ip = 176.80.50.6 sent to queue 0
+</pre></div>
+</div>
+<p>Terminal 1: running sample app flow rule enabled:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>./filter-program enabled
+[waiting for packets]
+</pre></div>
+</div>
+<p>Terminal 2: running scapy:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>$scapy
+welcome to Scapy
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=123)/IP(src=&#39;176.80.50.4&#39;, dst=&#39;192.168.3.1&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=50)/IP(src=&#39;176.80.50.5&#39;, dst=&#39;192.168.3.2&#39;),  \
+         iface=&#39;some interface&#39;, count=1)
+&gt;&gt; sendp(Ether()/Dot1Q(vlan=123)/IP(src=&#39;176.80.50.6&#39;, dst=&#39;192.168.5.2&#39;), \
+         iface=&#39;some interface&#39;, count=1)
+</pre></div>
+</div>
+<p>Terminal 1: output log:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>received packet with src ip = 176.80.50.4 sent to queue 3
+received packet with src ip = 176.80.50.5 sent to queue 1
+received packet with src ip = 176.80.50.6 sent to queue 3
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">HowTo Guides</a><ul>
+      <li>Previous: <a href="flow_bifurcation.html" title="previous chapter"><span class="section-number">4. </span>Flow Bifurcation How-to Guide</a></li>
+      <li>Next: <a href="pvp_reference_benchmark.html" title="next chapter"><span class="section-number">6. </span>PVP reference benchmark setup using testpmd</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/howto/rte_flow.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

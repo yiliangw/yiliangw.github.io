@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>11. Stack Library &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="12. Mempool Library" href="mempool_lib.html" />
+    <link rel="prev" title="10. Ring Library" href="ring_lib.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="stack-library">
+<h1><span class="section-number">11. </span>Stack Library</h1>
+<p>DPDK’s stack library provides an API for configuration and use of a bounded
+stack of pointers.</p>
+<p>The stack library provides the following basic operations:</p>
+<ul class="simple">
+<li><p>Create a uniquely named stack of a user-specified size and using a
+user-specified socket, with either standard (lock-based) or lock-free
+behavior.</p></li>
+<li><p>Push and pop a burst of one or more stack objects (pointers). These function
+are multi-threading safe.</p></li>
+<li><p>Free a previously created stack.</p></li>
+<li><p>Lookup a pointer to a stack by its name.</p></li>
+<li><p>Query a stack’s current depth and number of free entries.</p></li>
+</ul>
+<section id="implementation">
+<h2><span class="section-number">11.1. </span>Implementation</h2>
+<p>The library supports two types of stacks: standard (lock-based) and lock-free.
+Both types use the same set of interfaces, but their implementations differ.</p>
+<section id="lock-based-stack">
+<span id="stack-library-std-stack"></span><h3><span class="section-number">11.1.1. </span>Lock-based Stack</h3>
+<p>The lock-based stack consists of a contiguous array of pointers, a current
+index, and a spinlock. Accesses to the stack are made multi-thread safe by the
+spinlock.</p>
+</section>
+<section id="lock-free-stack">
+<span id="stack-library-lf-stack"></span><h3><span class="section-number">11.1.2. </span>Lock-free Stack</h3>
+<p>The lock-free stack consists of a linked list of elements, each containing a
+data pointer and a next pointer, and an atomic stack depth counter. The
+lock-free property means that multiple threads can push and pop simultaneously,
+and one thread being preempted/delayed in a push or pop operation will not
+impede the forward progress of any other thread.</p>
+<p>The lock-free push operation enqueues a linked list of pointers by pointing the
+list’s tail to the current stack head, and using a CAS to swing the stack head
+pointer to the head of the list. The operation retries if it is unsuccessful
+(i.e. the list changed between reading the head and modifying it), else it
+adjusts the stack length and returns.</p>
+<p>The lock-free pop operation first reserves one or more list elements by
+adjusting the stack length, to ensure the dequeue operation will succeed
+without blocking. It then dequeues pointers by walking the list – starting
+from the head – then swinging the head pointer (using a CAS as well). While
+walking the list, the data pointers are recorded in an object table.</p>
+<p>The linked list elements themselves are maintained in a lock-free LIFO, and are
+allocated before stack pushes and freed after stack pops. Since the stack has a
+fixed maximum depth, these elements do not need to be dynamically created.</p>
+<p>The lock-free behavior is selected by passing the <em>RTE_STACK_F_LF</em> flag to
+rte_stack_create().</p>
+<section id="preventing-the-aba-problem">
+<h4><span class="section-number">11.1.2.1. </span>Preventing the ABA Problem</h4>
+<p>To prevent the ABA problem, this algorithm stack uses a 128-bit
+compare-and-swap instruction to atomically update both the stack top pointer
+and a modification counter. The ABA problem can occur without a modification
+counter if, for example:</p>
+<ol class="arabic simple">
+<li><p>Thread A reads head pointer X and stores the pointed-to list element.</p></li>
+<li><p>Other threads modify the list such that the head pointer is once again X,
+but its pointed-to data is different than what thread A read.</p></li>
+<li><p>Thread A changes the head pointer with a compare-and-swap and succeeds.</p></li>
+</ol>
+<p>In this case thread A would not detect that the list had changed, and would
+both pop stale data and incorrect change the head pointer. By adding a
+modification counter that is updated on every push and pop as part of the
+compare-and-swap, the algorithm can detect when the list changes even if the
+head pointer remains the same.</p>
+</section>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Programmer’s Guide</a><ul>
+      <li>Previous: <a href="ring_lib.html" title="previous chapter"><span class="section-number">10. </span>Ring Library</a></li>
+      <li>Next: <a href="mempool_lib.html" title="next chapter"><span class="section-number">12. </span>Mempool Library</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/prog_guide/stack_lib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

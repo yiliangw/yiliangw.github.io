@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>6. ZLIB Compression Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="vDPA Device Drivers" href="../vdpadevs/index.html" />
+    <link rel="prev" title="5. Intel(R) QuickAssist (QAT) Compression Poll Mode Driver" href="qat_comp.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="zlib-compression-poll-mode-driver">
+<h1><span class="section-number">6. </span>ZLIB Compression Poll Mode Driver</h1>
+<p>The ZLIB PMD (<strong>librte_compress_zlib</strong>) provides poll mode compression &amp;
+decompression driver based on SW zlib library,</p>
+<section id="features">
+<h2><span class="section-number">6.1. </span>Features</h2>
+<p>ZLIB PMD has support for:</p>
+<p>Compression/Decompression algorithm:</p>
+<ul class="simple">
+<li><p>DEFLATE</p></li>
+</ul>
+<p>Huffman code type:</p>
+<ul class="simple">
+<li><p>FIXED</p></li>
+<li><p>DYNAMIC</p></li>
+</ul>
+<p>Window size support:</p>
+<ul class="simple">
+<li><p>Min - 256 bytes</p></li>
+<li><p>Max - 32K</p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">6.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Scatter-Gather and Stateful not supported.</p></li>
+</ul>
+</section>
+<section id="installation">
+<h2><span class="section-number">6.3. </span>Installation</h2>
+<ul>
+<li><p>To build DPDK with ZLIB library, the user is required to download the <code class="docutils literal notranslate"><span class="pre">libz</span></code> library.</p></li>
+<li><p>Use following command for installation.</p></li>
+<li><dl class="simple">
+<dt>For Fedora users::</dt><dd><p>sudo yum install zlib-devel</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>For Ubuntu users::</dt><dd><p>sudo apt-get install zlib1g-dev</p>
+</dd>
+</dl>
+</li>
+<li><p>Once downloaded, the user needs to build the library.</p></li>
+<li><p>To build from sources
+download zlib sources from <a class="reference external" href="http://zlib.net/">http://zlib.net/</a> and do following before building DPDK:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>make
+sudo make install
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+<section id="initialization">
+<h2><span class="section-number">6.4. </span>Initialization</h2>
+<p>To use the PMD in an application, user must:</p>
+<ul class="simple">
+<li><p>Call <code class="docutils literal notranslate"><span class="pre">rte_vdev_init(&quot;compress_zlib&quot;)</span></code> within the application.</p></li>
+<li><p>Use <code class="docutils literal notranslate"><span class="pre">--vdev=&quot;compress_zlib&quot;</span></code> in the EAL options, which will call <code class="docutils literal notranslate"><span class="pre">rte_vdev_init()</span></code> internally.</p></li>
+</ul>
+<p>The following parameter (optional) can be provided in the previous two calls:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">socket_id:</span></code> Specify the socket where the memory for the device is going to be allocated
+(by default, socket_id will be the socket where the core that is creating the PMD is running on).</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Compression Device Drivers</a><ul>
+      <li>Previous: <a href="qat_comp.html" title="previous chapter"><span class="section-number">5. </span>Intel(R) QuickAssist (QAT) Compression Poll Mode Driver</a></li>
+      <li>Next: <a href="../vdpadevs/index.html" title="next chapter">vDPA Device Drivers</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/compressdevs/zlib.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,857 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>41. MVPP2 Poll Mode Driver &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="42. Netvsc poll mode driver" href="netvsc.html" />
+    <link rel="prev" title="40. MVNETA Poll Mode Driver" href="mvneta.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="mvpp2-poll-mode-driver">
+<span id="id1"></span><h1><span class="section-number">41. </span>MVPP2 Poll Mode Driver</h1>
+<p>The MVPP2 PMD (<strong>librte_net_mvpp2</strong>) provides poll mode driver support
+for the Marvell PPv2 (Packet Processor v2) 1/10 Gbps adapter.</p>
+<p>Detailed information about SoCs that use PPv2 can be obtained here:</p>
+<ul class="simple">
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-70xx/">https://www.marvell.com/embedded-processors/armada-70xx/</a></p></li>
+<li><p><a class="reference external" href="https://www.marvell.com/embedded-processors/armada-80xx/">https://www.marvell.com/embedded-processors/armada-80xx/</a></p></li>
+</ul>
+<section id="features">
+<h2><span class="section-number">41.1. </span>Features</h2>
+<p>Features of the MVPP2 PMD are:</p>
+<ul class="simple">
+<li><p>Speed capabilities</p></li>
+<li><p>Link status</p></li>
+<li><p>Tx Queue start/stop</p></li>
+<li><p>MTU update</p></li>
+<li><p>Jumbo frame</p></li>
+<li><p>Promiscuous mode</p></li>
+<li><p>Allmulticast mode</p></li>
+<li><p>Unicast MAC filter</p></li>
+<li><p>Multicast MAC filter</p></li>
+<li><p>RSS hash</p></li>
+<li><p>VLAN filter</p></li>
+<li><p>CRC offload</p></li>
+<li><p>L3 checksum offload</p></li>
+<li><p>L4 checksum offload</p></li>
+<li><p>Packet type parsing</p></li>
+<li><p>Basic stats</p></li>
+<li><p><a class="reference internal" href="#extstats"><span class="std std-ref">Extended stats</span></a></p></li>
+<li><p>RX flow control</p></li>
+<li><p>Scattered TX frames</p></li>
+<li><p><a class="reference internal" href="#extconf"><span class="std std-ref">QoS</span></a></p></li>
+<li><p><a class="reference internal" href="#flowapi"><span class="std std-ref">Flow API</span></a></p></li>
+<li><p><a class="reference internal" href="#mtrapi"><span class="std std-ref">Traffic metering and policing</span></a></p></li>
+<li><p><a class="reference internal" href="#tmapi"><span class="std std-ref">Traffic Management API</span></a></p></li>
+</ul>
+</section>
+<section id="limitations">
+<h2><span class="section-number">41.2. </span>Limitations</h2>
+<ul class="simple">
+<li><p>Number of lcores is limited to 9 by MUSDK internal design. If more lcores
+need to be allocated, locking will have to be considered. Number of available
+lcores can be changed via <code class="docutils literal notranslate"><span class="pre">MRVL_MUSDK_HIFS_RESERVED</span></code> define in
+<code class="docutils literal notranslate"><span class="pre">mrvl_ethdev.c</span></code> source file.</p></li>
+<li><p>Flushing vlans added for filtering is not possible due to MUSDK missing
+functionality. Current workaround is to reset board so that PPv2 has a
+chance to start in a sane state.</p></li>
+<li><p>MUSDK architecture does not support changing configuration in run time.
+All necessary configurations should be done before first dev_start().</p></li>
+<li><p>RX queue start/stop is not supported.</p></li>
+<li><p>Current implementation does not support replacement of buffers in the HW buffer pool
+at run time, so it is responsibility of the application to ensure that MTU does not exceed the configured buffer size.</p></li>
+<li><p>Configuring TX flow control currently is not supported.</p></li>
+<li><p>In current implementation, mechanism for acknowledging transmitted packets (<code class="docutils literal notranslate"><span class="pre">tx_done_cleanup</span></code>) is not supported.</p></li>
+<li><p>Running more than one DPDK-MUSDK application simultaneously is not supported.</p></li>
+</ul>
+</section>
+<section id="prerequisites">
+<h2><span class="section-number">41.3. </span>Prerequisites</h2>
+<ul>
+<li><p>Custom Linux Kernel sources</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/MarvellEmbeddedProcessors/linux-marvell.git -b linux-4.4.120-armada-18.09</span>
+</pre></div>
+</div>
+</li>
+<li><p>Out of tree <cite>mvpp2x_sysfs</cite> kernel module sources</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/MarvellEmbeddedProcessors/mvpp2x-marvell.git -b mvpp2x-armada-18.09</span>
+</pre></div>
+</div>
+</li>
+<li><p>MUSDK (Marvell User-Space SDK) sources</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">git clone https://github.com/MarvellEmbeddedProcessors/musdk-marvell.git -b musdk-release-SDK-10.3.5.0-PR2</span>
+</pre></div>
+</div>
+<p>MUSDK is a light-weight library that provides direct access to Marvell’s
+PPv2 (Packet Processor v2). Alternatively prebuilt MUSDK library can be
+requested from <a class="reference external" href="https://extranet.marvell.com">Marvell Extranet</a>. Once
+approval has been granted, library can be found by typing <code class="docutils literal notranslate"><span class="pre">musdk</span></code> in
+the search box.</p>
+<p>To get better understanding of the library one can consult documentation
+available in the <code class="docutils literal notranslate"><span class="pre">doc</span></code> top level directory of the MUSDK sources.</p>
+</li>
+<li><p>DPDK environment</p>
+<p>Follow the DPDK <a class="reference internal" href="../linux_gsg/index.html#linux-gsg"><span class="std std-ref">Getting Started Guide for Linux</span></a> to setup
+DPDK environment.</p>
+</li>
+</ul>
+</section>
+<section id="building-musdk">
+<h2><span class="section-number">41.4. </span>Building MUSDK</h2>
+<p>Driver needs precompiled MUSDK library during compilation.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export CROSS_COMPILE=&lt;toolchain&gt;/bin/aarch64-linux-gnu-</span>
+<span class="go">./bootstrap</span>
+<span class="go">./configure --host=aarch64-linux-gnu</span>
+<span class="go">make install</span>
+</pre></div>
+</div>
+<p>MUSDK will be installed to <cite>usr/local</cite> under current directory.
+For the detailed build instructions please consult <code class="docutils literal notranslate"><span class="pre">doc/musdk_get_started.txt</span></code>.</p>
+</section>
+<section id="building-dpdk">
+<h2><span class="section-number">41.5. </span>Building DPDK</h2>
+<p>Add path to libmusdk.pc in PKG_CONFIG_PATH environment variable.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">export PKG_CONFIG_PATH=$&lt;musdk_install_dir&gt;/lib/pkgconfig/:$PKG_CONFIG_PATH</span>
+
+<span class="go">meson setup build --cross-file config/arm/arm64_armada_linux_gcc</span>
+<span class="go">ninja -C build</span>
+</pre></div>
+</div>
+</section>
+<section id="usage-example">
+<h2><span class="section-number">41.6. </span>Usage Example</h2>
+<p>MVPP2 PMD requires extra out of tree kernel modules to function properly.
+<cite>musdk_cma</cite> sources are part of the MUSDK. Please consult
+<code class="docutils literal notranslate"><span class="pre">doc/musdk_get_started.txt</span></code> for the detailed build instructions.
+For <cite>mvpp2x_sysfs</cite> please consult <code class="docutils literal notranslate"><span class="pre">Documentation/pp22_sysfs.txt</span></code> for the
+detailed build instructions.</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">insmod musdk_cma.ko</span>
+<span class="go">insmod mvpp2x_sysfs.ko</span>
+</pre></div>
+</div>
+<p>Additionally interfaces used by DPDK application need to be put up:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">ip link set eth0 up</span>
+<span class="go">ip link set eth2 up</span>
+</pre></div>
+</div>
+<p>In order to run testpmd example application following command can be used:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=eth_mvpp2,iface=eth0,iface=eth2 -c 7 -- \</span>
+<span class="go">  --burst=128 --txd=2048 --rxd=1024 --rxq=2 --txq=2  --nb-cores=2 \</span>
+<span class="go">  -i -a --rss-udp</span>
+</pre></div>
+</div>
+</section>
+<section id="extended-stats">
+<span id="extstats"></span><h2><span class="section-number">41.7. </span>Extended stats</h2>
+<p>MVPP2 PMD supports the following extended statistics:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_bytes</span></code>: number of RX bytes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_packets</span></code>: number of RX packets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_unicast_packets</span></code>: number of RX unicast packets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_errors</span></code>: number of RX MAC errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_fullq_dropped</span></code>: number of RX packets dropped due to full RX queue</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_bm_dropped</span></code>: number of RX packets dropped due to no available buffers in the HW pool</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_early_dropped</span></code>: number of RX packets that were early dropped</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_fifo_dropped</span></code>: number of RX packets dropped due to RX fifo overrun</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rx_cls_dropped</span></code>: number of RX packets dropped by classifier</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_bytes</span></code>: number of TX bytes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_packets</span></code>: number of TX packets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_unicast_packets</span></code>: number of TX unicast packets</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tx_errors</span></code>: number of TX MAC errors</p></li>
+</ul>
+</div></blockquote>
+</section>
+<section id="external-configuration">
+<span id="extconf"></span><h2><span class="section-number">41.8. </span>External Configuration</h2>
+<p>Several driver configuration (e.g. QoS) can be done through external configuration file. Path to the
+file must be given as <cite>cfg</cite> in driver’s vdev parameter list.</p>
+<section id="configuration-syntax">
+<h3><span class="section-number">41.8.1. </span>Configuration syntax</h3>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[policer &lt;policer_id&gt;]</span>
+<span class="go">token_unit = &lt;token_unit&gt;</span>
+<span class="go">color = &lt;color_mode&gt;</span>
+<span class="go">cir = &lt;cir&gt;</span>
+<span class="go">ebs = &lt;ebs&gt;</span>
+<span class="go">cbs = &lt;cbs&gt;</span>
+
+<span class="go">[parser udf &lt;udf_id&gt;]</span>
+<span class="go">proto = &lt;proto&gt;</span>
+<span class="go">field = &lt;field&gt;</span>
+<span class="go">key = &lt;key&gt;</span>
+<span class="go">mask = &lt;mask&gt;</span>
+<span class="go">offset = &lt;offset&gt;</span>
+
+<span class="go">[port &lt;portnum&gt; default]</span>
+<span class="go">start_hdr = &lt;start_hdr&gt;</span>
+<span class="go">forward_bad_frames = &lt;forward_bad_frames&gt;</span>
+<span class="go">fill_bpool_buffs = &lt;fill_bpool_buffs&gt;</span>
+<span class="go">default_tc = &lt;default_tc&gt;</span>
+<span class="go">mapping_priority = &lt;mapping_priority&gt;</span>
+
+<span class="go">rate_limit_enable = &lt;rate_limit_enable&gt;</span>
+<span class="go">rate_limit = &lt;rate_limit&gt;</span>
+<span class="go">burst_size = &lt;burst_size&gt;</span>
+
+<span class="go">default_policer = &lt;policer_id&gt;</span>
+
+<span class="go">[port &lt;portnum&gt; tc &lt;traffic_class&gt;]</span>
+<span class="go">rxq = &lt;rx_queue_list&gt;</span>
+<span class="go">pcp = &lt;pcp_list&gt;</span>
+<span class="go">dscp = &lt;dscp_list&gt;</span>
+<span class="go">default_color = &lt;default_color&gt;</span>
+
+<span class="go">[port &lt;portnum&gt; tc &lt;traffic_class&gt;]</span>
+<span class="go">rxq = &lt;rx_queue_list&gt;</span>
+<span class="go">pcp = &lt;pcp_list&gt;</span>
+<span class="go">dscp = &lt;dscp_list&gt;</span>
+
+<span class="go">[port &lt;portnum&gt; txq &lt;txqnum&gt;]</span>
+<span class="go">sched_mode = &lt;sched_mode&gt;</span>
+<span class="go">wrr_weight = &lt;wrr_weight&gt;</span>
+
+<span class="go">rate_limit_enable = &lt;rate_limit_enable&gt;</span>
+<span class="go">rate_limit = &lt;rate_limit&gt;</span>
+<span class="go">burst_size = &lt;burst_size&gt;</span>
+</pre></div>
+</div>
+<p>Where:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;udf_id&gt;</span></code>: Logical UDF id.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;proto&gt;</span></code>: Indicate the preceding hdr before the UDF header (<cite>eth</cite> or <cite>udp</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;field&gt;</span></code>: Indicate the field of the &lt;proto&gt; hdr (<cite>type</cite> (eth) or <cite>dport</cite> (udp).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;key&gt;</span></code>: UDF key in string format starting with ‘0x’.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;mask&gt;</span></code>: UDF mask in string format starting with ‘0x’.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;offset&gt;</span></code>: Starting UDF offset from the &lt;proto&gt; hdr.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;portnum&gt;</span></code>: DPDK Port number (0..n).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;start_hdr&gt;</span></code>: Indicate what is the start header mode (<cite>none</cite> (eth), <cite>dsa</cite>, <cite>ext_dsa</cite> or <cite>custom</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;forward_bad_frames&gt;</span></code>: Indicate whether to forward or drop l2 bad packets (0 or 1).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;fill_bpool_buffs&gt;</span></code>: Control the amount of refill buffers (default is 64).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;default_tc&gt;</span></code>: Default traffic class (e.g. 0)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;mapping_priority&gt;</span></code>: QoS priority for mapping (<cite>ip</cite>, <cite>vlan</cite>, <cite>ip/vlan</cite> or <cite>vlan/ip</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;traffic_class&gt;</span></code>: Traffic Class to be configured.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;rx_queue_list&gt;</span></code>: List of DPDK RX queues (e.g. 0 1 3-4)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;pcp_list&gt;</span></code>: List of PCP values to handle in particular TC (e.g. 0 1 3-4 7).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;dscp_list&gt;</span></code>: List of DSCP values to handle in particular TC (e.g. 0-12 32-48 63).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;default_policer&gt;</span></code>: Id of the policer configuration section to be used as default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;policer_id&gt;</span></code>: Id of the policer configuration section (0..31).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;token_unit&gt;</span></code>: Policer token unit (<cite>bytes</cite> or <cite>packets</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;color_mode&gt;</span></code>: Policer color mode (<cite>aware</cite> or <cite>blind</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;cir&gt;</span></code>: Committed information rate in unit of kilo bits per second (data rate) or packets per second.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;cbs&gt;</span></code>: Committed burst size in unit of kilo bytes or number of packets.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;ebs&gt;</span></code>: Excess burst size in unit of kilo bytes or number of packets.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;default_color&gt;</span></code>: Default color for specific tc.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;rate_limit_enable&gt;</span></code>: Enables per port or per txq rate limiting (<cite>0</cite>/<cite>1</cite> to disable/enable).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;rate_limit&gt;</span></code>: Committed information rate, in kilo bits per second.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;burst_size&gt;</span></code>: Committed burst size, in kilo bytes.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;sched_mode&gt;</span></code>: Egress scheduler mode (<cite>wrr</cite> or <cite>sp</cite>).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&lt;wrr_weight&gt;</span></code>: Txq weight.</p></li>
+</ul>
+<p>Setting PCP/DSCP values for the default TC is not required. All PCP/DSCP
+values not assigned explicitly to particular TC will be handled by the
+default TC.</p>
+<section id="configuration-file-example">
+<h4><span class="section-number">41.8.1.1. </span>Configuration file example</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[policer 0]</span>
+<span class="go">token_unit = bytes</span>
+<span class="go">color = blind</span>
+<span class="go">cir = 100000</span>
+<span class="go">ebs = 64</span>
+<span class="go">cbs = 64</span>
+
+<span class="go">[port 0 default]</span>
+<span class="go">default_tc = 0</span>
+<span class="go">mapping_priority = ip</span>
+
+<span class="go">rate_limit_enable = 1</span>
+<span class="go">rate_limit = 1000</span>
+<span class="go">burst_size = 2000</span>
+
+<span class="go">[port 0 tc 0]</span>
+<span class="go">rxq = 0 1</span>
+
+<span class="go">[port 0 txq 0]</span>
+<span class="go">sched_mode = wrr</span>
+<span class="go">wrr_weight = 10</span>
+
+<span class="go">[port 0 txq 1]</span>
+<span class="go">sched_mode = wrr</span>
+<span class="go">wrr_weight = 100</span>
+
+<span class="go">[port 0 txq 2]</span>
+<span class="go">sched_mode = sp</span>
+
+<span class="go">[port 0 tc 1]</span>
+<span class="go">rxq = 2</span>
+<span class="go">pcp = 5 6 7</span>
+<span class="go">dscp = 26-38</span>
+
+<span class="go">[port 1 default]</span>
+<span class="go">default_tc = 0</span>
+<span class="go">mapping_priority = vlan/ip</span>
+
+<span class="go">default_policer = 0</span>
+
+<span class="go">[port 1 tc 0]</span>
+<span class="go">rxq = 0</span>
+<span class="go">dscp = 10</span>
+
+<span class="go">[port 1 tc 1]</span>
+<span class="go">rxq = 1</span>
+<span class="go">dscp = 11-20</span>
+
+<span class="go">[port 1 tc 2]</span>
+<span class="go">rxq = 2</span>
+<span class="go">dscp = 30</span>
+
+<span class="go">[port 1 txq 0]</span>
+<span class="go">rate_limit_enable = 1</span>
+<span class="go">rate_limit = 10000</span>
+<span class="go">burst_size = 2000</span>
+</pre></div>
+</div>
+</section>
+<section id="configuration-file-example-with-udf">
+<h4><span class="section-number">41.8.1.2. </span>Configuration file example with UDF</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">[parser udf 0]</span>
+<span class="go">proto = eth</span>
+<span class="go">field = type</span>
+<span class="go">key = 0x8842</span>
+<span class="go">mask = 0xffff</span>
+<span class="go">offset = 6</span>
+</pre></div>
+</div>
+</section>
+<section id="id2">
+<h4><span class="section-number">41.8.1.3. </span>Usage example</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=eth_mvpp2,iface=eth0,iface=eth2,cfg=/home/user/mrvl.conf \</span>
+<span class="go">  -c 7 -- -i -a --disable-hw-vlan-strip --rxq=3 --txq=3</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+<section id="flow-api">
+<span id="flowapi"></span><h2><span class="section-number">41.9. </span>Flow API</h2>
+<p>PPv2 offers packet classification capabilities via classifier engine which
+can be configured via generic flow API offered by DPDK.</p>
+<p>The <a class="reference internal" href="../prog_guide/rte_flow.html#flow-isolated-mode"><span class="std std-ref">Flow isolated mode</span></a> is supported.</p>
+<p>For an additional description please refer to DPDK <a class="reference internal" href="../prog_guide/rte_flow.html"><span class="doc">Generic flow API (rte_flow)</span></a>.</p>
+<section id="supported-flow-actions">
+<h3><span class="section-number">41.9.1. </span>Supported flow actions</h3>
+<p>Following flow action items are supported by the driver:</p>
+<ul class="simple">
+<li><p>DROP</p></li>
+<li><p>QUEUE</p></li>
+<li><p>METER</p></li>
+</ul>
+</section>
+<section id="supported-flow-items">
+<h3><span class="section-number">41.9.2. </span>Supported flow items</h3>
+<p>Following flow items and their respective fields are supported by the driver:</p>
+<ul class="simple">
+<li><p>ETH</p>
+<ul>
+<li><p>source MAC</p></li>
+<li><p>destination MAC</p></li>
+<li><p>ethertype</p></li>
+</ul>
+</li>
+<li><p>VLAN</p>
+<ul>
+<li><p>PCP</p></li>
+<li><p>VID</p></li>
+</ul>
+</li>
+<li><p>IPV4</p>
+<ul>
+<li><p>DSCP</p></li>
+<li><p>protocol</p></li>
+<li><p>source address</p></li>
+<li><p>destination address</p></li>
+</ul>
+</li>
+<li><p>IPV6</p>
+<ul>
+<li><p>flow label</p></li>
+<li><p>next header</p></li>
+<li><p>source address</p></li>
+<li><p>destination address</p></li>
+</ul>
+</li>
+<li><p>UDP</p>
+<ul>
+<li><p>source port</p></li>
+<li><p>destination port</p></li>
+</ul>
+</li>
+<li><p>TCP</p>
+<ul>
+<li><p>source port</p></li>
+<li><p>destination port</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="classifier-match-engine">
+<h3><span class="section-number">41.9.3. </span>Classifier match engine</h3>
+<p>Classifier has an internal match engine which can be configured to
+operate in either exact or maskable mode.</p>
+<p>Mode is selected upon creation of the first unique flow rule as follows:</p>
+<ul class="simple">
+<li><p>maskable, if key size is up to 8 bytes.</p></li>
+<li><p>exact, otherwise, i.e for keys bigger than 8 bytes.</p></li>
+</ul>
+<p>Where the key size equals the number of bytes of all fields specified
+in the flow items.</p>
+<table class="docutils align-default" id="id8">
+<caption><span class="caption-number">Table 41.1 </span><span class="caption-text">Examples of key size calculation</span></caption>
+<colgroup>
+<col style="width: 70%" />
+<col style="width: 18%" />
+<col style="width: 12%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Flow pattern</p></th>
+<th class="head"><p>Key size in bytes</p></th>
+<th class="head"><p>Used engine</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>ETH (destination MAC) / VLAN (VID)</p></td>
+<td><p>6 + 2 = 8</p></td>
+<td><p>Maskable</p></td>
+</tr>
+<tr class="row-odd"><td><p>VLAN (VID) / IPV4 (source address)</p></td>
+<td><p>2 + 4 = 6</p></td>
+<td><p>Maskable</p></td>
+</tr>
+<tr class="row-even"><td><p>TCP (source port, destination port)</p></td>
+<td><p>2 + 2 = 4</p></td>
+<td><p>Maskable</p></td>
+</tr>
+<tr class="row-odd"><td><p>VLAN (priority) / IPV4 (source address)</p></td>
+<td><p>1 + 4 = 5</p></td>
+<td><p>Maskable</p></td>
+</tr>
+<tr class="row-even"><td><p>IPV4 (destination address) / UDP (source port, destination port)</p></td>
+<td><p>6 + 2 + 2 = 10</p></td>
+<td><p>Exact</p></td>
+</tr>
+<tr class="row-odd"><td><p>VLAN (VID) / IPV6 (flow label, destination address)</p></td>
+<td><p>2 + 3 + 16 = 21</p></td>
+<td><p>Exact</p></td>
+</tr>
+<tr class="row-even"><td><p>IPV4 (DSCP, source address, destination address)</p></td>
+<td><p>1 + 4 + 4 = 9</p></td>
+<td><p>Exact</p></td>
+</tr>
+<tr class="row-odd"><td><p>IPV6 (flow label, source address, destination address)</p></td>
+<td><p>3 + 16 + 16 = 35</p></td>
+<td><p>Exact</p></td>
+</tr>
+</tbody>
+</table>
+<p>From the user perspective maskable mode means that masks specified
+via flow rules are respected. In case of exact match mode, masks
+which do not provide exact matching (all bits masked) are ignored.</p>
+<p>If the flow matches more than one classifier rule the first
+(with the lowest index) matched takes precedence.</p>
+</section>
+<section id="flow-rules-usage-example">
+<h3><span class="section-number">41.9.4. </span>Flow rules usage example</h3>
+<p>Before proceeding run testpmd user application:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=eth_mvpp2,iface=eth0,iface=eth2 -c 3 -- -i --p 3 -a --disable-hw-vlan-strip</span>
+</pre></div>
+</div>
+<section id="example-1">
+<h4><span class="section-number">41.9.4.1. </span>Example #1</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern eth src is 10:11:12:13:14:15 / end actions drop / end</span>
+</pre></div>
+</div>
+<p>In this case key size is 6 bytes thus maskable type is selected. Testpmd
+will set mask to ff:ff:ff:ff:ff:ff i.e traffic explicitly matching
+above rule will be dropped.</p>
+</section>
+<section id="example-2">
+<h4><span class="section-number">41.9.4.2. </span>Example #2</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern ipv4 src spec 10.10.10.0 src mask 255.255.255.0 / tcp src spec 0x10 src mask 0x10 / end action drop / end</span>
+</pre></div>
+</div>
+<p>In this case key size is 8 bytes thus maskable type is selected.
+Flows which have IPv4 source addresses ranging from 10.10.10.0 to 10.10.10.255
+and tcp source port set to 16 will be dropped.</p>
+</section>
+<section id="example-3">
+<h4><span class="section-number">41.9.4.3. </span>Example #3</h4>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern vlan vid spec 0x10 vid mask 0x10 / ipv4 src spec 10.10.1.1 src mask 255.255.0.0 dst spec 11.11.11.1 dst mask 255.255.255.0 / end actions drop / end</span>
+</pre></div>
+</div>
+<p>In this case key size is 10 bytes thus exact type is selected.
+Even though each item has partial mask set, masks will be ignored.
+As a result only flows with VID set to 16 and IPv4 source and destination
+addresses set to 10.10.1.1 and 11.11.11.1 respectively will be dropped.</p>
+</section>
+</section>
+<section id="id3">
+<h3><span class="section-number">41.9.5. </span>Limitations</h3>
+<p>Following limitations need to be taken into account while creating flow rules:</p>
+<ul class="simple">
+<li><p>For IPv4 exact match type the key size must be up to 12 bytes.</p></li>
+<li><p>For IPv6 exact match type the key size must be up to 36 bytes.</p></li>
+<li><p>Following fields cannot be partially masked (all masks are treated as
+if they were exact):</p>
+<ul>
+<li><p>ETH: ethertype</p></li>
+<li><p>VLAN: PCP, VID</p></li>
+<li><p>IPv4: protocol</p></li>
+<li><p>IPv6: next header</p></li>
+<li><p>TCP/UDP: source port, destination port</p></li>
+</ul>
+</li>
+<li><p>Only one classifier table can be created thus all rules in the table
+have to match table format. Table format is set during creation of
+the first unique flow rule.</p></li>
+<li><p>Up to 5 fields can be specified per flow rule.</p></li>
+<li><p>Up to 20 flow rules can be added.</p></li>
+</ul>
+<p>For additional information about classifier please consult
+<code class="docutils literal notranslate"><span class="pre">doc/musdk_cls_user_guide.txt</span></code>.</p>
+</section>
+</section>
+<section id="traffic-metering-and-policing">
+<span id="mtrapi"></span><h2><span class="section-number">41.10. </span>Traffic metering and policing</h2>
+<p>MVPP2 PMD supports DPDK traffic metering and policing that allows the following:</p>
+<ol class="arabic simple">
+<li><p>Meter ingress traffic.</p></li>
+<li><p>Do policing.</p></li>
+<li><p>Gather statistics.</p></li>
+</ol>
+<p>For an additional description please refer to DPDK <a class="reference internal" href="../prog_guide/traffic_metering_and_policing.html"><span class="doc">Traffic Metering and Policing API</span></a>.</p>
+<p>The policer objects defined by this feature can work with the default policer defined via config file as described in <a class="reference internal" href="#extconf"><span class="std std-ref">QoS Support</span></a>.</p>
+<section id="id4">
+<h3><span class="section-number">41.10.1. </span>Limitations</h3>
+<p>The following capabilities are not supported:</p>
+<ul class="simple">
+<li><p>MTR object meter DSCP table update</p></li>
+<li><p>MTR object policer action update</p></li>
+<li><p>MTR object enabled statistics</p></li>
+</ul>
+</section>
+<section id="id5">
+<h3><span class="section-number">41.10.2. </span>Usage example</h3>
+<ol class="arabic">
+<li><p>Run testpmd user app:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=eth_mvpp2,iface=eth0,iface=eth2 -c 6 -- -i -p 3 -a --txd 1024 --rxd 1024</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create meter profile:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port meter profile 0 0 srtcm_rfc2697 2000 256 256</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create meter:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; create port meter 0 0 0 yes d d d 0 1 0</span>
+</pre></div>
+</div>
+</li>
+<li><p>Create flow rule witch meter attached:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; flow create 0 ingress pattern ipv4 src is 10.10.10.1 / end actions meter mtr_id 0 / end</span>
+</pre></div>
+</div>
+</li>
+</ol>
+<p>For a detailed usage description please refer to “Traffic Metering and Policing” section in DPDK <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html"><span class="doc">Testpmd Runtime Functions</span></a>.</p>
+</section>
+</section>
+<section id="traffic-management-api">
+<span id="tmapi"></span><h2><span class="section-number">41.11. </span>Traffic Management API</h2>
+<p>MVPP2 PMD supports generic DPDK Traffic Management API which allows to
+configure the following features:</p>
+<ol class="arabic simple">
+<li><p>Hierarchical scheduling</p></li>
+<li><p>Traffic shaping</p></li>
+<li><p>Congestion management</p></li>
+<li><p>Packet marking</p></li>
+</ol>
+<p>Internally TM is represented by a hierarchy (tree) of nodes.
+Node which has a parent is called a leaf whereas node without
+parent is called a non-leaf (root).
+MVPP2 PMD supports two level hierarchy where level 0 represents ports and level 1 represents tx queues of a given port.</p>
+<figure class="align-default">
+<img alt="../_images/mvpp2_tm.svg" src="../_images/mvpp2_tm.svg" /></figure>
+<p>Nodes hold following types of settings:</p>
+<ul class="simple">
+<li><p>for egress scheduler configuration: weight</p></li>
+<li><p>for egress rate limiter: private shaper</p></li>
+<li><p>bitmask indicating which statistics counters will be read</p></li>
+</ul>
+<p>Hierarchy is always constructed from the top, i.e first a root node is added
+then some number of leaf nodes. Number of leaf nodes cannot exceed number
+of configured tx queues.</p>
+<p>After hierarchy is complete it can be committed.</p>
+<p>For an additional description please refer to DPDK <a class="reference internal" href="../prog_guide/traffic_management.html"><span class="doc">Traffic Management API</span></a>.</p>
+<section id="id6">
+<h3><span class="section-number">41.11.1. </span>Limitations</h3>
+<p>The following capabilities are not supported:</p>
+<ul class="simple">
+<li><p>Traffic manager WRED profile and WRED context</p></li>
+<li><p>Traffic manager shared shaper update</p></li>
+<li><p>Traffic manager packet marking</p></li>
+<li><p>Maximum number of levels in hierarchy is 2</p></li>
+<li><p>Currently dynamic change of a hierarchy is not supported</p></li>
+</ul>
+</section>
+<section id="id7">
+<h3><span class="section-number">41.11.2. </span>Usage example</h3>
+<p>For a detailed usage description please refer to “Traffic Management” section in DPDK <a class="reference internal" href="../testpmd_app_ug/testpmd_funcs.html"><span class="doc">Testpmd Runtime Functions</span></a>.</p>
+<ol class="arabic">
+<li><p>Run testpmd as follows:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">./dpdk-testpmd --vdev=net_mrvl,iface=eth0,iface=eth2,cfg=./qos_config -c 7 -- \</span>
+<span class="go">-i -p 3 --disable-hw-vlan-strip --rxq 3 --txq 3 --txd 1024 --rxd 1024</span>
+</pre></div>
+</div>
+</li>
+<li><p>Stop all ports:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port stop all</span>
+</pre></div>
+</div>
+</li>
+<li><p>Add shaper profile:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm node shaper profile 0 0 900000 70000 0</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>0       - Id of a port.
+0       - Id of a new shaper profile.
+900000  - Shaper rate in bytes/s.
+70000   - Bucket size in bytes.
+0       - Packet length adjustment - ignored.
+</pre></div>
+</div>
+</li>
+<li><p>Add non-leaf node for port 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm nonleaf node 0 3 -1 0 0 0 0 0 1 3 0</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span> 0  - Id of a port
+ 3  - Id of a new node.
+-1  - Indicate that root does not have a parent.
+ 0  - Priority of the node.
+ 0  - Weight of the node.
+ 0  - Id of a level. Since this is a root 0 is passed.
+ 0  - Id of the shaper profile.
+ 0  - Number of SP priorities.
+ 3  - Enable statistics for both number of transmitted packets and bytes.
+ 0  - Number of shared shapers.
+</pre></div>
+</div>
+</li>
+<li><p>Add leaf node for tx queue 0:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm leaf node 0 0 3 0 30 1 -1 0 0 1 0</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span> 0  - Id of a port.
+ 0  - Id of a new node.
+ 3  - Id of the parent node.
+ 0  - Priority of a node.
+ 30 - WRR weight.
+ 1  - Id of a level. Since this is a leaf node 1 is passed.
+-1  - Id of a shaper. -1 indicates that shaper is not attached.
+ 0  - Congestion management is not supported.
+ 0  - Congestion management is not supported.
+ 1  - Enable statistics counter for number of transmitted packets.
+ 0  - Number of shared shapers.
+</pre></div>
+</div>
+</li>
+<li><p>Add leaf node for tx queue 1:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm leaf node 0 1 3 0 60 1 -1 0 0 1 0</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span> 0  - Id of a port.
+ 1  - Id of a new node.
+ 3  - Id of the parent node.
+ 0  - Priority of a node.
+ 60 - WRR weight.
+ 1  - Id of a level. Since this is a leaf node 1 is passed.
+-1  - Id of a shaper. -1 indicates that shaper is not attached.
+ 0  - Congestion management is not supported.
+ 0  - Congestion management is not supported.
+ 1  - Enable statistics counter for number of transmitted packets.
+ 0  - Number of shared shapers.
+</pre></div>
+</div>
+</li>
+<li><p>Add leaf node for tx queue 2:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; add port tm leaf node 0 2 3 0 99 1 -1 0 0 1 0</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span> 0  - Id of a port.
+ 2  - Id of a new node.
+ 3  - Id of the parent node.
+ 0  - Priority of a node.
+ 99 - WRR weight.
+ 1  - Id of a level. Since this is a leaf node 1 is passed.
+-1  - Id of a shaper. -1 indicates that shaper is not attached.
+ 0  - Congestion management is not supported.
+ 0  - Congestion management is not supported.
+ 1  - Enable statistics counter for number of transmitted packets.
+ 0  - Number of shared shapers.
+</pre></div>
+</div>
+</li>
+<li><p>Commit hierarchy:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port tm hierarchy commit 0 no</span>
+</pre></div>
+</div>
+<p>Parameters have following meaning:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>0  - Id of a port.
+no - Do not flush TM hierarchy if commit fails.
+</pre></div>
+</div>
+</li>
+<li><p>Start all ports</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; port start all</span>
+</pre></div>
+</div>
+</li>
+<li><p>Enable forwarding</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">testpmd&gt; start</span>
+</pre></div>
+</div>
+</li>
+</ol>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../linux_gsg/index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Network Interface Controller Drivers</a><ul>
+      <li>Previous: <a href="mvneta.html" title="previous chapter"><span class="section-number">40. </span>MVNETA Poll Mode Driver</a></li>
+      <li>Next: <a href="netvsc.html" title="next chapter"><span class="section-number">42. </span>Netvsc poll mode driver</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/nics/mvpp2.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

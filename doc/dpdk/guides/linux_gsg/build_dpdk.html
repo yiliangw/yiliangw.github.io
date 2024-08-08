@@ -1,0 +1,309 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+    <title>3. Compiling the DPDK Target from Source &#8212; Data Plane Development Kit 23.11.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/css/custom.css" />
+    <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="4. Cross compiling DPDK for aarch64 and aarch32" href="cross_build_dpdk_for_arm64.html" />
+    <link rel="prev" title="2. System Requirements" href="sys_reqs.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="compiling-the-dpdk-target-from-source">
+<span id="linux-gsg-compiling-dpdk"></span><h1><span class="section-number">3. </span>Compiling the DPDK Target from Source</h1>
+<section id="uncompress-dpdk-and-browse-sources">
+<h2><span class="section-number">3.1. </span>Uncompress DPDK and Browse Sources</h2>
+<p>First, uncompress the archive and move to the uncompressed DPDK source directory:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">tar xJf dpdk-&lt;version&gt;.tar.xz</span>
+<span class="go">cd dpdk-&lt;version&gt;</span>
+</pre></div>
+</div>
+<p>The DPDK is composed of several directories, including:</p>
+<ul class="simple">
+<li><p>doc: DPDK Documentation</p></li>
+<li><p>license: DPDK license information</p></li>
+<li><p>lib: Source code of DPDK libraries</p></li>
+<li><p>drivers: Source code of DPDK poll-mode drivers</p></li>
+<li><p>app: Source code of DPDK applications (automatic tests)</p></li>
+<li><p>examples: Source code of DPDK application examples</p></li>
+<li><p>config, buildtools: Framework-related scripts and configuration</p></li>
+<li><p>usertools: Utility scripts for end-users of DPDK applications</p></li>
+<li><p>devtools: Scripts for use by DPDK developers</p></li>
+<li><p>kernel: Kernel modules needed for some operating systems</p></li>
+</ul>
+</section>
+<section id="compiling-and-installing-dpdk-system-wide">
+<h2><span class="section-number">3.2. </span>Compiling and Installing DPDK System-wide</h2>
+<p>DPDK can be configured, built and installed on your system using the tools
+<code class="docutils literal notranslate"><span class="pre">meson</span></code> and <code class="docutils literal notranslate"><span class="pre">ninja</span></code>.</p>
+<section id="dpdk-configuration">
+<h3><span class="section-number">3.2.1. </span>DPDK Configuration</h3>
+<p>To configure a DPDK build use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">meson setup &lt;options&gt; build</span>
+</pre></div>
+</div>
+<p>where “build” is the desired output build directory, and “&lt;options&gt;” can be
+empty or one of a number of meson or DPDK-specific build options, described
+later in this section. The configuration process will finish with a summary
+of what DPDK libraries and drivers are to be built and installed, and for
+each item disabled, a reason why that is the case. This information can be
+used, for example, to identify any missing required packages for a driver.</p>
+<p>Once configured, to build and then install DPDK system-wide use:</p>
+<div class="highlight-console notranslate"><div class="highlight"><pre><span></span><span class="go">cd build</span>
+<span class="go">ninja</span>
+<span class="go">meson install</span>
+<span class="go">ldconfig</span>
+</pre></div>
+</div>
+<p>The last two commands above generally need to be run as root,
+with the <cite>meson install</cite> step copying the built objects to their final system-wide locations,
+and the last step causing the dynamic loader <cite>ld.so</cite> to update its cache to take account of the new objects.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On some linux distributions, such as Fedora or Redhat, paths in <cite>/usr/local</cite> are
+not in the default paths for the loader. Therefore, on these
+distributions, <cite>/usr/local/lib</cite> and <cite>/usr/local/lib64</cite> should be added
+to a file in <cite>/etc/ld.so.conf.d/</cite> before running <cite>ldconfig</cite>.</p>
+</div>
+</section>
+<section id="adjusting-build-options">
+<span id="id1"></span><h3><span class="section-number">3.2.2. </span>Adjusting Build Options</h3>
+<p>DPDK has a number of options that can be adjusted as part of the build configuration process.
+These options can be listed by running <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">configure</span></code> inside a configured build folder.
+Many of these options come from the “meson” tool itself and can be seen documented on the
+<a class="reference external" href="https://mesonbuild.com/Builtin-options.html">Meson Website</a>.</p>
+<p>For example, to change the build-type from the default, “debugoptimized”,
+to a regular “debug” build, you can either:</p>
+<ul class="simple">
+<li><p>pass <code class="docutils literal notranslate"><span class="pre">-Dbuildtype=debug</span></code> or <code class="docutils literal notranslate"><span class="pre">--buildtype=debug</span></code> to meson when configuring the build folder initially</p></li>
+<li><p>run <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">configure</span> <span class="pre">-Dbuildtype=debug</span></code> inside the build folder after the initial meson run.</p></li>
+</ul>
+<p>Other options are specific to the DPDK project but can be adjusted similarly.
+The “platform” option specifies a set a configuration parameters that will be used.
+The valid values are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-Dplatform=native</span></code> will tailor the configuration to the build machine.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-Dplatform=generic</span></code> will use configuration that works on all machines
+of the same architecture as the build machine.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-Dplatform=&lt;SoC&gt;</span></code> will use configuration optimized for a particular SoC.
+Consult the “socs” dictionary in <code class="docutils literal notranslate"><span class="pre">config/arm/meson.build</span></code> to see which
+SoCs are supported.</p></li>
+</ul>
+<p>The instruction set will be set automatically by default according to these rules:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">-Dplatform=native</span></code> sets <code class="docutils literal notranslate"><span class="pre">cpu_instruction_set</span></code> to <code class="docutils literal notranslate"><span class="pre">native</span></code>,
+which configures <code class="docutils literal notranslate"><span class="pre">-march</span></code> (x86_64), <code class="docutils literal notranslate"><span class="pre">-mcpu</span></code> (ppc), <code class="docutils literal notranslate"><span class="pre">-mtune</span></code> (ppc) to <code class="docutils literal notranslate"><span class="pre">native</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">-Dplatform=generic</span></code> sets <code class="docutils literal notranslate"><span class="pre">cpu_instruction_set</span></code> to <code class="docutils literal notranslate"><span class="pre">generic</span></code>,
+which configures <code class="docutils literal notranslate"><span class="pre">-march</span></code> (x86_64), <code class="docutils literal notranslate"><span class="pre">-mcpu</span></code> (ppc), <code class="docutils literal notranslate"><span class="pre">-mtune</span></code> (ppc) to
+a common minimal baseline needed for DPDK.</p></li>
+</ul>
+<p>To override what instruction set will be used, set the <code class="docutils literal notranslate"><span class="pre">cpu_instruction_set</span></code>
+parameter to the instruction set of your choice (such as <code class="docutils literal notranslate"><span class="pre">corei7</span></code>, <code class="docutils literal notranslate"><span class="pre">power8</span></code>, etc.).</p>
+<p><code class="docutils literal notranslate"><span class="pre">cpu_instruction_set</span></code> is not used in Arm builds, as setting the instruction set
+without other parameters leads to inferior builds. The way to tailor Arm builds
+is to build for a SoC using <code class="docutils literal notranslate"><span class="pre">-Dplatform=&lt;SoC&gt;</span></code> mentioned above.</p>
+<p>The values determined by the <code class="docutils literal notranslate"><span class="pre">platform</span></code> parameter may be overwritten.
+For example, to set the <code class="docutils literal notranslate"><span class="pre">max_lcores</span></code> value to 256, you can either:</p>
+<ul class="simple">
+<li><p>pass <code class="docutils literal notranslate"><span class="pre">-Dmax_lcores=256</span></code> to meson when configuring the build folder initially</p></li>
+<li><p>run <code class="docutils literal notranslate"><span class="pre">meson</span> <span class="pre">configure</span> <span class="pre">-Dmax_lcores=256</span></code> inside the build folder after the initial meson run.</p></li>
+</ul>
+<p>Some of the DPDK sample applications in the <cite>examples</cite> directory can be
+automatically built as part of a meson build too.
+To do so, pass a comma-separated list of the examples to build to the
+<cite>-Dexamples</cite> meson option as below:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>meson setup -Dexamples=l2fwd,l3fwd build
+</pre></div>
+</div>
+<p>As with other meson options, this can also be set post-initial-config using <cite>meson configure</cite> in the build directory.
+There is also a special value “all” to request that all example applications whose
+dependencies are met on the current system are built.
+When <cite>-Dexamples=all</cite> is set as a meson option, meson will check each example application to see if it can be built,
+and add all which can be built to the list of tasks in the ninja build configuration file.</p>
+</section>
+<section id="building-32-bit-dpdk-on-64-bit-systems">
+<h3><span class="section-number">3.2.3. </span>Building 32-bit DPDK on 64-bit Systems</h3>
+<p>To build a 32-bit copy of DPDK on a 64-bit OS,
+the <code class="docutils literal notranslate"><span class="pre">-m32</span></code> flag should be passed to the compiler and linker
+to force the generation of 32-bit objects and binaries.
+This can be done either by setting <code class="docutils literal notranslate"><span class="pre">CFLAGS</span></code> and <code class="docutils literal notranslate"><span class="pre">LDFLAGS</span></code> in the environment,
+or by passing the value to meson using <code class="docutils literal notranslate"><span class="pre">-Dc_args=-m32</span></code> and <code class="docutils literal notranslate"><span class="pre">-Dc_link_args=-m32</span></code>.
+For correctly identifying and using any dependency packages,
+the <code class="docutils literal notranslate"><span class="pre">pkg-config</span></code> tool must also be configured
+to look in the appropriate directory for .pc files for 32-bit libraries.
+This is done by setting <code class="docutils literal notranslate"><span class="pre">PKG_CONFIG_LIBDIR</span></code> to the appropriate path.</p>
+<p>The following meson command can be used on RHEL/Fedora systems to configure a 32-bit build,
+assuming the relevant 32-bit development packages, such as a 32-bit libc, are installed:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>PKG_CONFIG_LIBDIR=/usr/lib/pkgconfig \
+    meson setup -Dc_args=&#39;-m32&#39; -Dc_link_args=&#39;-m32&#39; build
+</pre></div>
+</div>
+<p>For Debian/Ubuntu systems, the equivalent command is:</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>PKG_CONFIG_LIBDIR=/usr/lib/i386-linux-gnu/pkgconfig \
+    meson setup -Dc_args=&#39;-m32&#39; -Dc_link_args=&#39;-m32&#39; build
+</pre></div>
+</div>
+<p>Once the build directory has been configured,
+DPDK can be compiled using <code class="docutils literal notranslate"><span class="pre">ninja</span></code> as described above.</p>
+</section>
+<section id="building-applications-using-installed-dpdk">
+<span id="building-app-using-installed-dpdk"></span><h3><span class="section-number">3.2.4. </span>Building Applications Using Installed DPDK</h3>
+<p>When installed system-wide, DPDK provides a pkg-config file <code class="docutils literal notranslate"><span class="pre">libdpdk.pc</span></code> for applications to query as part of their build.
+It’s recommended that the pkg-config file be used, rather than hard-coding the parameters (cflags/ldflags)
+for DPDK into the application build process.</p>
+<p>An example of how to query and use the pkg-config file can be found in the <code class="docutils literal notranslate"><span class="pre">Makefile</span></code> of each of the example applications included with DPDK.
+A simplified example snippet is shown below, where the target binary name has been stored in the variable <code class="docutils literal notranslate"><span class="pre">$(APP)</span></code>
+and the sources for that build are stored in <code class="docutils literal notranslate"><span class="pre">$(SRCS-y)</span></code>.</p>
+<div class="highlight-makefile notranslate"><div class="highlight"><pre><span></span><span class="nv">PKGCONF</span> <span class="o">=</span> pkg-config
+
+<span class="nv">CFLAGS</span> <span class="o">+=</span> -O3 <span class="k">$(</span>shell <span class="k">$(</span>PKGCONF<span class="k">)</span> --cflags libdpdk<span class="k">)</span>
+<span class="nv">LDFLAGS</span> <span class="o">+=</span> <span class="k">$(</span>shell <span class="k">$(</span>PKGCONF<span class="k">)</span> --libs libdpdk<span class="k">)</span>
+
+<span class="nf">$(APP)</span><span class="o">:</span> <span class="k">$(</span><span class="nv">SRCS-y</span><span class="k">)</span> <span class="n">Makefile</span>
+        <span class="k">$(</span>CC<span class="k">)</span> <span class="k">$(</span>CFLAGS<span class="k">)</span> <span class="k">$(</span>SRCS-y<span class="k">)</span> -o <span class="nv">$@</span> <span class="k">$(</span>LDFLAGS<span class="k">)</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Unlike with the make build system present in older DPDK releases,
+the meson system is not
+designed to be used directly from a build directory. Instead it is
+recommended that it be installed either system-wide or to a known
+location in the user’s home directory. The install location can be set
+using the <cite>–prefix</cite> meson option (default: <cite>/usr/local</cite>).</p>
+</div>
+<p>an equivalent build recipe for a simple DPDK application using meson as a
+build system is shown below:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">project</span><span class="p">(</span><span class="s1">&#39;dpdk-app&#39;</span><span class="p">,</span> <span class="s1">&#39;c&#39;</span><span class="p">)</span>
+
+<span class="n">dpdk</span> <span class="o">=</span> <span class="n">dependency</span><span class="p">(</span><span class="s1">&#39;libdpdk&#39;</span><span class="p">)</span>
+<span class="n">sources</span> <span class="o">=</span> <span class="n">files</span><span class="p">(</span><span class="s1">&#39;main.c&#39;</span><span class="p">)</span>
+<span class="n">executable</span><span class="p">(</span><span class="s1">&#39;dpdk-app&#39;</span><span class="p">,</span> <span class="n">sources</span><span class="p">,</span> <span class="n">dependencies</span><span class="p">:</span> <span class="n">dpdk</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+            <p class="logo"><a href="../index.html">
+              <img class="logo" src="../_static/DPDK_logo_vertical_rev_small.png" alt="Logo"/>
+            </a></p>
+<h1 class="logo"><a href="../index.html">Data Plane Development Kit</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting Started Guide for Linux</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../freebsd_gsg/index.html">Getting Started Guide for FreeBSD</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../windows_gsg/index.html">Getting Started Guide for Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../sample_app_ug/index.html">Sample Applications User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../prog_guide/index.html">Programmer’s Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../howto/index.html">HowTo Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../tools/index.html">DPDK Tools User Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../testpmd_app_ug/index.html">Testpmd Application User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../nics/index.html">Network Interface Controller Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../bbdevs/index.html">Baseband Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cryptodevs/index.html">Crypto Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../compressdevs/index.html">Compression Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../vdpadevs/index.html">vDPA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../regexdevs/index.html">REGEX Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mldevs/index.html">Machine Learning Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../dmadevs/index.html">DMA Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../gpus/index.html">General-Purpose Graphics Processing Unit Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../eventdevs/index.html">Event Device Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rawdevs/index.html">Rawdev Drivers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../mempool/index.html">Mempool Device Driver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../platform/index.html">Platform Specific Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../contributing/index.html">Contributor’s Guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../rel_notes/index.html">Release Notes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Getting Started Guide for Linux</a><ul>
+      <li>Previous: <a href="sys_reqs.html" title="previous chapter"><span class="section-number">2. </span>System Requirements</a></li>
+      <li>Next: <a href="cross_build_dpdk_for_arm64.html" title="next chapter"><span class="section-number">4. </span>Cross compiling DPDK for aarch64 and aarch32</a></li>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      
+      
+      
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 4.3.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/linux_gsg/build_dpdk.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
