@@ -1,22 +1,44 @@
 main:
 
-  - title: Continual Learning for Abdominal Multi-Organ and Tumor Segmentation
-    authors: Yixiao Zhang, Xinyi Li, Huimiao Chen, Alan Yuille, <strong>Yaoyao Liu*</strong>, Zongwei Zhou* (*Corresponding authors)
-    conference_short: MICCAI
-    conference: International Conference on Medical Image Computing and Computer-Assisted Intervention <strong>(MICCAI)</strong>, 2023.
-    pdf: https://arxiv.org/pdf/2306.00988.pdf
-    code: https://github.com/MrGiovanni/ContinualLearning
-    bibtex: https://bib.yliu.me/MICCAI23.txt
-    image: ./assets/img/teaser_example_2.png
-    notes: Early Accept
+  - title: "LiveStack: OS Support for Cluster-Scale Full-Stack Live Simulation"
+    authors: Yiliang Wan, Haifeng Sun, Yihan Yang, Jonas Kaufmann, Antoine Kaufmann, Jialin Li
+    conference_short: arXiv'26
+    conference: arXiv preprint arXiv:2606.18958, 2026.
+    pdf: https://arxiv.org/pdf/2606.18958
+    # code: https://github.com/MrGiovanni/ContinualLearning
+    # bibtex: https://bib.yliu.me/MICCAI23.txt
+    # image: ./assets/img/teaser_example_2.png
+    # notes: Early Accept
 
-  - title: "Mnemonics Training: Multi-Class Incremental Learning without Forgetting"
-    authors: <strong>Yaoyao Liu</strong>, Yuting Su, An-An Liu, Bernt Schiele, Qianru Sun
-    conference_short: CVPR
-    conference: IEEE/CVF Conference on Computer Vision and Pattern Recognition <strong>(CVPR)</strong>, 2020.
-    pdf: https://arxiv.org/pdf/2002.10211.pdf
-    code: https://github.com/yaoyao-liu/class-incremental-learning/tree/main/mnemonics-training
-    page: https://class-il.mpi-inf.mpg.de/mnemonics/
-    bibtex: https://class-il.mpi-inf.mpg.de/mnemonics/
-    notes: Oral Presentation
-    image: ./assets/img/teaser_example.png
+  - title: Reaching Agreement Among Reasoning LLM Agents
+    authors: Chaoyi Ruan, Yiliang Wan, Ziji Shi, Jialin Li
+    conference_short: arXiv'25
+    conference: arXiv preprint arXiv:2512.20184, 2025.
+    pdf: https://arxiv.org/pdf/2512.20184
+    # code: https://github.com/MrGiovanni/ContinualLearning
+    # bibtex: https://bib.yliu.me/MICCAI23.txt
+    # image: ./assets/img/teaser_example_2.png
+    # notes: Early Accept
+
+  - title: Building State Machine Replication Using Practical Network Synchrony
+    authors: Yiliang Wan, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Jialin Li
+    # authors: <strong>Yiliang Wan</strong>, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Jialin Li
+    conference_short: arXiv'25
+    conference: arXiv preprint arXiv:2507.12792, 2025.
+    pdf: https://arxiv.org/pdf/2507.12792
+    poster: ./assets/files/syntony_poster.pdf
+    # code: https://github.com/yiliangw/syntony/
+    # page: https://class-il.mpi-inf.mpg.de/mnemonics/
+    # bibtex: https://class-il.mpi-inf.mpg.de/mnemonics/
+    # notes: Oral Presentation
+    # image: ./assets/img/teaser_example.png
+
+  # - title: Continual Learning for Abdominal Multi-Organ and Tumor Segmentation
+  #   authors: Yixiao Zhang, Xinyi Li, Huimiao Chen, Alan Yuille, <strong>Yaoyao Liu*</strong>, Zongwei Zhou* (*Corresponding authors)
+  #   conference_short: MICCAI
+  #   conference: International Conference on Medical Image Computing and Computer-Assisted Intervention <strong>(MICCAI)</strong>, 2023.
+  #   pdf: https://arxiv.org/pdf/2306.00988.pdf
+  #   code: https://github.com/MrGiovanni/ContinualLearning
+  #   bibtex: https://bib.yliu.me/MICCAI23.txt
+  #   image: ./assets/img/teaser_example_2.png
+  #   notes: Early Accept
