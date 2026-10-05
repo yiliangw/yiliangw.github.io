@@ -3,12 +3,14 @@ main:
   - title: "Ossim: OS-Driven Live Simulation for Cluster-Scale Full-Stack Evaluation"
     authors: Yiliang Wan, Haifeng Sun, Yihan Yang, Jonas Kaufmann, Antoine Kaufmann, Jialin Li
     conference_short: APSys'26
-    conference: The 17th ACM SIGOPS Asia-Pacific Workshop on Systems.
+    # conference: APSys'26
+    conference: The 17th ACM SIGOPS Asia-Pacific Workshop on Systems (APSys'26).
     pdf: https://arxiv.org/pdf/2606.18958
+    full_paper: ./assets/files/ossim.pdf
+    
     # code: https://github.com/MrGiovanni/ContinualLearning
     # bibtex: https://bib.yliu.me/MICCAI23.txt
     # image: ./assets/img/teaser_example_2.png
-    notes: Full Paper under Submission
 
   - title: Reaching Agreement Among Reasoning LLM Agents
     authors: Chaoyi Ruan, Yiliang Wan, Ziji Shi, Jialin Li
@@ -24,7 +26,7 @@ main:
     authors: Yiliang Wan, Inho Choid, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Haifeng Sun, Chaoyi Ruan, Jialin Li
     conference_short: arXiv'25
     conference: arXiv preprint arXiv:2507.12792, 2025.
-    pdf: https://arxiv.org/pdf/2507.12792
+    pdf: ./assets/files/chora.pdf
     poster: ./assets/files/syntony_poster.pdf
     # code: https://github.com/yiliangw/syntony/
     # page: https://class-il.mpi-inf.mpg.de/mnemonics/
