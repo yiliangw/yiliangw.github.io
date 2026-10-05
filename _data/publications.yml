@@ -23,7 +23,7 @@ main:
     # notes: Early Accept
 
   - title: Reducing Pipeline Bubbles in Message-Efficient State Machine Replication
-    authors: Yiliang Wan, Inho Choid, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Haifeng Sun, Chaoyi Ruan, Jialin Li
+    authors: Yiliang Wan, Inho Choi, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Haifeng Sun, Chaoyi Ruan, Jialin Li
     conference_short: arXiv'25
     conference: arXiv preprint arXiv:2507.12792, 2025.
     pdf: ./assets/files/chora.pdf
