@@ -1,14 +1,14 @@
 main:
 
-  - title: "LiveStack: OS Support for Cluster-Scale Full-Stack Live Simulation"
+  - title: "Ossim: OS-Driven Live Simulation for Cluster-Scale Full-Stack Evaluation"
     authors: Yiliang Wan, Haifeng Sun, Yihan Yang, Jonas Kaufmann, Antoine Kaufmann, Jialin Li
-    conference_short: arXiv'26
-    conference: arXiv preprint arXiv:2606.18958, 2026.
+    conference_short: APSys'26
+    conference: The 17th ACM SIGOPS Asia-Pacific Workshop on Systems.
     pdf: https://arxiv.org/pdf/2606.18958
     # code: https://github.com/MrGiovanni/ContinualLearning
     # bibtex: https://bib.yliu.me/MICCAI23.txt
     # image: ./assets/img/teaser_example_2.png
-    # notes: Early Accept
+    notes: Full Paper under Submission
 
   - title: Reaching Agreement Among Reasoning LLM Agents
     authors: Chaoyi Ruan, Yiliang Wan, Ziji Shi, Jialin Li
@@ -20,9 +20,8 @@ main:
     # image: ./assets/img/teaser_example_2.png
     # notes: Early Accept
 
-  - title: Building State Machine Replication Using Practical Network Synchrony
-    authors: Yiliang Wan, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Jialin Li
-    # authors: <strong>Yiliang Wan</strong>, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Jialin Li
+  - title: Reducing Pipeline Bubbles in Message-Efficient State Machine Replication
+    authors: Yiliang Wan, Inho Choid, Nitin Shivaraman, Akshaye Shenoi, Xiang Liu, Tao Luo, Haifeng Sun, Chaoyi Ruan, Jialin Li
     conference_short: arXiv'25
     conference: arXiv preprint arXiv:2507.12792, 2025.
     pdf: https://arxiv.org/pdf/2507.12792
