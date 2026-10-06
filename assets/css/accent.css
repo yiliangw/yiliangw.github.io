@@ -1,0 +1,86 @@
+/* Shared text colors and accents for the homepage. */
+:root {
+  --global-text-color: #000000;
+  --global-text-color-light: #666666;
+  --accent-color: #003D7C; /* NUS Blue */
+  --accent-hover-color: #005BAC; /* Beihang Blue */
+  /* --accent-hover-color: gray; */
+  --accent-contrast-color: #ffffff;
+  --global-theme-color: var(--accent-color);
+  --global-hover-color: var(--accent-hover-color);
+}
+
+/* Keep the blue accent legible against the existing dark background. */
+@media (prefers-color-scheme: dark) {
+  body.auto-dark-mode {
+    --global-text-color: #dadbdf;
+    --global-text-color-light: #aaaaaa;
+    --accent-color: #8FC8FF;
+    --accent-hover-color: #A6D4FF;
+    --accent-contrast-color: #20212b;
+    --global-theme-color: var(--accent-color);
+    --global-hover-color: var(--accent-hover-color);
+  }
+
+  body.auto-dark-mode th,
+  body.auto-dark-mode dt {
+    color: var(--accent-color);
+  }
+}
+
+body,
+autocolor {
+  color: var(--global-text-color);
+}
+
+strong {
+  color: inherit;
+}
+
+.page-footnote {
+  color: var(--global-text-color-light);
+}
+
+.page-footnote small {
+  font-size: 12px;
+}
+
+h1, h2, h3, h4, h5, h6,
+a {
+  color: var(--accent-color);
+}
+
+a:hover,
+a:focus-visible,
+a:active {
+  color: var(--accent-hover-color);
+}
+
+section a[href]:not(.btn):is(:hover, :focus-visible, :active) {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+}
+
+.social-icons a {
+  color: var(--accent-color) !important;
+}
+
+.social-icons a:hover,
+.social-icons a:focus-visible,
+.social-icons a:active {
+  color: var(--accent-hover-color) !important;
+}
+
+.publications ol.bibliography li .links a.btn {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.publications ol.bibliography li .links a.btn:hover,
+.publications ol.bibliography li .links a.btn:focus-visible,
+.publications ol.bibliography li .links a.btn:active {
+  color: var(--accent-contrast-color);
+  background-color: var(--accent-hover-color);
+  border-color: var(--accent-hover-color);
+}

@@ -34,9 +34,10 @@
     <link rel="stylesheet" href="./assets/css/style-no-dark-mode.css">
     <link rel="stylesheet" href="./assets/css/publications-no-dark-mode.css">
     {% endif %}
+    <link rel="stylesheet" href="./assets/css/accent.css">
 
   </head>
-  <body>
+  <body{% if site.auto_dark_mode %} class="auto-dark-mode"{% endif %}>
     <div class="wrapper">
       <header>
         
@@ -101,7 +102,12 @@
       <br>
 
       {% if site.enable_footnote %}
-      <p><small>Powered by Jekyll and <a href="https://github.com/yaoyao-liu/minimal-light" target="_blank" rel="noopener">Minimal Light</a> theme.</small></p>
+      <p class="page-footnote"><small>
+        {% if page.last_updated %}
+        Last updated: <time datetime="{{ page.last_updated }}">{{ page.last_updated | date: "%B %Y" }}</time> &middot;
+        {% endif %}
+        Powered by Jekyll and <a href="https://github.com/yaoyao-liu/minimal-light" target="_blank" rel="noopener">Minimal Light</a> theme.
+      </small></p>
       {% endif %}
 
       </section>

@@ -2,13 +2,14 @@
 title: Yiliang Wan
 position: PhD Candidate
 affiliation: National University of Singapore
-email: yiliangw (at) comp.nus.edu.sg
+email: yiliangw (at) u.nus.edu
 
 # Search Engine Optimization (SEO)
 # The following information is used to improve the website traffic from search engines, e.g., Google.
 # keywords: minimal 
-# description: The Minimal Light is a simple and elegant jekyll theme for academic personal homepage.
-# canonical: https://minimal-light-theme.yliu.me/
+description: "Yiliang Wan is a PhD Candidate at the National University of Singapore."
+url: "https://yiliangw.github.io"
+canonical: https://yiliangw.github.io/
 
 # Links 
 # If you don't need one of them, you may delete the corresponding line.
@@ -25,7 +26,7 @@ avatar: ./assets/img/avatar.png
 # favicon_dark: ./assets/img/favicon-dark.png
 
 # Footnote
-# You may use the option to disable the footnote, "Powered by Jekyll and Minimal Light theme."
+# Show the footer with the last-updated date and theme attribution.
 enable_footnote: true
 
 # Auto Dark Mode
@@ -46,6 +47,7 @@ font: "Serif" # "Serif" or "Sans Serif"
 
 # The following files will be removed from the generated website.
 exclude:
+  - Makefile
   - Gemfile
   - Gemfile.lock
   - README.md

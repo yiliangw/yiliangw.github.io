@@ -98,6 +98,16 @@ bundle exec jekyll server
 View the live page using `localhost`:
 <http://localhost:4000>. You can get the HTML files in `_site` folder.
 
+### Previewing in code-server
+
+Run `make preview` from the repository directory. Jekyll runs in the foreground
+and rebuilds the site when source files change. Open your code-server address
+with `/absproxy/4000/` appended, then refresh the browser after edits.
+Press **Ctrl+C** in the terminal to stop the preview.
+
+Use `make preview PREVIEW_PORT=4001` to choose another port, or
+`make preview PREVIEW_BASEURL=` to preview directly at `http://127.0.0.1:4000/`.
+
 ### Using the HTML version
 
 The compiled HTML files are available in the `html_source_file` folder. If you don't like Jekyll, you may directly edit and use the HTML version.
@@ -136,7 +146,7 @@ favicon: ./assets/img/favicon.png
 favicon_dark: ./assets/img/favicon-dark.png
 
 # Footnote
-# You may use the option to disable the footnote, "Powered by Jekyll and Minimal Light theme."
+# Show the footer with the last-updated date and theme attribution.
 enable_footnote: true
 
 # Auto Dark Mode
