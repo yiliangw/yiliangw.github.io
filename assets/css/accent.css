@@ -56,7 +56,7 @@ a:active {
   color: var(--accent-hover-color);
 }
 
-section a[href]:not(.btn):is(:hover, :focus-visible, :active) {
+section a[href]:not(.btn) {
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.15em;
