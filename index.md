@@ -1,6 +1,6 @@
 ---
 layout: homepage
-last_updated: "2026-10-30"
+last_updated: "2026-11-25"
 ---
 
 ## About
